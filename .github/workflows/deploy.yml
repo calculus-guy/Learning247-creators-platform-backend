@@ -20,17 +20,12 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          # Copy files to server
-          rsync -avz --delete \
-            --exclude 'node_modules' \
-            --exclude '.git' \
-            --exclude '.env' \
-            ./ ubuntu@34.251.237.6:/home/ubuntu/Learning247-creators-platform-backend/
-
           ssh -o StrictHostKeyChecking=no ubuntu@34.251.237.6 << 'EOF'
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           cd /home/ubuntu/Learning247-creators-platform-backend
+          git fetch origin master
+          git reset --hard origin/master
           npm install --omit=dev
           pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
           EOF
