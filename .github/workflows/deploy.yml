@@ -21,6 +21,8 @@ jobs:
       - name: Deploy to EC2
         run: |
           ssh -o StrictHostKeyChecking=no ubuntu@34.251.237.6 << 'EOF'
+          export NVM_DIR="$HOME/.nvm"
+          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           cd /home/ubuntu/Learning247-creators-platform-backend
           git fetch origin master
           git reset --hard origin/master
