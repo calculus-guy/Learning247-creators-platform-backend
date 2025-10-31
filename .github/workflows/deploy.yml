@@ -24,8 +24,9 @@ jobs:
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           cd /home/ubuntu/Learning247-creators-platform-backend
+          git config --global credential.helper store
           git fetch origin master
           git reset --hard origin/master
-          npm install --production
-          pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+          npm install --omit=dev
+          pm2 restart backend || pm2 start server.js --name backend
           EOF
