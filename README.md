@@ -1,15 +1,1 @@
 Creators Platform for Learning 247 Backend
-
-PORT=8080
-JWT_SECRET_KEY=bgiusb325hjbgk4298jhdbgshwe8u23ehjrbgwu28tufhre8whv&Gdasf98uv
-SESSION_SECRET=eongfoewhbfge078e6b78edbtv8edtbvesb89edtbvy9gvw87vgr8svrb
-
-DB_NAME=creatorsLearning247
-DB_USER=postgres
-DB_PASS=admin
-DB_HOST=localhost
-DB_PORT=5434
-
-GOOGLE_CLIENT_ID=541995291929-qq5ov5nu6bljkhk3actl8clkug0v1enl.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=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
-GOOGLE_CALLBACK_URL=http://localhost:8080/auth/google/callback
