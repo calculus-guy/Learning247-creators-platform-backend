@@ -3,7 +3,7 @@ name: Deploy Backend to EC2
 on:
   push:
     branches:
-      - master   # change to 'master' if your default branch is master
+      - staging   # change to 'staging' if your default branch is staging
 
 jobs:
   deploy:
@@ -20,12 +20,12 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no ubuntu@34.251.237.6 << 'EOF'
+          ssh -o StrictHostKeyChecking=no ubuntu@54.74.21.95 << 'EOF'
           export NVM_DIR="$HOME/.nvm"
           [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
           cd /home/ubuntu/Learning247-creators-platform-backend
-          git fetch origin master
-          git reset --hard origin/master
+          git fetch origin staging
+          git reset --hard origin/staging
           npm install --omit=dev
-          pm2 reload ecosystem.config.js --env production || pm2 start ecosystem.config.js --env production
+          pm2 reload ecosystem.config.js --env development || pm2 start ecosystem.config.js --env development
           EOF
