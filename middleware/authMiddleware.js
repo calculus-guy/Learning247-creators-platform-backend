@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const SECRET_KEY = process.env.JWT_SECRET_KEY || 'bgiusb325hjbgk4298jhdbgshwe8u23ehjrbgwu28tufhre8whv^&Gdasf98uv';
+const SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 module.exports = (req, res, next) => {
   const token = req.header('Authorization')?.replace('Bearer ', '');

@@ -2,7 +2,7 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "Backend for Learning247 creators platform",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js"
@@ -10,6 +10,7 @@
   "author": "Abdul-Lateef",
   "license": "ISC",
   "dependencies": {
+    "@mux/mux-node": "^12.8.0",
     "aws-sdk": "^2.1692.0",
     "axios": "^1.12.2",
     "bcrypt": "^6.0.0",
