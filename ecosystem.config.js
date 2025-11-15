@@ -6,10 +6,20 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: 8080,
+        DB_NAME: "creatorsLearning247",
+        DB_USER: "postgres",
+        DB_PASS: "admin",
+        DB_HOST: "localhost",
+        DB_PORT: 5434
       },
       env_production: {
         NODE_ENV: 'production',
         PORT: 8080,
+        DB_NAME: "creatorsLearning247",
+        DB_USER: "postgres",
+        DB_PASS: "admin",
+        DB_HOST: "localhost",
+        DB_PORT: 5434
       },
       watch: false,
     },

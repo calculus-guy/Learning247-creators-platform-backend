@@ -1,14 +1,25 @@
-// This controller is for the enugu summit sha
-
 const { validationResult } = require('express-validator');
 const Registration = require('../models/registrationModel');
+const { 
+  sendEventRegistrationEmail, 
+  sendAahbibiWelcomeEmail 
+} = require('../utils/email');
 
 exports.register = async (req, res) => {
-  const { role, firstname, lastname, email, location } = req.body;
+  console.log('Received registration request:', req.body);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ errors: errors.array() });
+  const { role, firstname, lastname, email, location, phone } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required.' });
+  }
+
+  if (!firstname) {
+    return res.status(400).json({ message: 'Firstname is required.' });
+  }
+
+  if (!phone) {
+    return res.status(400).json({ message: 'Phone number is required.' });
   }
 
   try {
@@ -18,16 +29,23 @@ exports.register = async (req, res) => {
     }
 
     const newRegistration = await Registration.create({
-      role: role || 'Guest',  // Default to 'Guest' if no role provided
+      role: role || 'Guest',
       firstname,
       lastname,
       email,
       location,
+      phone,
     });
 
-    res.status(201).json({ message: 'Registration successful', registration: newRegistration });
+    await sendEventRegistrationEmail(email, firstname);
+    await sendAahbibiWelcomeEmail(email, firstname);
+
+    res.status(201).json({
+      message: 'Registration successful. Emails sent.',
+      registration: newRegistration,
+    });
   } catch (error) {
-    console.error(error);
+    console.error('Registration or Email Error:', error);
     res.status(500).json({ message: 'Server error. Please try again later.' });
   }
 };
