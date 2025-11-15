@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'backend',
       script: 'server.js',
-      env: {
+      env_development: {
         NODE_ENV: 'development',
         PORT: 8080,
         DB_NAME: "creatorsLearning247",
