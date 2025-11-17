@@ -1,5 +1,7 @@
-const express = require('express');
 const dotenv = require("dotenv");
+dotenv.config();
+
+const express = require('express');
 const passport = require('passport');
 const session = require('express-session');
 const authRoutes = require('./routes/authRoutes');
@@ -13,8 +15,6 @@ const videoRoutes = require('./routes/videoRoutes')
 
 const app = express();
 app.use(express.json());
-
-dotenv.config();
 
 app.use(cors());
 
@@ -43,7 +43,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/videos', videoRoutes)
 
 const PORT = process.env.PORT || 8080;
-sequelize.sync({ alter: false })
+sequelize.sync({ force: false })
   .then(() => {
     app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
   })
