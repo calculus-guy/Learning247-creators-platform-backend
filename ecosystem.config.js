@@ -32,7 +32,7 @@ deploy: {
       host: '34.251.237.6',
       ref: 'origin/master',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
-      path: '/home/ubuntu/backend',
+      path: '/home/ubuntu/Learning247-creators-platform-backend',
       'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
       env: {
         NODE_ENV: 'production',
