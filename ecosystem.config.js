@@ -5,11 +5,11 @@ module.exports = {
       script: 'server.js',
       env_development: {
         NODE_ENV: 'development',
-        PORT: 8080,
+        PORT: 8080
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 8080,
+        PORT: 8080
       },
       watch: false,
     },
@@ -32,7 +32,7 @@ deploy: {
       host: '34.251.237.6',
       ref: 'origin/master',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
-      path: '/home/ubuntu/Learning247-creators-platform-backend',
+      path: '/home/ubuntu/backend',
       'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
       env: {
         NODE_ENV: 'production',
