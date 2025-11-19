@@ -17,17 +17,40 @@ const liveRoutes = require('./routes/liveRoutes');
 const app = express();
 app.use(express.json());
 
-app.use(cors());
+const allowedOrigins = [
+  'https://www.aahbibi.com', 
+  'https://aahbibi.com',
+  'http://localhost:3000' 
+];
 
-// Webhook route must come before JSON middleware
+const corsOptions = {
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+  credentials: true, 
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions)); 
+
+
 app.use('/api/webhooks', webhookRoutes);
 
-app.use(bodyParser.json());
+// NOTE: bodyParser.json() is redundant if you already use app.use(express.json())
+// I'll keep it commented out for security/clarity.
+// app.use(bodyParser.json()); 
+
 
 app.use(session({
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: true
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: true
 }));
 
 app.use(passport.initialize());
@@ -47,7 +70,7 @@ app.use('/videos', videoRoutes)
 
 const PORT = process.env.PORT || 8080;
 sequelize.sync({ force: false })
-  .then(() => {
-    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
-  })
-  .catch(err => console.error(' DB Connection Failed:', err));
+  .then(() => {
+    app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+  })
+  .catch(err => console.error(' DB Connection Failed:', err));
