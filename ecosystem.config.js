@@ -5,21 +5,11 @@ module.exports = {
       script: 'server.js',
       env_development: {
         NODE_ENV: 'development',
-        PORT: 8080,
-        DB_NAME: "creatorsLearning247",
-        DB_USER: "postgres",
-        DB_PASS: "admin",
-        DB_HOST: "localhost",
-        DB_PORT: 5434
+        PORT: 8080
       },
       env_production: {
         NODE_ENV: 'production',
-        PORT: 8080,
-        DB_NAME: "creatorsLearning247",
-        DB_USER: "postgres",
-        DB_PASS: "admin",
-        DB_HOST: "localhost",
-        DB_PORT: 5434
+        PORT: 8080
       },
       watch: false,
     },
@@ -32,7 +22,7 @@ deploy: {
       ref: 'origin/staging',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
       path: '/home/ubuntu/backend',
-      'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env development',
+      'post-deploy': 'npm install && npx sequelize db:migrate && pm2 reload ecosystem.config.js --env development',
       env: {
         NODE_ENV: 'development',
       },
@@ -43,7 +33,7 @@ deploy: {
       ref: 'origin/master',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
       path: '/home/ubuntu/backend',
-      'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'npm install && npx sequelize db:migrate && pm2 reload ecosystem.config.js --env production',
       env: {
         NODE_ENV: 'production',
       },
