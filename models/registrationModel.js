@@ -28,7 +28,7 @@ const Registration = sequelize.define('Registration', {
   },
   phone: {
     type: DataTypes.STRING,
-    allowNull: false, // Assuming phone number is required
+    allowNull: true,
   },
   location: {
     type: DataTypes.STRING,

@@ -10,6 +10,7 @@ const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const webhookRoutes = require('./routes/webhookRoutes');
 const videoRoutes = require('./routes/videoRoutes')
+const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
 app.use(express.json());
@@ -37,6 +38,8 @@ app.use('/auth', authRoutes);
 app.use('/register', rateLimiter);
 
 app.use('/event', registrationRoutes);
+
+app.use('/live', liveRoutes);
 
 app.use('/uploads', express.static('uploads'));
 

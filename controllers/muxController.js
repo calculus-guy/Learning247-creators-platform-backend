@@ -1,5 +1,6 @@
 const Mux = require('@mux/mux-node');
 const Video = require('../models/Video');
+const LiveClass = require('../models/liveClass');
 
 const endpointSecret = process.env.MUX_WEBHOOK_SECRET;
 
@@ -27,45 +28,41 @@ exports.handleMuxWebhook = async (req, res) => {
 
     console.log(`[Webhook] Event Received and Verified: ${type}`);
 
-    if (type === 'video.asset.ready') {
-      const uploadId = data.upload_id; // Mux uses snake_case
-      const playbackId = data.playback_ids?.[0]?.id || null;
-
-      if (!uploadId) {
-        console.error('[Webhook] Error: "upload_id" is missing from the "video.asset.ready" event payload.');
-        return res.status(400).send('Missing upload_id in payload');
-      }
-
-      const [updatedCount] = await Video.update(
-        {
-          status: 'ready',
-          muxAssetId: data.id,
-          muxPlaybackId: playbackId,
-          durationSeconds: Math.floor(data.duration || 0)
-        },
-        { where: { muxUploadId: uploadId } }
-      );
-
-      if (updatedCount === 0) {
-        console.warn(`[Webhook] No video row found to update for muxUploadId: ${uploadId}`);
-      } else {
-        console.log(`[Webhook] Success: Video marked as ready for muxUploadId: ${uploadId}`);
-      }
-    }
-
-    if (type === 'video.asset.errored') {
+    // Video Upload Asset Events (legacy, keep unchanged)
+    if (type === 'video.asset.ready' && data.upload_id && !data.live_stream_id) {
       const uploadId = data.upload_id;
-       if (!uploadId) {
-        console.error('[Webhook] Error: "upload_id" is missing from the "video.asset.errored" event payload.');
-        return res.status(400).send('Missing upload_id in payload');
-      }
+      const playbackId = data.playback_ids?.[0]?.id || null;
+      if (!uploadId) return res.status(400).send('Missing upload_id in payload');
       await Video.update(
-        { status: 'failed' },
+        { status: 'ready', muxAssetId: data.id, muxPlaybackId: playbackId, durationSeconds: Math.floor(data.duration || 0) },
         { where: { muxUploadId: uploadId } }
       );
-      console.log(`[Webhook] Video processing failed for muxUploadId: ${uploadId}`);
     }
-
+    if (type === 'video.asset.errored' && data.upload_id && !data.live_stream_id) {
+      const uploadId = data.upload_id;
+      if (!uploadId) return res.status(400).send('Missing upload_id in payload');
+      await Video.update({ status: 'failed' }, { where: { muxUploadId: uploadId } });
+    }
+    // LIVE STREAM EVENTS
+    if (data.live_stream_id) {
+      // 1. Live Stream Started
+      if (type === 'video.live_stream.active') {
+        await LiveClass.update({ status: 'live' }, { where: { mux_stream_id: data.live_stream_id } });
+      } else if (type === 'video.live_stream.idle') {
+        await LiveClass.update({ status: 'ended' }, { where: { mux_stream_id: data.live_stream_id } });
+      } else if (type === 'video.live_stream.completed') {
+        await LiveClass.update({ status: 'recorded' }, { where: { mux_stream_id: data.live_stream_id } });
+      } else if (type === 'video.asset.ready' && data.live_stream_id) {
+        // Recording for live completed
+        await LiveClass.update(
+          {
+            recording_asset_id: data.id,
+            mux_playback_id: data.playback_ids?.[0]?.id || null
+          },
+          { where: { mux_stream_id: data.live_stream_id } }
+        );
+      }
+    }
     return res.status(200).send('Webhook processed successfully.');
   } catch (err) {
     console.error('[Webhook] Error processing event:', err);
