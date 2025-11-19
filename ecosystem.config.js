@@ -22,7 +22,7 @@ deploy: {
       ref: 'origin/staging',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
       path: '/home/ubuntu/backend',
-      'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env development',
+      'post-deploy': 'npm install && npx sequelize db:migrate && pm2 reload ecosystem.config.js --env development',
       env: {
         NODE_ENV: 'development',
       },
@@ -33,7 +33,7 @@ deploy: {
       ref: 'origin/master',
       repo: 'git@github.com:calculus-guy/Learning247-creators-platform-backend.git',
       path: '/home/ubuntu/backend',
-      'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
+      'post-deploy': 'npm install && npx sequelize db:migrate && pm2 reload ecosystem.config.js --env production',
       env: {
         NODE_ENV: 'production',
       },
