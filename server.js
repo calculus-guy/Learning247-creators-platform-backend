@@ -24,27 +24,19 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-  credentials: true, 
-  optionsSuccessStatus: 204
+  origin: allowedOrigins,
+  credentials: true,
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions)); 
+app.options('*', cors(corsOptions));
 
 
 app.use('/api/webhooks', webhookRoutes);
 
-// NOTE: bodyParser.json() is redundant if you already use app.use(express.json())
-// I'll keep it commented out for security/clarity.
-// app.use(bodyParser.json()); 
+app.use(bodyParser.json()); 
 
 
 app.use(session({
