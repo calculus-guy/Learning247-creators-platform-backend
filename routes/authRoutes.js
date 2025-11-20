@@ -39,11 +39,7 @@ router.get('/google/callback',
       { expiresIn: '7d' }
     );
 
-    res.json({
-      message: 'Logged in with Google successfully',
-      token,
-      user: req.user
-    });
+    res.redirect(`https://www.aahbibi.com/dashboard?token=${token}`);
   }
 );
 

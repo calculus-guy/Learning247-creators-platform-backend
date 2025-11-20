@@ -10,3 +10,44 @@
   "email": "admin@example.com",
   "password": "123456"
 }
+
+
+ How to TEST with Postman
+1. Get a valid Authorization: Bearer <token> by logging in with your existing /auth/login endpoint.2. Use the endpoints above:
+•	Set the Authorization header as required.
+•	Use the Body (raw, JSON) for POSTs as shown above.
+________________________________________
+Sample Testing Flows
+A. Create Live Class
+•	Method: POST
+•	URL: http://localhost:8080/live/create
+•	Headers: Authorization: Bearer <token>
+•	Body: as shown above
+•	Expect: 201 Created, returns liveClass info with stream key, RTMP, playbackId.
+B. Add a Host
+•	Method: POST
+•	URL: http://localhost:8080/live/{liveClassId}/add-host
+•	Body: { "userId": 2, "role": "cohost" }
+•	Expect: Success or already exists error
+C. Add an Attendee
+•	Method: POST
+•	URL: http://localhost:8080/live/{liveClassId}/add-attendee
+•	Body: { "userId": 5, "statusPaid": true }
+•	Expect: Added attendee or error
+D. Get Info/Playback/Lists
+•	GET /live/{id}
+•	GET /live/{id}/playback
+•	GET /live/{id}/hosts
+•	GET /live/{id}/attendees
+________________________________________
+Common Errors
+•	401 Unauthorized: Missing or invalid JWT token
+•	404 Not Found: Class ID wrong or not existing
+•	400 Bad Request: Invalid input, host or attendee already exists
+________________________________________
+Process Flow Explained
+1.	Live class is created — backend provisions on Mux, saves all keys/tokens for creator and OBS.
+2.	Host/Attendee management — only users in the system can host, co-host, or attend a class.
+3.	Streaming — Creator streams to OBS using RTMP/stream key (from create response).
+4.	Live player — Any user (or only attendees, up to frontend logic) accesses the playback URL to watch live.
+5.	Stream finishes — Mux's webhook will update backend status and fill in recording asset (replay works on same /playback endpoint).

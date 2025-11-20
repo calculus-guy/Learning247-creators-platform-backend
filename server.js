@@ -19,7 +19,7 @@ const app = express();
 const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',
-  'http://localhost:3000' 
+  'http://localhost:3000'
 ];
 
 const corsOptions = {

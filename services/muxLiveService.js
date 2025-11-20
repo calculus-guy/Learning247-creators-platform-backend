@@ -1,10 +1,10 @@
-const Mux = require('@mux/mux-node');
-const muxClient = new Mux({
-  tokenId: process.env.MUX_TOKEN_ID,
-  tokenSecret: process.env.MUX_TOKEN_SECRET
-});
+const { Mux } = require('@mux/mux-node');
+const muxClient = new Mux(
+  process.env.MUX_TOKEN_ID,
+  process.env.MUX_TOKEN_SECRET
+);
 
-const LiveStreams = muxClient.video.live_streams;
+const LiveStreams = muxClient.video.liveStreams;
 const Assets = muxClient.video.assets;
 
 async function createLiveStream({ title, passthrough }) {

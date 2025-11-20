@@ -38,6 +38,7 @@ exports.handleMuxWebhook = async (req, res) => {
         { where: { muxUploadId: uploadId } }
       );
     }
+    
     if (type === 'video.asset.errored' && data.upload_id && !data.live_stream_id) {
       const uploadId = data.upload_id;
       if (!uploadId) return res.status(400).send('Missing upload_id in payload');
