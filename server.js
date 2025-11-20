@@ -15,10 +15,10 @@ const videoRoutes = require('./routes/videoRoutes')
 const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
-app.use(express.json());
+
 
 const allowedOrigins = [
-  'https://www.aahbibi.com', 
+  'https://www.aahbibi.com',
   'https://aahbibi.com',
   'http://localhost:3000' 
 ];
@@ -30,13 +30,12 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions)); 
-app.options('*', cors(corsOptions));
+app.use(cors(corsOptions));
 
 
 app.use('/api/webhooks', webhookRoutes);
-
-app.use(bodyParser.json()); 
+app.use(express.json());
+// app.use(bodyParser.json()); 
 
 
 app.use(session({
