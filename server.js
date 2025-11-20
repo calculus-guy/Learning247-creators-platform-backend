@@ -7,7 +7,7 @@ const session = require('express-session');
 const authRoutes = require('./routes/authRoutes');
 const sequelize = require('./config/db');
 const cors = require('cors');
-const bodyParser = require('body-parser');
+const bodyParser = require('body-parser'); // NOTE: bodyParser is no longer needed if using express.json()
 const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const webhookRoutes = require('./routes/webhookRoutes');
@@ -16,28 +16,30 @@ const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
 
-
 const allowedOrigins = [
-  'https://www.aahbibi.com',
-  'https://aahbibi.com',
-  'http://localhost:3000' 
+  'https://www.aahbibi.com',
+  'https://aahbibi.com',
+  'http://localhost:3000' 
 ];
 
 const corsOptions = {
-  origin: allowedOrigins,
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  optionsSuccessStatus: 200
+  origin: allowedOrigins,
+  credentials: true,
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  optionsSuccessStatus: 200
 };
 
-app.use(cors(corsOptions));
+// 1. GLOBAL MIDDLEWARE (CORS, WEBHOOKS, BODY PARSING)
+app.use(cors(corsOptions)); // <-- CORS FIRST
 
-
+// Webhook route must come before JSON middleware (as it needs the raw body)
 app.use('/api/webhooks', webhookRoutes);
+
+// BODY PARSER (MOVED UP FOR GLOBAL USE)
 app.use(express.json());
-// app.use(bodyParser.json()); 
 
 
+// 2. SESSION AND AUTHENTICATION MIDDLEWARE
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -47,6 +49,8 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+
+// 3. ROUTES
 app.use('/auth', authRoutes);
 
 app.use('/register', rateLimiter);
