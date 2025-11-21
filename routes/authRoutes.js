@@ -39,7 +39,9 @@ router.get('/google/callback',
       { expiresIn: '7d' }
     );
 
-    res.redirect(`https://www.aahbibi.com/dashboard?token=${token}`);
+    // Set the token as a cookie (not httpOnly since frontend needs access; secure for HTTPS; lax for most flows)
+    res.cookie('token', token, { httpOnly: false, secure: true, sameSite: 'lax' });
+    res.redirect('https://www.aahbibi.com/dashboard');
   }
 );
 
