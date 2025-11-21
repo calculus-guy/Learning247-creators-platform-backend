@@ -16,6 +16,8 @@ const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
 
+app.use(require('cookie-parser')());
+
 const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',

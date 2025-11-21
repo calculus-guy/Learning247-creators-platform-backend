@@ -2,7 +2,12 @@ const jwt = require('jsonwebtoken');
 const SECRET_KEY = process.env.JWT_SECRET_KEY;
 
 module.exports = (req, res, next) => {
-  const token = req.header('Authorization')?.replace('Bearer ', '');
+  // Try header first
+  let token = req.header('Authorization')?.replace('Bearer ', '');
+  // If not in header, try cookie
+  if (!token && req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  }
 
   if (!token) {
     return res.status(401).json({ message: 'Access denied, token missing.' });
