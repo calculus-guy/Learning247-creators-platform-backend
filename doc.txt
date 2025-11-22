@@ -2,7 +2,8 @@
   "firstname": "Test",
   "lastname": "User",
   "email": "testuser@example.com",
-  "password": "password123"
+  "password": "password123",
+  "confirmPassword": "password123"
 }
 
 
@@ -51,3 +52,6 @@ Process Flow Explained
 3.	Streaming — Creator streams to OBS using RTMP/stream key (from create response).
 4.	Live player — Any user (or only attendees, up to frontend logic) accesses the playback URL to watch live.
 5.	Stream finishes — Mux's webhook will update backend status and fill in recording asset (replay works on same /playback endpoint).
+
+
+https://prod-api.aahbibi.com/videos/upload
