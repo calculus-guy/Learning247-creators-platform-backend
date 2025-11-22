@@ -25,7 +25,8 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: allowedOrigins,
+//   origin: allowedOrigins,
+  origin: "*", // TEMPORARY: Allow all origins for testing; replace with allowedOrigins in production
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   optionsSuccessStatus: 200

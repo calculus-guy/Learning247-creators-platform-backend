@@ -1,5 +1,4 @@
-const Mux = require("@mux/mux-node");
-const { Webhooks } = Mux;
+const { Webhooks } = require("@mux/mux-node");
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
 
@@ -15,9 +14,13 @@ exports.handleMuxWebhook = async (req, res) => {
 
   let event;
   try {
-    Webhooks.verifyHeader(req.body, signature, endpointSecret);
+    // Create Webhooks instance and verify signature
+    // verifySignature expects: (body as string, headers object, secret)
+    const webhooks = new Webhooks(endpointSecret);
+    const bodyString = typeof req.body === 'string' ? req.body : req.body.toString('utf-8');
+    webhooks.verifySignature(bodyString, req.headers, endpointSecret);
 
-    event = JSON.parse(req.body.toString('utf-8'));
+    event = JSON.parse(bodyString);
 
   } catch (err) {
     console.error('Mux webhook signature verification failed:', err.message);
