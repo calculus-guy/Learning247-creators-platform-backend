@@ -1,35 +1,37 @@
-const Mux = require("@mux/mux-node");
-const { Webhooks } = Mux;
-const Video = require('../models/Video');
-const LiveClass = require('../models/liveClass');
+const { Webhooks } = require("@mux/mux-node");
+const Video = require("../models/Video");
+const LiveClass = require("../models/liveClass");
 
 const endpointSecret = process.env.MUX_WEBHOOK_SECRET;
 
 exports.handleMuxWebhook = async (req, res) => {
   let event;
 
-  // 1. Get signature header
-  const signature = req.get('Mux-Signature') || req.get('mux-signature');
-  if (!signature) {
-    console.warn('[Webhook] Missing Mux signature header.');
-    return res.status(400).json({ error: 'Missing Mux signature header' });
+  const rawBody = req.rawBody; // Express raw body (must be enabled)
+  if (!rawBody) {
+    console.error("[Webhook] rawBody missing. Signature verification requires raw body.");
+    return res.status(400).send("rawBody missing");
   }
 
   try {
-    event = Webhooks.verifySignature(req.body, req.headers, endpointSecret);
+    // NEW MUX v12 SIGNATURE VERIFICATION (correct format)
+    event = Webhooks.verifySignature({
+      payload: rawBody,
+      headers: req.headers,
+      secret: endpointSecret,
+    });
 
-    console.log("[Webhook] Verified Event:", event.type);
+    console.log("[Webhook] Verified event:", event.type);
 
   } catch (err) {
-    console.error("Mux webhook signature verification failed:", err.message);
+    console.error("Mux webhook signature verification FAILED:", err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // 3. Extract event information
   const { type, data } = event;
 
   try {
-    // ---------------- VIDEO UPLOAD EVENTS ----------------
+    // ---------------- VIDEO ASSET EVENTS ----------------
     if (type === "video.asset.ready" && data.upload_id && !data.live_stream_id) {
       const playbackId = data.playback_ids?.[0]?.id || null;
 
@@ -89,6 +91,6 @@ exports.handleMuxWebhook = async (req, res) => {
 
   } catch (err) {
     console.error("[Webhook] Error processing event:", err);
-    return res.status(500).send("Internal server error while processing webhook.");
+    return res.status(500).send("Internal server error while processing webhook");
   }
 };
