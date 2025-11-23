@@ -21,12 +21,13 @@ app.use(require('cookie-parser')());
 const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:3001',
+  "https://aistudio.google.com"
 ];
 
 const corsOptions = {
-//   origin: allowedOrigins,
-  origin: "*", // TEMPORARY: Allow all origins for testing; replace with allowedOrigins in production
+  origin: allowedOrigins,
   credentials: true,
   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
   optionsSuccessStatus: 200
