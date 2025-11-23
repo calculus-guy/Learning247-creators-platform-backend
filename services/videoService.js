@@ -18,7 +18,13 @@ exports.uploadVideoService = async ({
   try {
 
     const upload = await mux.video.uploads.create({
-      cors_origin: '*',
+      cors_origin: [
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "https://aistudio.google.com",
+        "https://ahabibi.com"
+      ],
+      allow_credentials: true,
       new_asset_settings: {
         playback_policy: ['public'],
       },
