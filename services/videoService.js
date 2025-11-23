@@ -22,7 +22,7 @@ exports.uploadVideoService = async ({
         "http://localhost:3000",
         "http://localhost:3001",
         "https://aistudio.google.com",
-        "https://ahabibi.com"
+        "https://www.aahbibi.com"
       ],
       allow_credentials: true,
       new_asset_settings: {
