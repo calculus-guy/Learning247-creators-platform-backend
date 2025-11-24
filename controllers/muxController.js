@@ -1,27 +1,33 @@
-const { Webhooks } = require("@mux/mux-node");
+const Mux = require("@mux/mux-node");
 const Video = require("../models/Video");
 const LiveClass = require("../models/liveClass");
 
 const endpointSecret = process.env.MUX_WEBHOOK_SECRET;
 
+const mux = new Mux();
+
 exports.handleMuxWebhook = async (req, res) => {
   let event;
 
-  const rawBody = req.body; // Express raw body (must be enabled)
+  const rawBody = req.body; 
+  
   if (!rawBody) {
     console.error("[Webhook] rawBody missing. Signature verification requires raw body.");
     return res.status(400).send("rawBody missing");
   }
 
   try {
-    // NEW MUX v12 SIGNATURE VERIFICATION (correct format)
-    event = Webhooks.verifySignature({
-      payload: rawBody,
-      headers: req.headers,
-      secret: endpointSecret,
-    });
+    const isValidSignature = mux.webhooks.verifySignature(
+      rawBody,        
+      req.headers,       
+      endpointSecret    
+    );
 
-    console.log("[Webhook] Verified event:", event.type);
+    console.log("[Webhook] Signature verified:", isValidSignature);
+
+    // Parse the JSON body after verification
+    event = JSON.parse(rawBody);
+    console.log("[Webhook] Event type:", event.type);
 
   } catch (err) {
     console.error("Mux webhook signature verification FAILED:", err.message);
@@ -44,6 +50,7 @@ exports.handleMuxWebhook = async (req, res) => {
         },
         { where: { muxUploadId: data.upload_id } }
       );
+      console.log(`[Webhook] Video asset ${data.id} marked as ready`);
     }
 
     if (type === "video.asset.errored" && data.upload_id && !data.live_stream_id) {
@@ -51,6 +58,7 @@ exports.handleMuxWebhook = async (req, res) => {
         { status: "failed" },
         { where: { muxUploadId: data.upload_id } }
       );
+      console.log(`[Webhook] Video asset marked as failed`);
     }
 
     // ---------------- LIVE STREAM EVENTS ----------------
@@ -60,6 +68,7 @@ exports.handleMuxWebhook = async (req, res) => {
           { status: "live" },
           { where: { mux_stream_id: data.live_stream_id } }
         );
+        console.log(`[Webhook] Live stream ${data.live_stream_id} is now active`);
       }
 
       if (type === "video.live_stream.idle") {
@@ -67,6 +76,7 @@ exports.handleMuxWebhook = async (req, res) => {
           { status: "ended" },
           { where: { mux_stream_id: data.live_stream_id } }
         );
+        console.log(`[Webhook] Live stream ${data.live_stream_id} is now idle`);
       }
 
       if (type === "video.live_stream.completed") {
@@ -74,6 +84,7 @@ exports.handleMuxWebhook = async (req, res) => {
           { status: "recorded" },
           { where: { mux_stream_id: data.live_stream_id } }
         );
+        console.log(`[Webhook] Live stream ${data.live_stream_id} completed`);
       }
 
       if (type === "video.asset.ready") {
@@ -84,6 +95,7 @@ exports.handleMuxWebhook = async (req, res) => {
           },
           { where: { mux_stream_id: data.live_stream_id } }
         );
+        console.log(`[Webhook] Recording asset ${data.id} ready for live stream`);
       }
     }
 
