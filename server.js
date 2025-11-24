@@ -7,7 +7,6 @@ const passport = require('passport');
 const session = require('express-session');
 const authRoutes = require('./routes/authRoutes');
 const sequelize = require('./config/db');
-const bodyParser = require('body-parser'); // NOTE: bodyParser is no longer needed if using express.json()
 const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const webhookRoutes = require('./routes/webhookRoutes');
@@ -15,6 +14,11 @@ const videoRoutes = require('./routes/videoRoutes')
 const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
+
+app.post(
+  "/api/webhooks/mux",
+  express.raw({ type: "application/json" })  // raw body BEFORE ANY parsing
+);
 
 app.use(require('cookie-parser')());
 
@@ -43,8 +47,6 @@ const corsOptions = {
 
 app.use(cors(corsOptions)); 
 
-app.use('/api/webhooks', webhookRoutes);
-
 app.use(express.json());
 
 
@@ -59,6 +61,8 @@ app.use(passport.session());
 
 
 // 3. ROUTES
+app.use('/api/webhooks', webhookRoutes);
+
 app.use('/auth', authRoutes);
 
 app.use('/register', rateLimiter);
