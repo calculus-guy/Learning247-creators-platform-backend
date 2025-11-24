@@ -15,10 +15,10 @@ const liveRoutes = require('./routes/liveRoutes');
 
 const app = express();
 
-app.post(
-  "/api/webhooks/mux",
-  express.raw({ type: "application/json" })  // raw body BEFORE ANY parsing
-);
+// app.post(
+//   "/api/webhooks/mux",
+//   express.raw({ type: "application/json" })  // raw body BEFORE ANY parsing
+// );
 
 app.use(require('cookie-parser')());
 
@@ -47,6 +47,8 @@ const corsOptions = {
 
 app.use(cors(corsOptions)); 
 
+app.use('/api/webhooks', webhookRoutes);
+
 app.use(express.json());
 
 
@@ -59,9 +61,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-
-// 3. ROUTES
-app.use('/api/webhooks', webhookRoutes);
 
 app.use('/auth', authRoutes);
 

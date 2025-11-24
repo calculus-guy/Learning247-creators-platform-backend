@@ -7,7 +7,7 @@ const endpointSecret = process.env.MUX_WEBHOOK_SECRET;
 exports.handleMuxWebhook = async (req, res) => {
   let event;
 
-  const rawBody = req.rawBody; // Express raw body (must be enabled)
+  const rawBody = req.body; // Express raw body (must be enabled)
   if (!rawBody) {
     console.error("[Webhook] rawBody missing. Signature verification requires raw body.");
     return res.status(400).send("rawBody missing");
