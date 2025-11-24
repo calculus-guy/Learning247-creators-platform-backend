@@ -19,31 +19,35 @@ const app = express();
 app.use(require('cookie-parser')());
 
 const allowedOrigins = [
-  'https://www.aahbibi.com',
-  'https://aahbibi.com',
-  'http://localhost:3000',
-  'http://localhost:3001',
+  'https://www.aahbibi.com',
+  'https://aahbibi.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
   "https://aistudio.google.com"
 ];
 
 const corsOptions = {
-  origin: allowedOrigins,
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  optionsSuccessStatus: 200
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS blocked: Origin " + origin));
+    }
+  },
+  credentials: true,
+  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+  optionsSuccessStatus: 200,
 };
 
-// 1. GLOBAL MIDDLEWARE (CORS, WEBHOOKS, BODY PARSING)
-app.use(cors(corsOptions)); // <-- CORS FIRST
+app.use(cors(corsOptions)); 
 
-// Webhook route must come before JSON middleware (as it needs the raw body)
 app.use('/api/webhooks', webhookRoutes);
 
-// BODY PARSER (MOVED UP FOR GLOBAL USE)
 app.use(express.json());
 
 
-// 2. SESSION AND AUTHENTICATION MIDDLEWARE
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
