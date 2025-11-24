@@ -1,12 +1,12 @@
 const dotenv = require("dotenv");
 dotenv.config();
+const cors = require('cors');
 
 const express = require('express');
 const passport = require('passport');
 const session = require('express-session');
 const authRoutes = require('./routes/authRoutes');
 const sequelize = require('./config/db');
-const cors = require('cors');
 const bodyParser = require('body-parser'); // NOTE: bodyParser is no longer needed if using express.json()
 const registrationRoutes = require('./routes/registrationRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
@@ -33,7 +33,7 @@ const corsOptions = {
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error("CORS blocked: Origin " + origin));
+      callback(new Error("CORS blocked: Origin " + origin), false);
     }
   },
   credentials: true,
