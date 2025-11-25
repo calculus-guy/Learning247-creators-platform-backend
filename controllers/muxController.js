@@ -1,10 +1,11 @@
-const Mux = require("@mux/mux-node");
+// const Mux = require("@mux/mux-node");
+const mux = require("../config/mux");
 const Video = require("../models/Video");
 const LiveClass = require("../models/liveClass");
 
 const endpointSecret = process.env.MUX_WEBHOOK_SECRET;
 
-const mux = new Mux();
+// const mux = new Mux();
 
 exports.handleMuxWebhook = async (req, res) => {
   let event;
