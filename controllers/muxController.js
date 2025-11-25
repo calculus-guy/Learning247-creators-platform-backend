@@ -17,8 +17,11 @@ exports.handleMuxWebhook = async (req, res) => {
   }
 
   try {
+
+    const rawBodyString = rawBody.toString('utf8');
+
     const isValidSignature = mux.webhooks.verifySignature(
-      rawBody,        
+      rawBodyString,        
       req.headers,       
       endpointSecret    
     );
@@ -26,7 +29,7 @@ exports.handleMuxWebhook = async (req, res) => {
     console.log("[Webhook] Signature verified:", isValidSignature);
 
     // Parse the JSON body after verification
-    event = JSON.parse(rawBody);
+    event = JSON.parse(rawBodyString);
     console.log("[Webhook] Event type:", event.type);
 
   } catch (err) {
