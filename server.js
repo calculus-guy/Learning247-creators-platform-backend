@@ -122,7 +122,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 
-app.post(
+app.use(
   "/api/webhooks", webhookRoutes
 );
 
