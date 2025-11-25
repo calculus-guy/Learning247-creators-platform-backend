@@ -105,11 +105,11 @@ const app = express();
    1. GLOBAL MIDDLEWARE
 ---------------------------------------------------- */
 
-app.use(cookieParser());
+// app.use(cookieParser());
 
-// JSON body parser must ALWAYS come before routes
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// // JSON body parser must ALWAYS come before routes
+// app.use(express.json());
+// app.use(express.urlencoded({ extended: true }));
 
 /* ----------------------------------------------------
    2. CORS
@@ -145,6 +145,14 @@ app.post(
   express.raw({ type: "application/json" }), // raw BEFORE the controller
   webhookController.handleMuxWebhook
 );
+
+
+app.use(cookieParser());
+
+// JSON body parser must ALWAYS come before routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 
 /* ----------------------------------------------------
    4. OTHER ROUTES (NORMAL JSON PARSING)
