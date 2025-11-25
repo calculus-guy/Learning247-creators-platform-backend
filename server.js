@@ -81,7 +81,6 @@
 //   })
 //   .catch(err => console.error(' DB Connection Failed:', err));
 
-
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -90,22 +89,16 @@ const express = require('express');
 const passport = require('passport');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
-
+const webhookRoutes = require('./routes/webhookRoutes');
 const authRoutes = require('./routes/authRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
-const webhookController = require('./controllers/muxController'); // IMPORTANT
+// const webhookController = require('./controllers/muxController'); // IMPORTANT
 const videoRoutes = require('./routes/videoRoutes');
 const liveRoutes = require('./routes/liveRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 
 const app = express();
-
-app.post(
-  "/api/webhooks/mux",
-  express.raw({ type: "application/json" }), // raw BEFORE the controller
-  webhookController.handleMuxWebhook
-);
 
 const allowedOrigins = [
   'https://www.aahbibi.com',
@@ -129,11 +122,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 
-// app.post(
-//   "/api/webhooks/mux",
-//   express.raw({ type: "application/json" }), // raw BEFORE the controller
-//   webhookController.handleMuxWebhook
-// );
+app.post(
+  "/api/webhooks", webhookRoutes
+);
 
 
 app.use(cookieParser());
