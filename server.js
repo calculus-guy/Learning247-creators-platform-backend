@@ -101,19 +101,11 @@ const sequelize = require('./config/db');
 
 const app = express();
 
-/* ----------------------------------------------------
-   1. GLOBAL MIDDLEWARE
----------------------------------------------------- */
-
-// app.use(cookieParser());
-
-// // JSON body parser must ALWAYS come before routes
-// app.use(express.json());
-// app.use(express.urlencoded({ extended: true }));
-
-/* ----------------------------------------------------
-   2. CORS
----------------------------------------------------- */
+app.post(
+  "/api/webhooks/mux",
+  express.raw({ type: "application/json" }), // raw BEFORE the controller
+  webhookController.handleMuxWebhook
+);
 
 const allowedOrigins = [
   'https://www.aahbibi.com',
@@ -136,27 +128,20 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-/* ----------------------------------------------------
-   3. MUX WEBHOOK (RAW BODY!)
----------------------------------------------------- */
 
-app.post(
-  "/api/webhooks/mux",
-  express.raw({ type: "application/json" }), // raw BEFORE the controller
-  webhookController.handleMuxWebhook
-);
+// app.post(
+//   "/api/webhooks/mux",
+//   express.raw({ type: "application/json" }), // raw BEFORE the controller
+//   webhookController.handleMuxWebhook
+// );
 
 
 app.use(cookieParser());
 
-// JSON body parser must ALWAYS come before routes
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 
-/* ----------------------------------------------------
-   4. OTHER ROUTES (NORMAL JSON PARSING)
----------------------------------------------------- */
 
 app.use(session({
   secret: process.env.SESSION_SECRET,
@@ -176,9 +161,6 @@ app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes);
 
-/* ----------------------------------------------------
-   5. START SERVER
----------------------------------------------------- */
 
 const PORT = process.env.PORT || 8080;
 
