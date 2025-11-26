@@ -1,4 +1,12 @@
-const { Mux } = require('@mux/mux-node');
+// Ensure you are using the correct import for your Mux version
+const Mux = require('@mux/mux-node'); 
+
+// Check for missing keys immediately to avoid runtime crashes
+if (!process.env.MUX_TOKEN_ID || !process.env.MUX_TOKEN_SECRET) {
+  console.error("FATAL: MUX_TOKEN_ID or MUX_TOKEN_SECRET is missing from .env");
+}
+
+// Instantiate Mux Client
 const muxClient = new Mux(
   process.env.MUX_TOKEN_ID,
   process.env.MUX_TOKEN_SECRET
@@ -14,13 +22,11 @@ async function createLiveStream({ title, passthrough }) {
       new_asset_settings: {
         playback_policy: ['public']
       },
-      latency_mode: 'low',         // low-latency for classes
+      latency_mode: 'low',
       reconnect_window: 60,
-      passthrough,                 // store liveClass.id here for webhook mapping
-      // passthrough is optional but very useful for mapping events back to DB
+      passthrough,
     });
 
-    // live.stream_key is present
     return {
       mux_stream_id: live.id,
       mux_stream_key: live.stream_key,
@@ -28,7 +34,9 @@ async function createLiveStream({ title, passthrough }) {
       mux_playback_id: live.playback_ids?.[0]?.id || null
     };
   } catch (err) {
-    console.error('createLiveStream error', err);
+    console.error('Mux API Error in createLiveStream:', err);
+    // Attach a flag so the controller knows this is a 3rd party API error
+    err.name = 'MuxError'; 
     throw err;
   }
 }
