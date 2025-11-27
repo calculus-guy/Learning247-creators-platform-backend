@@ -123,9 +123,34 @@ exports.getVideoById = async (req, res) => {
 exports.getUserVideos = async (req, res) => {
   try {
     const { userId } = req.params;
+    const userIdInt = parseInt(userId, 10);
 
-    if (req.user.id !== userId)
+    // Ensure userId from params matches authenticated user
+    if (req.user.id !== userIdInt) {
       return res.status(403).json({ message: 'Unauthorized access.' });
+    }
+
+    const videos = await Video.findAll({
+      where: { userId: userIdInt },
+      order: [['created_at', 'DESC']]
+    });
+
+    return res.status(200).json({
+      count: videos.length,
+      videos
+    });
+  } catch (error) {
+    console.error('Error fetching user videos:', error);
+    return res.status(500).json({ message: 'Server error fetching user videos.' });
+  }
+};
+
+// ============================
+//  GET CURRENT USER'S VIDEOS (Convenience endpoint)
+// ============================
+exports.getMyVideos = async (req, res) => {
+  try {
+    const userId = req.user.id;
 
     const videos = await Video.findAll({
       where: { userId },
@@ -137,7 +162,7 @@ exports.getUserVideos = async (req, res) => {
       videos
     });
   } catch (error) {
-    console.error('Error fetching user videos:', error);
-    return res.status(500).json({ message: 'Server error fetching user videos.' });
+    console.error('Error fetching my videos:', error);
+    return res.status(500).json({ message: 'Server error fetching videos.' });
   }
 };

@@ -11,6 +11,7 @@ const authRoutes = require('./routes/authRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const videoRoutes = require('./routes/videoRoutes');
 const liveRoutes = require('./routes/liveRoutes');
+const userRoutes = require('./routes/userRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 
@@ -42,13 +43,10 @@ app.use(
   "/api/webhooks", webhookRoutes
 );
 
-
-
 app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 
 app.use(session({
@@ -64,6 +62,7 @@ app.use('/auth', authRoutes);
 app.use('/register', rateLimiter);
 app.use('/event', registrationRoutes);
 app.use('/live', liveRoutes);
+app.use('/users', userRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
