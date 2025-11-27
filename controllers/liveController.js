@@ -1,6 +1,4 @@
-const LiveClass = require('../models/liveClass');
-const LiveHost = require('../models/liveHost');
-const LiveAttendee = require('../models/liveAttendee');
+const { LiveClass, LiveHost, LiveAttendee } = require('../models/liveIndex');
 const muxLiveService = require('../services/muxLiveService');
 const User = require('../models/User');
 
