@@ -17,26 +17,26 @@ const sequelize = require('./config/db');
 
 const app = express();
 
-const allowedOrigins = [
-  'https://www.aahbibi.com',
-  'https://aahbibi.com',
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'https://aistudio.google.com'
-];
+// const allowedOrigins = [
+//   'https://www.aahbibi.com',
+//   'https://aahbibi.com',
+//   'http://localhost:3000',
+//   'http://localhost:3001',
+//   'https://aistudio.google.com'
+// ];
 
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error("CORS blocked: " + origin), false);
-  },
-  credentials: true,
-  methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
-  optionsSuccessStatus: 200,
-};
+// const corsOptions = {
+//   origin: function (origin, callback) {
+//     if (!origin) return callback(null, true);
+//     if (allowedOrigins.includes(origin)) return callback(null, true);
+//     return callback(new Error("CORS blocked: " + origin), false);
+//   },
+//   credentials: true,
+//   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+//   optionsSuccessStatus: 200,
+// };
 
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
 
 
 app.use(
