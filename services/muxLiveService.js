@@ -1,12 +1,9 @@
-// Ensure you are using the correct import for your Mux version
 const Mux = require('@mux/mux-node'); 
 
-// Check for missing keys immediately to avoid runtime crashes
 if (!process.env.MUX_TOKEN_ID || !process.env.MUX_TOKEN_SECRET) {
   console.error("FATAL: MUX_TOKEN_ID or MUX_TOKEN_SECRET is missing from .env");
 }
 
-// Instantiate Mux Client
 const muxClient = new Mux(
   process.env.MUX_TOKEN_ID,
   process.env.MUX_TOKEN_SECRET
@@ -35,7 +32,6 @@ async function createLiveStream({ title, passthrough }) {
     };
   } catch (err) {
     console.error('Mux API Error in createLiveStream:', err);
-    // Attach a flag so the controller knows this is a 3rd party API error
     err.name = 'MuxError'; 
     throw err;
   }

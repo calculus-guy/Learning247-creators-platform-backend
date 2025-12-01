@@ -143,3 +143,7 @@ sequelize.sync({ force: false })
     );
   })
   .catch(err => console.error('DB Connection Failed:', err));
+
+
+
+  ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6

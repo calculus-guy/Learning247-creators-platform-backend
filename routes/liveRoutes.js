@@ -3,6 +3,9 @@ const router = express.Router();
 const liveController = require('../controllers/liveController');
 const authMiddleware = require('../middleware/authMiddleware');
 
+// Get all live classes (public endpoint with optional filters)
+router.get('/getLive', liveController.getAllLiveClasses);
+
 router.post('/create', authMiddleware, liveController.createLiveClass);
 router.post('/:id/add-host', authMiddleware, liveController.addHost);
 router.post('/:id/add-attendee', authMiddleware, liveController.addAttendee);

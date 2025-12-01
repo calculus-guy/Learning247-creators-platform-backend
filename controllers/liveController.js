@@ -167,3 +167,46 @@ exports.getAttendees = async (req, res) => {
     return handleError(res, error);
   }
 };
+
+exports.getAllLiveClasses = async (req, res) => {
+  try {
+    const { status, privacy } = req.query;
+    
+    const filters = {};
+    
+    // Filter by privacy if provided (default to public for unauthenticated users)
+    if (privacy) {
+      filters.privacy = privacy;
+    } else {
+      filters.privacy = 'public'; // Only show public classes by default
+    }
+    
+    // Filter by status if provided
+    if (status) filters.status = status;
+
+    const liveClasses = await LiveClass.findAll({
+      where: filters,
+      order: [['startTime', 'ASC']],
+      include: [
+        {
+          model: LiveHost,
+          as: 'hosts',
+          include: [{ model: User, attributes: ['id', 'firstname', 'lastname', 'email'] }]
+        }
+      ]
+    });
+
+    // The status is managed by Mux webhooks:
+    // - "scheduled" = created but not streaming yet
+    // - "live" = actively streaming (set by webhook: video.live_stream.active)
+    // - "ended" = stream stopped (set by webhook: video.live_stream.idle)
+    // - "recorded" = recording available (set by webhook: video.live_stream.completed)
+
+    return res.json({
+      count: liveClasses.length,
+      liveClasses
+    });
+  } catch (error) {
+    return handleError(res, error);
+  }
+};
