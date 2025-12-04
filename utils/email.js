@@ -102,3 +102,181 @@ exports.sendAahbibiWelcomeEmail = async (to, firstname) => {
     html,
   });
 };
+
+/**
+ * PURCHASE CONFIRMATION EMAIL (to student)
+ */
+exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amount) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Purchase Confirmed! 🎉</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        Thank you for your purchase! You now have lifetime access to:
+      </p>
+
+      <p style="font-size: 18px; font-weight: bold; color: #333;">
+        ${contentTitle}
+      </p>
+
+      <p><strong>Amount Paid:</strong> ₦${amount.toFixed(2)}</p>
+
+      <p>
+        You can access your purchased content anytime from your dashboard at 
+        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+      </p>
+
+      <p>
+        Happy learning!
+      </p>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Purchase Confirmed - ${contentTitle}`,
+    html,
+  });
+};
+
+/**
+ * SALE NOTIFICATION EMAIL (to creator)
+ */
+exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studentName, amount) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>You Made a Sale! 💰</h2>
+
+      <p>Dear ${creatorName},</p>
+
+      <p>
+        Great news! <strong>${studentName}</strong> just purchased your content:
+      </p>
+
+      <p style="font-size: 18px; font-weight: bold; color: #333;">
+        ${contentTitle}
+      </p>
+
+      <p><strong>Amount:</strong> ₦${amount.toFixed(2)}</p>
+
+      <p>
+        This amount has been added to your wallet. You can view your earnings and withdraw funds 
+        from your creator dashboard at <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+      </p>
+
+      <p>
+        Keep creating amazing content!
+      </p>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `New Sale - ${contentTitle}`,
+    html,
+  });
+};
+
+/**
+ * WITHDRAWAL CONFIRMATION EMAIL (to creator)
+ */
+exports.sendWithdrawalConfirmationEmail = async (to, firstname, amount, netAmount, bankName, accountNumber) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Withdrawal Successful! ✅</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        Your withdrawal request has been processed successfully!
+      </p>
+
+      <p><strong>Withdrawal Amount:</strong> ₦${amount.toFixed(2)}</p>
+      <p><strong>Platform Fee (20%):</strong> ₦${(amount * 0.20).toFixed(2)}</p>
+      <p><strong>Net Amount Transferred:</strong> ₦${netAmount.toFixed(2)}</p>
+
+      <p><strong>Bank Details:</strong></p>
+      <p>
+        ${bankName}<br/>
+        ${accountNumber}
+      </p>
+
+      <p>
+        The funds should reflect in your account within 1-3 business days.
+      </p>
+
+      <p>
+        You can view your transaction history in your creator dashboard at 
+        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+      </p>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Withdrawal Successful',
+    html,
+  });
+};
+
+/**
+ * WITHDRAWAL FAILURE EMAIL (to creator)
+ */
+exports.sendWithdrawalFailureEmail = async (to, firstname, amount, reason) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Withdrawal Failed ❌</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        Unfortunately, your withdrawal request could not be processed.
+      </p>
+
+      <p><strong>Amount:</strong> ₦${amount.toFixed(2)}</p>
+      <p><strong>Reason:</strong> ${reason}</p>
+
+      <p>
+        The funds have been returned to your available balance. Please check your bank details 
+        and try again, or contact our support team for assistance.
+      </p>
+
+      <p>
+        You can retry the withdrawal from your creator dashboard at 
+        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+      </p>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Withdrawal Failed - Action Required',
+    html,
+  });
+};
