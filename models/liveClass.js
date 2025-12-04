@@ -7,7 +7,7 @@ const LiveClass = sequelize.define('LiveClass', {
     defaultValue: DataTypes.UUIDV4,
     primaryKey: true
   },
-  // userId: { type: DataTypes.INTEGER, allowNull: false }, // Creator of the live class
+  userId: { type: DataTypes.INTEGER, allowNull: true, field: 'user_id' }, // Creator of the live class
   title: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: true },
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },

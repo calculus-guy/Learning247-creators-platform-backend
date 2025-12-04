@@ -147,3 +147,5 @@ sequelize.sync({ force: false })
 
 
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
+
+   npx sequelize-cli db:migrate
