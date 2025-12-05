@@ -275,3 +275,99 @@ exports.calculateFees = async (req, res) => {
     });
   }
 };
+
+/**
+ * Get transaction history
+ * GET /api/wallet/transactions
+ */
+exports.getTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { 
+      transactionType, 
+      startDate, 
+      endDate, 
+      limit = 50, 
+      offset = 0 
+    } = req.query;
+
+    const { getTransactionHistory } = require('../services/transactionService');
+
+    const result = await getTransactionHistory({
+      userId,
+      transactionType,
+      startDate,
+      endDate,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    return res.status(200).json({
+      success: true,
+      ...result
+    });
+  } catch (error) {
+    console.error('Get transactions error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transaction history'
+    });
+  }
+};
+
+/**
+ * Get transaction statistics
+ * GET /api/wallet/transaction-stats
+ */
+exports.getTransactionStats = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const { getTransactionStats } = require('../services/transactionService');
+
+    const stats = await getTransactionStats(userId);
+
+    return res.status(200).json({
+      success: true,
+      stats
+    });
+  } catch (error) {
+    console.error('Get transaction stats error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch transaction statistics'
+    });
+  }
+};
+
+/**
+ * Export transactions to CSV
+ * GET /api/wallet/export-transactions
+ */
+exports.exportTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { transactionType, startDate, endDate } = req.query;
+
+    const { exportTransactionsToCSV } = require('../services/transactionService');
+
+    const csv = await exportTransactionsToCSV({
+      userId,
+      transactionType,
+      startDate,
+      endDate
+    });
+
+    // Set headers for CSV download
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=transactions_${Date.now()}.csv`);
+
+    return res.status(200).send(csv);
+  } catch (error) {
+    console.error('Export transactions error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to export transactions'
+    });
+  }
+};

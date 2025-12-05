@@ -24,4 +24,13 @@ router.get('/banks', authMiddleware, walletController.getBanks);
 // Calculate withdrawal fees (preview)
 router.post('/calculate-fees', authMiddleware, walletController.calculateFees);
 
+// Get transaction history
+router.get('/transactions', authMiddleware, walletController.getTransactions);
+
+// Get transaction statistics
+router.get('/transaction-stats', authMiddleware, walletController.getTransactionStats);
+
+// Export transactions to CSV
+router.get('/export-transactions', authMiddleware, walletController.exportTransactions);
+
 module.exports = router;
