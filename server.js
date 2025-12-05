@@ -17,6 +17,8 @@ const walletRoutes = require('./routes/walletRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 
+require('./models/walletIndex');
+
 const app = express();
 
 const allowedOrigins = [
