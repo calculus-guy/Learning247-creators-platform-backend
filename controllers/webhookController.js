@@ -127,6 +127,24 @@ exports.handlePaystackWebhook = async (req, res) => {
           metadata: { reference, gateway: 'paystack' }
         });
 
+        // Send email notification
+        try {
+          const user = await User.findByPk(payout.userId);
+          if (user) {
+            const { sendWithdrawalConfirmationEmail } = require('../utils/email');
+            await sendWithdrawalConfirmationEmail(
+              user.email,
+              user.firstname,
+              payout.amount,
+              payout.netAmount,
+              payout.bankName,
+              payout.accountNumber
+            );
+          }
+        } catch (emailError) {
+          console.error('[Paystack Webhook] Email notification error:', emailError);
+        }
+
         console.log('[Paystack Webhook] Payout completed:', reference);
       }
     }
@@ -153,6 +171,22 @@ exports.handlePaystackWebhook = async (req, res) => {
         if (wallet) {
           wallet.pendingAmount = parseFloat(wallet.pendingAmount) - parseFloat(payout.amount);
           await wallet.save();
+        }
+
+        // Send email notification
+        try {
+          const user = await User.findByPk(payout.userId);
+          if (user) {
+            const { sendWithdrawalFailureEmail } = require('../utils/email');
+            await sendWithdrawalFailureEmail(
+              user.email,
+              user.firstname,
+              payout.amount,
+              payout.failureReason
+            );
+          }
+        } catch (emailError) {
+          console.error('[Paystack Webhook] Email notification error:', emailError);
         }
 
         console.log('[Paystack Webhook] Payout failed:', reference);
@@ -293,6 +327,24 @@ exports.handleStripeWebhook = async (req, res) => {
             metadata: { transferId: transfer.id, gateway: 'stripe' }
           });
 
+          // Send email notification
+          try {
+            const user = await User.findByPk(payout.userId);
+            if (user) {
+              const { sendWithdrawalConfirmationEmail } = require('../utils/email');
+              await sendWithdrawalConfirmationEmail(
+                user.email,
+                user.firstname,
+                payout.amount,
+                payout.netAmount,
+                payout.bankName,
+                payout.accountNumber
+              );
+            }
+          } catch (emailError) {
+            console.error('[Stripe Webhook] Email notification error:', emailError);
+          }
+
           console.log('[Stripe Webhook] Payout completed:', transfer.id);
         } else if (transfer.status === 'failed') {
           // Update payout status
@@ -308,6 +360,22 @@ exports.handleStripeWebhook = async (req, res) => {
           if (wallet) {
             wallet.pendingAmount = parseFloat(wallet.pendingAmount) - parseFloat(payout.amount);
             await wallet.save();
+          }
+
+          // Send email notification
+          try {
+            const user = await User.findByPk(payout.userId);
+            if (user) {
+              const { sendWithdrawalFailureEmail } = require('../utils/email');
+              await sendWithdrawalFailureEmail(
+                user.email,
+                user.firstname,
+                payout.amount,
+                payout.failureReason
+              );
+            }
+          } catch (emailError) {
+            console.error('[Stripe Webhook] Email notification error:', emailError);
           }
 
           console.log('[Stripe Webhook] Payout failed:', transfer.id);
