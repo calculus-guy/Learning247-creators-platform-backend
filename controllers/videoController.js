@@ -97,19 +97,34 @@ exports.getVideoById = async (req, res) => {
       }
     }
 
-    // Build playback URL using muxPlaybackId
+    // Access control check (handled by middleware)
+    // If middleware passed, user has access
+    if (!req.hasAccess) {
+      // This shouldn't happen if middleware is properly configured
+      return res.status(402).json({
+        success: false,
+        message: 'Payment required to access this video',
+        requiresPayment: true,
+        price: video.price
+      });
+    }
+
+    // Build playback URL using muxPlaybackId (only if user has access)
     const playbackUrl = video.muxPlaybackId
       ? `https://stream.mux.com/${video.muxPlaybackId}.m3u8`
       : null;
 
-     // Record analytics
+    // Record analytics
     const userId = req.user ? req.user.id : null;
     const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     recordView({ videoId: id, userId, ipAddress });
 
     return res.status(200).json({
       ...video.dataValues,
-      playbackUrl
+      playbackUrl,
+      accessGranted: true,
+      accessReason: req.accessReason,
+      purchaseDate: req.purchaseDate || null
     });
   } catch (error) {
     console.error('Error fetching video by ID:', error);

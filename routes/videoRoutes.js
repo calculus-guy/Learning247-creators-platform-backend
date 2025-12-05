@@ -7,6 +7,7 @@ const { uploadVideo,
  } = require('../controllers/videoController');
 const { upload } = require('../utils/multerConfig');
 const authMiddleware = require('../middleware/authMiddleware');
+const { checkContentAccess } = require('../middleware/purchaseMiddleware');
 
 const router = express.Router();
 
@@ -20,6 +21,6 @@ router.post(
 router.get('/', getAllVideos);             // public feed
 router.get('/my-videos', authMiddleware, getMyVideos); // current user's videos
 router.get('/user/:userId', authMiddleware, getUserVideos); // creator dashboard
-router.get('/:id', getVideoById);          // single video + metadata
+router.get('/:id', checkContentAccess, getVideoById);          // single video + metadata (with access control)
 
 module.exports = router;

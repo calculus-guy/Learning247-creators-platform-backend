@@ -127,7 +127,23 @@ exports.getLiveClassById = async (req, res) => {
     const { id } = req.params;
     const live = await LiveClass.findByPk(id);
     if (!live) return res.status(404).json({ message: 'Live class not found.' });
-    return res.json(live);
+    
+    // Access control check (handled by middleware)
+    if (!req.hasAccess) {
+      return res.status(402).json({
+        success: false,
+        message: 'Payment required to access this live class',
+        requiresPayment: true,
+        price: live.price
+      });
+    }
+
+    return res.json({
+      ...live.dataValues,
+      accessGranted: true,
+      accessReason: req.accessReason,
+      purchaseDate: req.purchaseDate || null
+    });
   } catch (error) {
     return handleError(res, error);
   }
@@ -139,10 +155,25 @@ exports.getPlayback = async (req, res) => {
     const live = await LiveClass.findByPk(id);
     
     if (!live) return res.status(404).json({ message: 'Live class not found.' });
+    
+    // Access control check (handled by middleware)
+    if (!req.hasAccess) {
+      return res.status(402).json({
+        success: false,
+        message: 'Payment required to access this live class',
+        requiresPayment: true,
+        price: live.price
+      });
+    }
+
     if (!live.mux_playback_id) return res.status(400).json({ message: 'Playback ID not generated yet.' });
 
     const url = muxLiveService.generatePlaybackUrl(live.mux_playback_id);
-    return res.json({ playbackUrl: url });
+    return res.json({ 
+      playbackUrl: url,
+      accessGranted: true,
+      accessReason: req.accessReason
+    });
   } catch (error) {
     return handleError(res, error);
   }
