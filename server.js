@@ -13,6 +13,7 @@ const videoRoutes = require('./routes/videoRoutes');
 const liveRoutes = require('./routes/liveRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
+const walletRoutes = require('./routes/walletRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 
@@ -53,6 +54,7 @@ app.use('/event', registrationRoutes);
 app.use('/live', liveRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
+app.use('/api/wallet', walletRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
