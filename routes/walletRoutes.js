@@ -24,6 +24,9 @@ router.get('/banks', authMiddleware, walletController.getBanks);
 // Calculate withdrawal fees (preview)
 router.post('/calculate-fees', authMiddleware, walletController.calculateFees);
 
+// Test Paystack API connectivity
+router.get('/test-paystack', authMiddleware, walletController.testPaystack);
+
 // Resolve account number to get account name
 router.post('/resolve-account', authMiddleware, walletController.resolveAccount);
 

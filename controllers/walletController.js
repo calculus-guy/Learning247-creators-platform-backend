@@ -278,12 +278,41 @@ exports.calculateFees = async (req, res) => {
 };
 
 /**
+ * Test Paystack API connectivity
+ * GET /api/wallet/test-paystack
+ */
+exports.testPaystack = async (req, res) => {
+  try {
+    const { paystackClient } = require('../config/paystack');
+    
+    // Simple test - get banks list
+    const response = await paystackClient.get('/bank?currency=NGN&perPage=5');
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Paystack API is working',
+      sampleBanks: response.data.data.slice(0, 3),
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Paystack test error:', error.response?.data || error.message);
+    
+    return res.status(500).json({
+      success: false,
+      message: 'Paystack API is not responding',
+      error: error.response?.data || error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+};
+
+/**
  * Resolve account number to get account name
  * POST /api/wallet/resolve-account
  */
 exports.resolveAccount = async (req, res) => {
   try {
-    const { accountNumber, bankCode } = req.body;
+    const { accountNumber, bankCode, fallbackMode = false } = req.body;
 
     // Validate input
     if (!accountNumber || !bankCode) {
@@ -301,6 +330,32 @@ exports.resolveAccount = async (req, res) => {
       });
     }
 
+    // If fallback mode, skip Paystack and return basic info
+    if (fallbackMode) {
+      const { getNigerianBanks } = require('../services/payoutService');
+      try {
+        const banks = await getNigerianBanks();
+        const bank = banks.find(b => b.code === bankCode);
+        
+        return res.status(200).json({
+          success: true,
+          data: {
+            accountNumber,
+            accountName: null, // User will need to enter manually
+            bankCode,
+            bankName: bank ? bank.name : null,
+            fallbackMode: true,
+            message: 'Account verification temporarily unavailable. Please verify account details manually.'
+          }
+        });
+      } catch (fallbackError) {
+        return res.status(500).json({
+          success: false,
+          message: 'Service temporarily unavailable'
+        });
+      }
+    }
+
     const accountDetails = await resolveAccountNumber(accountNumber, bankCode);
 
     return res.status(200).json({
@@ -314,7 +369,8 @@ exports.resolveAccount = async (req, res) => {
     if (error.message.includes('Could not resolve account name')) {
       return res.status(404).json({
         success: false,
-        message: 'Account not found. Please verify the account number and bank code.'
+        message: 'Account not found. Please verify the account number and bank code.',
+        fallbackSuggestion: 'Try using fallbackMode: true in request body to proceed manually'
       });
     }
 
@@ -327,7 +383,9 @@ exports.resolveAccount = async (req, res) => {
 
     return res.status(500).json({
       success: false,
-      message: 'Failed to resolve account details'
+      message: 'Failed to resolve account details. Paystack API may be temporarily unavailable.',
+      debug: error.message,
+      fallbackSuggestion: 'Try using fallbackMode: true in request body to proceed manually'
     });
   }
 };
