@@ -268,36 +268,6 @@ async function getNigerianBanks() {
 }
 
 /**
- * Get bank name from bank code (static lookup for reliability)
- */
-function getBankNameFromCode(bankCode) {
-  const bankNames = {
-    '044': 'Access Bank',
-    '023': 'Citibank',
-    '063': 'Diamond Bank',
-    '050': 'Ecobank Nigeria',
-    '070': 'Fidelity Bank',
-    '011': 'First Bank of Nigeria',
-    '214': 'First City Monument Bank',
-    '058': 'Guaranty Trust Bank',
-    '030': 'Heritage Bank',
-    '082': 'Keystone Bank',
-    '076': 'Polaris Bank',
-    '101': 'Providus Bank',
-    '221': 'Stanbic IBTC Bank',
-    '068': 'Standard Chartered Bank',
-    '232': 'Sterling Bank',
-    '032': 'Union Bank of Nigeria',
-    '033': 'United Bank for Africa',
-    '215': 'Unity Bank',
-    '035': 'Wema Bank',
-    '057': 'Zenith Bank'
-  };
-  
-  return bankNames[bankCode] || null;
-}
-
-/**
  * Resolve account number to get account name
  * @param {string} accountNumber - 10-digit account number
  * @param {string} bankCode - Bank code from Paystack
@@ -305,23 +275,45 @@ function getBankNameFromCode(bankCode) {
  */
 async function resolveAccountNumber(accountNumber, bankCode) {
   try {
+    console.log(`Resolving account: ${accountNumber} for bank code: ${bankCode}`);
+    
     const response = await paystackClient.get(`/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
     
+    console.log('Paystack response:', JSON.stringify(response.data, null, 2));
+    
     if (!response.data.status) {
+      console.error('Paystack returned status false:', response.data.message);
       throw new Error(response.data.message || 'Could not resolve account name');
     }
 
-    // Get bank name from static lookup (more reliable than additional API call)
-    const bankName = getBankNameFromCode(bankCode);
+    // Try to get bank name dynamically from banks API
+    let bankName = null;
+    try {
+      const banksResponse = await getNigerianBanks();
+      const bank = banksResponse.find(b => b.code === bankCode);
+      bankName = bank ? bank.name : null;
+      console.log(`Found bank name: ${bankName} for code: ${bankCode}`);
+    } catch (bankError) {
+      console.warn('Could not fetch bank name dynamically:', bankError.message);
+      // Fallback to null - the account name is what matters most
+    }
 
-    return {
+    const result = {
       accountNumber,
       accountName: response.data.data.account_name,
       bankCode,
       bankName
     };
+
+    console.log('Final result:', result);
+    return result;
+
   } catch (error) {
-    console.error('Account resolution error:', error.response?.data || error.message);
+    console.error('Account resolution error details:');
+    console.error('Error message:', error.message);
+    console.error('Error response:', error.response?.data);
+    console.error('Error status:', error.response?.status);
+    console.error('Full error:', error);
     
     if (error.response?.status === 422) {
       throw new Error('Could not resolve account name. Please check the account number and bank code.');
@@ -331,7 +323,9 @@ async function resolveAccountNumber(accountNumber, bankCode) {
       throw new Error('Invalid bank code or account number format');
     }
 
-    throw new Error(error.response?.data?.message || 'Failed to resolve account details');
+    // Return the actual Paystack error message if available
+    const paystackMessage = error.response?.data?.message || error.response?.data?.error;
+    throw new Error(paystackMessage || error.message || 'Failed to resolve account details');
   }
 }
 
