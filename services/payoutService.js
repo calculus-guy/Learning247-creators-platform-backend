@@ -268,6 +268,36 @@ async function getNigerianBanks() {
 }
 
 /**
+ * Get bank name from bank code (static lookup for reliability)
+ */
+function getBankNameFromCode(bankCode) {
+  const bankNames = {
+    '044': 'Access Bank',
+    '023': 'Citibank',
+    '063': 'Diamond Bank',
+    '050': 'Ecobank Nigeria',
+    '070': 'Fidelity Bank',
+    '011': 'First Bank of Nigeria',
+    '214': 'First City Monument Bank',
+    '058': 'Guaranty Trust Bank',
+    '030': 'Heritage Bank',
+    '082': 'Keystone Bank',
+    '076': 'Polaris Bank',
+    '101': 'Providus Bank',
+    '221': 'Stanbic IBTC Bank',
+    '068': 'Standard Chartered Bank',
+    '232': 'Sterling Bank',
+    '032': 'Union Bank of Nigeria',
+    '033': 'United Bank for Africa',
+    '215': 'Unity Bank',
+    '035': 'Wema Bank',
+    '057': 'Zenith Bank'
+  };
+  
+  return bankNames[bankCode] || null;
+}
+
+/**
  * Resolve account number to get account name
  * @param {string} accountNumber - 10-digit account number
  * @param {string} bankCode - Bank code from Paystack
@@ -281,17 +311,8 @@ async function resolveAccountNumber(accountNumber, bankCode) {
       throw new Error(response.data.message || 'Could not resolve account name');
     }
 
-    // Get bank name from banks list since Paystack resolve API doesn't always return it
-    let bankName = null;
-    try {
-      const banksResponse = await paystackClient.get('/bank?currency=NGN');
-      const banks = banksResponse.data.data;
-      const bank = banks.find(b => b.code === bankCode);
-      bankName = bank ? bank.name : null;
-    } catch (bankError) {
-      console.warn('Could not fetch bank name:', bankError.message);
-      // Continue without bank name if this fails
-    }
+    // Get bank name from static lookup (more reliable than additional API call)
+    const bankName = getBankNameFromCode(bankCode);
 
     return {
       accountNumber,
