@@ -9,7 +9,8 @@ const {
   initiateWithdrawal,
   processPaystackPayout,
   processStripePayout,
-  getNigerianBanks
+  getNigerianBanks,
+  resolveAccountNumber
 } = require('../services/payoutService');
 const Payout = require('../models/Payout');
 const User = require('../models/User');
@@ -272,6 +273,61 @@ exports.calculateFees = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to calculate fees'
+    });
+  }
+};
+
+/**
+ * Resolve account number to get account name
+ * POST /api/wallet/resolve-account
+ */
+exports.resolveAccount = async (req, res) => {
+  try {
+    const { accountNumber, bankCode } = req.body;
+
+    // Validate input
+    if (!accountNumber || !bankCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account number and bank code are required'
+      });
+    }
+
+    // Validate account number format (Nigerian account numbers are 10 digits)
+    if (!/^\d{10}$/.test(accountNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Account number must be 10 digits'
+      });
+    }
+
+    const accountDetails = await resolveAccountNumber(accountNumber, bankCode);
+
+    return res.status(200).json({
+      success: true,
+      data: accountDetails
+    });
+  } catch (error) {
+    console.error('Resolve account error:', error);
+    
+    // Handle specific Paystack errors
+    if (error.message.includes('Could not resolve account name')) {
+      return res.status(404).json({
+        success: false,
+        message: 'Account not found. Please verify the account number and bank code.'
+      });
+    }
+
+    if (error.message.includes('Invalid bank code')) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid bank code provided'
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to resolve account details'
     });
   }
 };

@@ -24,6 +24,9 @@ router.get('/banks', authMiddleware, walletController.getBanks);
 // Calculate withdrawal fees (preview)
 router.post('/calculate-fees', authMiddleware, walletController.calculateFees);
 
+// Resolve account number to get account name
+router.post('/resolve-account', authMiddleware, walletController.resolveAccount);
+
 // Get transaction history
 router.get('/transactions', authMiddleware, walletController.getTransactions);
 

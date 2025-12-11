@@ -267,10 +267,46 @@ async function getNigerianBanks() {
   }
 }
 
+/**
+ * Resolve account number to get account name
+ * @param {string} accountNumber - 10-digit account number
+ * @param {string} bankCode - Bank code from Paystack
+ * @returns {object} - Account details
+ */
+async function resolveAccountNumber(accountNumber, bankCode) {
+  try {
+    const response = await paystackClient.get(`/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`);
+    
+    if (!response.data.status) {
+      throw new Error(response.data.message || 'Could not resolve account name');
+    }
+
+    return {
+      accountNumber,
+      accountName: response.data.data.account_name,
+      bankCode,
+      bankName: response.data.data.bank_name || null
+    };
+  } catch (error) {
+    console.error('Account resolution error:', error.response?.data || error.message);
+    
+    if (error.response?.status === 422) {
+      throw new Error('Could not resolve account name. Please check the account number and bank code.');
+    }
+    
+    if (error.response?.status === 400) {
+      throw new Error('Invalid bank code or account number format');
+    }
+
+    throw new Error(error.response?.data?.message || 'Failed to resolve account details');
+  }
+}
+
 module.exports = {
   calculatePayoutFees,
   initiateWithdrawal,
   processPaystackPayout,
   processStripePayout,
-  getNigerianBanks
+  getNigerianBanks,
+  resolveAccountNumber
 };

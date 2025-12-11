@@ -6,8 +6,9 @@ const authMiddleware = require('../middleware/authMiddleware');
 // Initialize payment checkout
 router.post('/initialize', authMiddleware, paymentController.initializeCheckout);
 
-// Verify payment
-router.post('/verify/:reference', authMiddleware, paymentController.verifyPayment);
+// Verify payment (GET and POST, no auth required since reference is unique)
+router.get('/verify/:reference', paymentController.verifyPayment);
+router.post('/verify/:reference', paymentController.verifyPayment);
 
 // Get student's purchase history
 router.get('/my-purchases', authMiddleware, paymentController.getMyPurchases);

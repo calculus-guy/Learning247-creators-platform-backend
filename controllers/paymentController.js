@@ -131,7 +131,7 @@ exports.initializeCheckout = async (req, res) => {
 
 /**
  * Verify payment
- * POST /api/payments/verify/:reference
+ * GET/POST /api/payments/verify/:reference
  */
 exports.verifyPayment = async (req, res) => {
   try {
@@ -141,7 +141,24 @@ exports.verifyPayment = async (req, res) => {
     if (!gateway || !['paystack', 'stripe'].includes(gateway)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or missing gateway parameter'
+        message: 'Invalid or missing gateway parameter. Use ?gateway=paystack or ?gateway=stripe'
+      });
+    }
+
+    console.log(`[Payment Verification] Starting verification for reference: ${reference}, gateway: ${gateway}`);
+
+    // Check if purchase already exists (webhook may have already processed it)
+    const existingPurchase = await Purchase.findOne({
+      where: { paymentReference: reference }
+    });
+
+    if (existingPurchase) {
+      console.log(`[Payment Verification] Purchase already exists for reference: ${reference}`);
+      return res.status(200).json({
+        success: true,
+        message: 'Payment already verified',
+        purchase: existingPurchase,
+        alreadyProcessed: true
       });
     }
 
@@ -154,6 +171,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     if (!verificationResult.success) {
+      console.log(`[Payment Verification] Verification failed for reference: ${reference}`);
       return res.status(400).json({
         success: false,
         message: verificationResult.message || 'Payment verification failed'
@@ -165,7 +183,7 @@ exports.verifyPayment = async (req, res) => {
     let userId, contentType, contentId, amount, currency;
 
     if (gateway === 'paystack') {
-      userId = paymentData.metadata.userId;
+      userId = parseInt(paymentData.metadata.userId);
       contentType = paymentData.metadata.contentType;
       contentId = paymentData.metadata.contentId;
       amount = paymentData.amount / 100; // Convert from kobo
@@ -178,7 +196,9 @@ exports.verifyPayment = async (req, res) => {
       currency = paymentData.currency;
     }
 
-    // Process the payment
+    console.log(`[Payment Verification] Processing payment for user ${userId}, ${contentType} ${contentId}`);
+
+    // Process the payment (this will create the purchase record)
     const result = await processSuccessfulPayment({
       userId,
       contentType,
@@ -189,13 +209,15 @@ exports.verifyPayment = async (req, res) => {
       gateway
     });
 
+    console.log(`[Payment Verification] Payment processed successfully for reference: ${reference}`);
+
     return res.status(200).json({
       success: true,
       message: result.message,
       purchase: result.purchase
     });
   } catch (error) {
-    console.error('Verify payment error:', error);
+    console.error('[Payment Verification] Error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to verify payment'

@@ -156,6 +156,8 @@ async function processSuccessfulPayment({ userId, contentType, contentId, amount
   const transaction = await sequelize.transaction();
   
   try {
+    console.log(`[Process Payment] Starting for user ${userId}, ${contentType} ${contentId}, amount: ${amount}`);
+
     // Check if purchase already exists (idempotency)
     const existingPurchase = await Purchase.findOne({
       where: { paymentReference: reference }
@@ -163,6 +165,7 @@ async function processSuccessfulPayment({ userId, contentType, contentId, amount
 
     if (existingPurchase) {
       await transaction.rollback();
+      console.log(`[Process Payment] Purchase already exists for reference: ${reference}`);
       return {
         success: true,
         purchase: existingPurchase,
@@ -172,24 +175,28 @@ async function processSuccessfulPayment({ userId, contentType, contentId, amount
 
     // Create purchase record
     const purchase = await Purchase.create({
-      userId,
+      userId: parseInt(userId),
       contentType,
       contentId,
-      amount,
+      amount: parseFloat(amount),
       currency: currency || 'NGN',
       paymentGateway: gateway,
       paymentReference: reference,
       paymentStatus: 'completed'
     }, { transaction });
 
+    console.log(`[Process Payment] Purchase created with ID: ${purchase.id}`);
+
     // Get content creator ID
     let creatorId;
     if (contentType === 'video') {
       const video = await Video.findByPk(contentId);
       creatorId = video?.userId;
+      console.log(`[Process Payment] Video creator ID: ${creatorId}`);
     } else if (contentType === 'live_class') {
       const liveClass = await LiveClass.findByPk(contentId);
       creatorId = liveClass?.userId;
+      console.log(`[Process Payment] Live class creator ID: ${creatorId}`);
     }
 
     if (creatorId) {
@@ -199,19 +206,24 @@ async function processSuccessfulPayment({ userId, contentType, contentId, amount
       if (!wallet) {
         wallet = await Wallet.create({
           userId: creatorId,
-          totalEarnings: amount,
+          totalEarnings: parseFloat(amount),
           withdrawnAmount: 0,
           pendingAmount: 0,
           currency: currency || 'NGN'
         }, { transaction });
+        console.log(`[Process Payment] Wallet created for creator ${creatorId}`);
       } else {
         // Update wallet earnings
         wallet.totalEarnings = parseFloat(wallet.totalEarnings) + parseFloat(amount);
         await wallet.save({ transaction });
+        console.log(`[Process Payment] Wallet updated for creator ${creatorId}, new total: ${wallet.totalEarnings}`);
       }
+    } else {
+      console.log(`[Process Payment] Warning: No creator found for ${contentType} ${contentId}`);
     }
 
     await transaction.commit();
+    console.log(`[Process Payment] Transaction committed successfully for reference: ${reference}`);
 
     return {
       success: true,
@@ -220,7 +232,7 @@ async function processSuccessfulPayment({ userId, contentType, contentId, amount
     };
   } catch (error) {
     await transaction.rollback();
-    console.error('Process payment error:', error);
+    console.error('[Process Payment] Error:', error);
     throw error;
   }
 }
