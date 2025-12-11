@@ -281,11 +281,23 @@ async function resolveAccountNumber(accountNumber, bankCode) {
       throw new Error(response.data.message || 'Could not resolve account name');
     }
 
+    // Get bank name from banks list since Paystack resolve API doesn't always return it
+    let bankName = null;
+    try {
+      const banksResponse = await paystackClient.get('/bank?currency=NGN');
+      const banks = banksResponse.data.data;
+      const bank = banks.find(b => b.code === bankCode);
+      bankName = bank ? bank.name : null;
+    } catch (bankError) {
+      console.warn('Could not fetch bank name:', bankError.message);
+      // Continue without bank name if this fails
+    }
+
     return {
       accountNumber,
       accountName: response.data.data.account_name,
       bankCode,
-      bankName: response.data.data.bank_name || null
+      bankName
     };
   } catch (error) {
     console.error('Account resolution error:', error.response?.data || error.message);
