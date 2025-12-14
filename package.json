@@ -5,7 +5,16 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "jest",
+    "test:watch": "jest --watch"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testTimeout": 30000,
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ]
   },
   "author": "Abdul-Lateef",
   "license": "ISC",
@@ -32,10 +41,14 @@
     "rate-limit-redis": "^4.2.3",
     "redis": "^5.8.3",
     "sequelize": "^6.37.7",
-    "stripe": "^20.0.0"
+    "stripe": "^20.0.0",
+    "zego-express-engine-webrtc": "^3.11.0"
   },
   "keywords": [],
   "devDependencies": {
-    "nodemon": "^3.1.10"
+    "fast-check": "^4.4.0",
+    "jest": "^30.2.0",
+    "nodemon": "^3.1.10",
+    "supertest": "^7.1.4"
   }
 }

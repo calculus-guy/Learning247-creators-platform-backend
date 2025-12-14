@@ -25,10 +25,80 @@ const LiveClass = sequelize.define('LiveClass', {
   mux_playback_id: { type: DataTypes.STRING, allowNull: true },
   recording_asset_id: { type: DataTypes.STRING, allowNull: true },
 
+  // ZegoCloud fields
+  zego_room_id: { type: DataTypes.STRING, allowNull: true },
+  zego_app_id: { type: DataTypes.STRING, allowNull: true },
+  streaming_provider: { 
+    type: DataTypes.ENUM('mux', 'zegocloud'), 
+    defaultValue: 'zegocloud',
+    validate: {
+      isIn: [['mux', 'zegocloud']]
+    }
+  },
+  zego_room_token: { type: DataTypes.TEXT, allowNull: true },
+  max_participants: { 
+    type: DataTypes.INTEGER, 
+    allowNull: true,
+    defaultValue: 50,
+    validate: {
+      min: 1,
+      max: 1000
+    }
+  },
+
 }, {
   tableName: 'live_classes',
   timestamps: true,
-  underscored: true
+  underscored: true,
+  validate: {
+    // Custom validation to ensure proper provider-specific fields
+    providerFieldsConsistency() {
+      if (this.streaming_provider === 'zegocloud') {
+        if (this.status === 'live' && !this.zego_room_id) {
+          throw new Error('ZegoCloud room ID is required for live classes using ZegoCloud');
+        }
+      } else if (this.streaming_provider === 'mux') {
+        if (this.status === 'live' && !this.mux_stream_id) {
+          throw new Error('Mux stream ID is required for live classes using Mux');
+        }
+      }
+    }
+  }
 });
+
+// Instance methods for ZegoCloud functionality
+LiveClass.prototype.isZegoCloudProvider = function() {
+  return this.streaming_provider === 'zegocloud';
+};
+
+LiveClass.prototype.isMuxProvider = function() {
+  return this.streaming_provider === 'mux';
+};
+
+LiveClass.prototype.getStreamingConfig = function() {
+  if (this.isZegoCloudProvider()) {
+    return {
+      provider: 'zegocloud',
+      roomId: this.zego_room_id,
+      appId: this.zego_app_id,
+      token: this.zego_room_token,
+      maxParticipants: this.max_participants
+    };
+  } else if (this.isMuxProvider()) {
+    return {
+      provider: 'mux',
+      streamId: this.mux_stream_id,
+      streamKey: this.mux_stream_key,
+      rtmpUrl: this.mux_rtmp_url,
+      playbackId: this.mux_playback_id
+    };
+  }
+  return null;
+};
+
+LiveClass.prototype.canAcceptMoreParticipants = function(currentCount) {
+  if (!this.isZegoCloudProvider()) return true;
+  return !this.max_participants || currentCount < this.max_participants;
+};
 
 module.exports = LiveClass;
