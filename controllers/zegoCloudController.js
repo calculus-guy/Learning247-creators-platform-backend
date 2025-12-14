@@ -1,11 +1,7 @@
 const { zegoCloudService, ZegoCloudError } = require('../services/zegoCloudService');
-const { 
-  createError, 
-  validateRequiredFields, 
-  validateUserPermissions,
-  logOperation 
-} = require('../utils/zegoCloudErrors');
-const LiveClass = require('../models/LiveClass');
+// Note: Error handling utilities available if needed
+// const { createError, validateRequiredFields, validateUserPermissions, logOperation } = require('../utils/zegoCloudErrors');
+const LiveClass = require('../models/liveClass');
 const User = require('../models/User');
 const crypto = require('crypto');
 

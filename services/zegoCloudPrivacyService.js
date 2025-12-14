@@ -1,4 +1,4 @@
-const LiveClass = require('../models/LiveClass');
+const LiveClass = require('../models/liveClass');
 const User = require('../models/User');
 const { ZegoCloudError } = require('./zegoCloudService');
 
