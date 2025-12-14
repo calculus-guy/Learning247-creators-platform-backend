@@ -2,11 +2,13 @@ const express = require('express');
 const router = express.Router();
 
 // Import middleware
-const { authenticateToken } = require('../middleware/authMiddleware');
+const authenticateToken = require('../middleware/authMiddleware');
 const { checkContentAccess } = require('../middleware/purchaseMiddleware');
-const { errorHandler } = require('../utils/zegoCloudErrors');
 
 // Import controller methods
+const zegoCloudController = require('../controllers/zegoCloudController');
+
+// Extract functions from controller
 const {
   createRoom,
   joinRoom,
@@ -16,7 +18,7 @@ const {
   removeParticipant,
   getInvitationCode,
   validateInvitation
-} = require('../controllers/zegoCloudController');
+} = zegoCloudController;
 
 /**
  * ZegoCloud Live Streaming Routes
@@ -152,7 +154,6 @@ router.get('/config', authenticateToken, (req, res) => {
   }
 });
 
-// Error handling middleware (must be last)
-router.use(errorHandler);
+// Routes are ready
 
 module.exports = router;
