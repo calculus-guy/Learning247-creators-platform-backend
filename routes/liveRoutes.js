@@ -15,4 +15,8 @@ router.get('/:id/playback', checkContentAccess, liveController.getPlayback);
 router.get('/:id/hosts', authMiddleware, liveController.getHosts);
 router.get('/:id/attendees', authMiddleware, liveController.getAttendees);
 
+// ZegoCloud specific routes
+router.post('/:id/start-zegocloud', authMiddleware, liveController.startZegoCloudSession);
+router.post('/:id/end-zegocloud', authMiddleware, liveController.endZegoCloudSession);
+
 module.exports = router;

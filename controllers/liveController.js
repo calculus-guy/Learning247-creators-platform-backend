@@ -46,14 +46,40 @@ const handleError = (res, error) => {
 
 exports.createLiveClass = async (req, res) => {
   try {
-    const { title, description, price, thumbnailUrl, startTime, endTime, privacy } = req.body;
+    const { title, description, price, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
     const userId = req.user.id; 
 
     // Basic check before calling services
     if (!title) return res.status(400).json({ success: false, message: "Title is required" });
 
-    // Step 1: Create Mux live stream
-    const muxDetails = await muxLiveService.createLiveStream({ title, passthrough: '' });
+    // Validate streaming provider
+    if (!['mux', 'zegocloud'].includes(streamingProvider)) {
+      return res.status(400).json({ success: false, message: "Invalid streaming provider. Must be 'mux' or 'zegocloud'" });
+    }
+
+    let streamingDetails = {};
+
+    if (streamingProvider === 'mux') {
+      // Step 1a: Create Mux live stream
+      const muxDetails = await muxLiveService.createLiveStream({ title, passthrough: '' });
+      streamingDetails = {
+        streaming_provider: 'mux',
+        mux_stream_id: muxDetails.mux_stream_id,
+        mux_stream_key: muxDetails.mux_stream_key,
+        mux_rtmp_url: muxDetails.mux_rtmp_url,
+        mux_playback_id: muxDetails.mux_playback_id
+      };
+    } else if (streamingProvider === 'zegocloud') {
+      // Step 1b: Prepare for ZegoCloud (room will be created when going live)
+      streamingDetails = {
+        streaming_provider: 'zegocloud',
+        // ZegoCloud fields will be populated when creator starts the live session
+        zego_room_id: null,
+        zego_app_id: null,
+        zego_room_token: null,
+        max_participants: req.body.maxParticipants || 50
+      };
+    }
 
     // Step 2: Create LiveClass row
     const liveClass = await LiveClass.create({
@@ -66,10 +92,7 @@ exports.createLiveClass = async (req, res) => {
       endTime,
       privacy,
       status: 'scheduled', // Ensure this matches your Enum definition exactly
-      mux_stream_id: muxDetails.mux_stream_id,
-      mux_stream_key: muxDetails.mux_stream_key,
-      mux_rtmp_url: muxDetails.mux_rtmp_url,
-      mux_playback_id: muxDetails.mux_playback_id
+      ...streamingDetails
     });
 
     // Step 3: Add creator as primary host
@@ -79,7 +102,16 @@ exports.createLiveClass = async (req, res) => {
       role: 'creator'
     });
 
-    return res.json({ success: true, liveClass });
+    return res.json({ 
+      success: true, 
+      liveClass: {
+        ...liveClass.dataValues,
+        // Include helpful info for frontend
+        streamingProvider: liveClass.streaming_provider,
+        isZegoCloud: liveClass.streaming_provider === 'zegocloud',
+        isMux: liveClass.streaming_provider === 'mux'
+      }
+    });
   } catch (error) {
     return handleError(res, error);
   }
@@ -199,6 +231,141 @@ exports.getAttendees = async (req, res) => {
   }
 };
 
+/**
+ * Start ZegoCloud live session
+ * POST /live/:id/start-zegocloud
+ */
+exports.startZegoCloudSession = async (req, res) => {
+  try {
+    const { id: liveClassId } = req.params;
+    const userId = req.user.id;
+
+    // Get live class details
+    const liveClass = await LiveClass.findByPk(liveClassId);
+    if (!liveClass) {
+      return res.status(404).json({
+        success: false,
+        message: 'Live class not found'
+      });
+    }
+
+    // Only creator can start the session
+    if (liveClass.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the creator can start the live session'
+      });
+    }
+
+    // Must be a ZegoCloud live class
+    if (liveClass.streaming_provider !== 'zegocloud') {
+      return res.status(400).json({
+        success: false,
+        message: 'This live class is not configured for ZegoCloud streaming'
+      });
+    }
+
+    // Check if already live
+    if (liveClass.status === 'live') {
+      return res.status(409).json({
+        success: false,
+        message: 'Live class is already active',
+        data: {
+          roomId: liveClass.zego_room_id,
+          appId: liveClass.zego_app_id,
+          creatorToken: liveClass.zego_room_token
+        }
+      });
+    }
+
+    // Import ZegoCloud service
+    const { zegoCloudService } = require('../services/zegoCloudService');
+
+    // Start the live session
+    const sessionResult = await zegoCloudService.startLiveSession(liveClassId, userId, {
+      maxParticipants: liveClass.max_participants,
+      privacy: liveClass.privacy
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'ZegoCloud live session started successfully',
+      data: {
+        liveClassId: sessionResult.liveClassId,
+        roomId: sessionResult.roomId,
+        appId: sessionResult.appId,
+        creatorToken: sessionResult.creatorToken,
+        sessionStartedAt: sessionResult.sessionStartedAt,
+        liveClass: {
+          id: liveClass.id,
+          title: liveClass.title,
+          description: liveClass.description,
+          privacy: liveClass.privacy,
+          maxParticipants: liveClass.max_participants
+        }
+      }
+    });
+
+  } catch (error) {
+    return handleError(res, error);
+  }
+};
+
+/**
+ * End ZegoCloud live session
+ * POST /live/:id/end-zegocloud
+ */
+exports.endZegoCloudSession = async (req, res) => {
+  try {
+    const { id: liveClassId } = req.params;
+    const userId = req.user.id;
+
+    // Get live class details
+    const liveClass = await LiveClass.findByPk(liveClassId);
+    if (!liveClass) {
+      return res.status(404).json({
+        success: false,
+        message: 'Live class not found'
+      });
+    }
+
+    // Only creator can end the session
+    if (liveClass.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only the creator can end the live session'
+      });
+    }
+
+    // Must be a ZegoCloud live class
+    if (liveClass.streaming_provider !== 'zegocloud') {
+      return res.status(400).json({
+        success: false,
+        message: 'This live class is not configured for ZegoCloud streaming'
+      });
+    }
+
+    // Import ZegoCloud service
+    const { zegoCloudService } = require('../services/zegoCloudService');
+
+    // End the live session
+    const endResult = await zegoCloudService.endLiveSession(liveClassId, 'creator_ended');
+
+    return res.status(200).json({
+      success: true,
+      message: 'ZegoCloud live session ended successfully',
+      data: {
+        liveClassId: endResult.liveClassId,
+        endedAt: endResult.endedAt,
+        reason: endResult.reason
+      }
+    });
+
+  } catch (error) {
+    return handleError(res, error);
+  }
+};
+
 exports.getAllLiveClasses = async (req, res) => {
   try {
     const { status, privacy } = req.query;
@@ -227,11 +394,16 @@ exports.getAllLiveClasses = async (req, res) => {
       ]
     });
 
-    // The status is managed by Mux webhooks:
+    // The status is managed by Mux webhooks for Mux streams:
     // - "scheduled" = created but not streaming yet
     // - "live" = actively streaming (set by webhook: video.live_stream.active)
     // - "ended" = stream stopped (set by webhook: video.live_stream.idle)
     // - "recorded" = recording available (set by webhook: video.live_stream.completed)
+    
+    // For ZegoCloud streams, status is managed by our service:
+    // - "scheduled" = created but not started yet
+    // - "live" = ZegoCloud room is active
+    // - "ended" = ZegoCloud session ended
 
     return res.json({
       count: liveClasses.length,
