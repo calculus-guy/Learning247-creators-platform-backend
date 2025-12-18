@@ -66,7 +66,7 @@ exports.getMe = async (req, res) => {
 
     // Fetch user details from database
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'firstname', 'lastname', 'email', 'role', 'provider', 'createdAt', 'updatedAt']
+      attributes: ['id', 'firstname', 'lastname', 'email', 'role', 'createdAt', 'updatedAt']
     });
 
     if (!user) {
