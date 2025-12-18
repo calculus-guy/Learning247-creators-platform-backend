@@ -59,17 +59,7 @@ exports.createLiveClass = async (req, res) => {
 
     let streamingDetails = {};
 
-    if (streamingProvider === 'mux') {
-      // Step 1a: Create Mux live stream
-      const muxDetails = await muxLiveService.createLiveStream({ title, passthrough: '' });
-      streamingDetails = {
-        streaming_provider: 'mux',
-        mux_stream_id: muxDetails.mux_stream_id,
-        mux_stream_key: muxDetails.mux_stream_key,
-        mux_rtmp_url: muxDetails.mux_rtmp_url,
-        mux_playback_id: muxDetails.mux_playback_id
-      };
-    } else if (streamingProvider === 'zegocloud') {
+    if (streamingProvider === 'zegocloud') {
       // Step 1b: Prepare for ZegoCloud (room will be created when going live)
       streamingDetails = {
         streaming_provider: 'zegocloud',
@@ -80,6 +70,18 @@ exports.createLiveClass = async (req, res) => {
         max_participants: req.body.maxParticipants || 50
       };
     }
+    
+    else if (streamingProvider === 'mux') {
+      // Step 1a: Create Mux live stream
+      const muxDetails = await muxLiveService.createLiveStream({ title, passthrough: '' });
+      streamingDetails = {
+        streaming_provider: 'mux',
+        mux_stream_id: muxDetails.mux_stream_id,
+        mux_stream_key: muxDetails.mux_stream_key,
+        mux_rtmp_url: muxDetails.mux_rtmp_url,
+        mux_playback_id: muxDetails.mux_playback_id
+      };
+    } 
 
     // Step 2: Create LiveClass row
     const liveClass = await LiveClass.create({
