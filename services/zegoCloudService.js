@@ -95,33 +95,47 @@ class ZegoCloudService {
         throw new Error('Room ID and User ID are required');
       }
 
-      // Token payload with microsecond precision for uniqueness
-      const now = Date.now();
+      // ZegoCloud specific token generation
+      const appId = parseInt(ZEGO_APP_ID);
+      const userIdStr = userId.toString();
+      const serverSecret = ZEGO_SERVER_SECRET;
+      const effectiveTimeInSeconds = ZEGO_TOKEN_EXPIRY || 3600;
+      
+      // Current timestamp
+      const now = Math.floor(Date.now() / 1000);
+      const exp = now + effectiveTimeInSeconds;
+      
+      // ZegoCloud token payload structure
       const payload = {
-        iss: ZEGO_APP_ID,
-        exp: Math.floor(now / 1000) + ZEGO_TOKEN_EXPIRY,
-        iat: Math.floor(now / 1000),
-        nonce: now + Math.random(), // Added nonce for uniqueness
-        aud: 'zegocloud',
-        room_id: roomId,
-        user_id: userId.toString(),
-        role: role,
-        privilege: this.getRolePrivileges(role)
+        iss: appId,                    // App ID as issuer
+        exp: exp,                      // Expiration time
+        iat: now,                      // Issued at time
+        aud: 'zegocloud',             // Audience
+        room_id: roomId,              // Room ID
+        user_id: userIdStr,           // User ID as string
+        privilege: this.getZegoPrivileges(role), // ZegoCloud privileges
+        stream_id_list: null          // Stream permissions (null = all streams)
       };
 
-      // Create token using HMAC SHA256
+      // Create header
       const header = {
         alg: 'HS256',
         typ: 'JWT'
       };
 
-      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64url');
-      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
+      // Encode header and payload
+      const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
       
+      // Create signature
+      const signatureInput = `${encodedHeader}.${encodedPayload}`;
       const signature = crypto
-        .createHmac('sha256', ZEGO_SERVER_SECRET)
-        .update(`${encodedHeader}.${encodedPayload}`)
-        .digest('base64url');
+        .createHmac('sha256', serverSecret)
+        .update(signatureInput)
+        .digest('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
 
       const token = `${encodedHeader}.${encodedPayload}.${signature}`;
       
@@ -136,6 +150,19 @@ class ZegoCloudService {
         { roomId, userId, role, error: error.message }
       );
     }
+  }
+
+  /**
+   * Base64 URL encode helper
+   * @param {string} str - String to encode
+   * @returns {string} Base64 URL encoded string
+   */
+  base64UrlEncode(str) {
+    return Buffer.from(str)
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
   }
 
   /**
@@ -642,7 +669,32 @@ class ZegoCloudService {
   }
 
   /**
-   * Get role-based privileges for token generation
+   * Get ZegoCloud specific privileges for token generation
+   * @param {string} role - User role
+   * @returns {Object} ZegoCloud privilege object
+   */
+  getZegoPrivileges(role) {
+    // ZegoCloud privilege constants
+    const PRIVILEGE_KEY_LOGIN = 1;           // Login privilege
+    const PRIVILEGE_KEY_PUBLISH = 2;         // Publish stream privilege
+    
+    const privileges = {};
+    
+    // All users can login
+    privileges[PRIVILEGE_KEY_LOGIN] = 1;
+    
+    // Set publish privileges based on role
+    if (role === 'host' || role === 'participant') {
+      privileges[PRIVILEGE_KEY_PUBLISH] = 1;  // Can publish
+    } else {
+      privileges[PRIVILEGE_KEY_PUBLISH] = 0;  // Cannot publish (audience)
+    }
+
+    return privileges;
+  }
+
+  /**
+   * Get role-based privileges for token generation (legacy method)
    * @param {string} role - User role
    * @returns {Object} Role privileges
    */
