@@ -58,3 +58,43 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+exports.getMe = async (req, res) => {
+  try {
+    // Get user ID from the authenticated request (set by authMiddleware)
+    const userId = req.user.id;
+
+    // Fetch user details from database
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'firstname', 'lastname', 'email', 'role', 'provider', 'createdAt', 'updatedAt']
+    });
+
+    if (!user) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'User not found' 
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        id: user.id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        role: user.role,
+        // provider: user.provider || 'local',
+        fullName: `${user.firstname} ${user.lastname}`.trim(),
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error('Get user profile error:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch user profile' 
+    });
+  }
+};

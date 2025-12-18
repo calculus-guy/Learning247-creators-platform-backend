@@ -2,7 +2,7 @@ const express = require('express');
 const passport = require('passport');
 const { body } = require('express-validator');
 const jwt = require('jsonwebtoken');
-const { signup, login } = require('../controllers/authController');
+const { signup, login, getMe } = require('../controllers/authController');
 const rateLimiter = require('../middleware/rateLimiter');
 const authMiddleware = require('../middleware/authMiddleware');
 const { googleStrategy } = require('../services/oauthService');
@@ -26,6 +26,9 @@ router.post('/login', [
   body('email').isEmail().withMessage('Invalid email address'),
   body('password').not().isEmpty().withMessage('Password is required')
 ], rateLimiter, login);
+
+// Get Current User Profile
+router.get('/me', authMiddleware, getMe);
 
 // Google OAuth Routes
 router.get('/google', passport.authenticate('google', { scope: ['email', 'profile'] }));
