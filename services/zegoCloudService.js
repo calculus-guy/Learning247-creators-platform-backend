@@ -466,11 +466,11 @@ class ZegoCloudService {
       // Create ZegoCloud room
       const roomResult = await this.createRoom(liveClassId, creatorId, options);
       
-      // Update database with room information
+      // ✅ Update database with room information (NO TOKEN STORAGE)
       await existingClass.update({
         zego_room_id: roomResult.roomId,
         zego_app_id: roomResult.appId,
-        zego_room_token: roomResult.creatorToken,
+        // ❌ REMOVED: zego_room_token: roomResult.creatorToken,
         status: 'live',
         max_participants: options.maxParticipants || existingClass.max_participants,
         updatedAt: new Date()
@@ -483,7 +483,7 @@ class ZegoCloudService {
         liveClassId,
         roomId: roomResult.roomId,
         appId: roomResult.appId,
-        creatorToken: roomResult.creatorToken,
+        creatorToken: roomResult.creatorToken, // ✅ Return token but don't store it
         sessionStartedAt: new Date()
       };
     } catch (error) {

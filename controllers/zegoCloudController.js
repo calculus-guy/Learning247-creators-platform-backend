@@ -278,7 +278,7 @@ const createRoom = async (req, res) => {
       zego_room_id: roomResult.roomId,
       zego_app_id: roomResult.appId,
       streaming_provider: 'zegocloud',
-      zego_room_token: roomResult.creatorToken,
+      // ❌ REMOVED: zego_room_token: roomResult.creatorToken,
       max_participants: maxParticipants || null,
       status: 'live'
     });

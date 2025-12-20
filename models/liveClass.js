@@ -35,7 +35,7 @@ const LiveClass = sequelize.define('LiveClass', {
       isIn: [['mux', 'zegocloud']]
     }
   },
-  zego_room_token: { type: DataTypes.TEXT, allowNull: true },
+  // ❌ REMOVED: zego_room_token - tokens are generated per-request
   max_participants: { 
     type: DataTypes.INTEGER, 
     allowNull: true,
@@ -81,7 +81,7 @@ LiveClass.prototype.getStreamingConfig = function() {
       provider: 'zegocloud',
       roomId: this.zego_room_id,
       appId: this.zego_app_id,
-      token: this.zego_room_token,
+      // ❌ REMOVED: token - tokens are generated per-request for security
       maxParticipants: this.max_participants
     };
   } else if (this.isMuxProvider()) {

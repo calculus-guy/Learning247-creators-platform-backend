@@ -172,12 +172,18 @@ exports.getLiveClassById = async (req, res) => {
       });
     }
 
-    return res.json({
+    // ✅ Add streaming provider info for frontend
+    const response = {
       ...live.dataValues,
       accessGranted: true,
       accessReason: req.accessReason,
-      purchaseDate: req.purchaseDate || null
-    });
+      purchaseDate: req.purchaseDate || null,
+      // ✅ Helper flags for frontend
+      isZegoCloud: live.streaming_provider === 'zegocloud',
+      isMux: live.streaming_provider === 'mux'
+    };
+
+    return res.json(response);
   } catch (error) {
     return handleError(res, error);
   }
@@ -200,14 +206,30 @@ exports.getPlayback = async (req, res) => {
       });
     }
 
-    if (!live.mux_playback_id) return res.status(400).json({ message: 'Playback ID not generated yet.' });
+    // ✅ ONLY check playback ID for Mux streams
+    if (live.streaming_provider === 'mux') {
+      if (!live.mux_playback_id) {
+        return res.status(400).json({ message: 'Playback ID not generated yet.' });
+      }
+      const url = muxLiveService.generatePlaybackUrl(live.mux_playback_id);
+      return res.json({ 
+        playbackUrl: url,
+        accessGranted: true,
+        accessReason: req.accessReason
+      });
+    }
 
-    const url = muxLiveService.generatePlaybackUrl(live.mux_playback_id);
-    return res.json({ 
-      playbackUrl: url,
-      accessGranted: true,
-      accessReason: req.accessReason
-    });
+    // ✅ For ZegoCloud, redirect to join-room endpoint
+    if (live.streaming_provider === 'zegocloud') {
+      return res.status(400).json({
+        success: false,
+        message: 'ZegoCloud streams use real-time joining. Use /api/live/zegocloud/join-room instead.',
+        redirectTo: `/api/live/zegocloud/join-room`,
+        liveClassId: live.id
+      });
+    }
+
+    return res.status(400).json({ message: 'Unknown streaming provider.' });
   } catch (error) {
     return handleError(res, error);
   }
@@ -269,13 +291,17 @@ exports.startZegoCloudSession = async (req, res) => {
 
     // Check if already live
     if (liveClass.status === 'live') {
+      // ✅ Generate fresh token for creator instead of using stored one
+      const { zegoCloudService } = require('../services/zegoCloudService');
+      const freshToken = zegoCloudService.generateToken(liveClass.zego_room_id, userId, 'host');
+      
       return res.status(409).json({
         success: false,
         message: 'Live class is already active',
         data: {
           roomId: liveClass.zego_room_id,
           appId: liveClass.zego_app_id,
-          creatorToken: liveClass.zego_room_token
+          creatorToken: freshToken // ✅ Fresh token, not stored one
         }
       });
     }
