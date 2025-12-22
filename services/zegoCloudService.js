@@ -174,27 +174,42 @@ class ZegoCloudService {
       const now = Math.floor(Date.now() / 1000);
       const exp = now + effectiveTimeInSeconds;
       
-      // UI Kit specific payload structure
+      // ✅ UI Kit uses the SAME JWT format as SDK
+      // ZegoCloud UI Kit expects standard JWT tokens, not custom format
       const payload = {
-        app_id: appId,
-        user_id: userIdStr,
-        room_id: roomId,
-        privilege: this.getUIKitPrivileges(role),
-        expire_time: exp
+        iss: appId,                    // App ID as issuer
+        exp: exp,                      // Expiration time
+        iat: now,                      // Issued at time
+        aud: 'zegocloud',             // Audience
+        room_id: roomId,              // Room ID
+        user_id: userIdStr,           // User ID as string
+        privilege: this.getZegoPrivileges(role), // Same privileges as SDK
+        stream_id_list: null          // Stream permissions (null = all streams)
       };
 
-      // Create the kit token using a different algorithm for UI Kit
-      const payloadStr = JSON.stringify(payload);
+      // Create header
+      const header = {
+        alg: 'HS256',
+        typ: 'JWT'
+      };
+
+      // Encode header and payload
+      const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+      const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
+      
+      // Create signature
+      const signatureInput = `${encodedHeader}.${encodedPayload}`;
       const signature = crypto
         .createHmac('sha256', serverSecret)
-        .update(payloadStr)
-        .digest('hex');
+        .update(signatureInput)
+        .digest('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=/g, '');
 
-      // UI Kit token format: base64(payload) + signature
-      const encodedPayload = Buffer.from(payloadStr).toString('base64');
-      const kitToken = `04${encodedPayload}${signature}`;
+      const kitToken = `${encodedHeader}.${encodedPayload}.${signature}`;
       
-      console.log(`ZegoCloud UI Kit token generated for user ${userId} in room ${roomId} with role ${role}`);
+      console.log(`ZegoCloud UI Kit token (JWT format) generated for user ${userId} in room ${roomId} with role ${role}`);
       
       return kitToken;
     } catch (error) {
@@ -744,27 +759,6 @@ class ZegoCloudService {
     } else {
       privileges[PRIVILEGE_KEY_PUBLISH] = 0;  // Cannot publish (audience)
     }
-
-    return privileges;
-  }
-
-  /**
-   * Get UI Kit specific privileges for token generation
-   * @param {string} role - User role
-   * @returns {Object} UI Kit privilege object
-   */
-  getUIKitPrivileges(role) {
-    // UI Kit privilege mapping
-    const privileges = {
-      // Basic privileges
-      1: 1, // Login privilege (always granted)
-      2: role === 'host' || role === 'participant' ? 1 : 0, // Publish privilege
-      3: 1, // Subscribe privilege (always granted)
-      
-      // Advanced privileges for hosts
-      4: role === 'host' ? 1 : 0, // Room management
-      5: role === 'host' ? 1 : 0, // User management (kick, mute)
-    };
 
     return privileges;
   }
