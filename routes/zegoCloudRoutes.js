@@ -3,7 +3,7 @@ const router = express.Router();
 
 // Import middleware
 const authenticateToken = require('../middleware/authMiddleware');
-const { checkContentAccess } = require('../middleware/purchaseMiddleware');
+const { checkZegoCloudAccess, checkZegoCloudAccessByParam } = require('../middleware/zegoCloudMiddleware');
 
 // Import controller methods
 const zegoCloudController = require('../controllers/zegoCloudController');
@@ -50,7 +50,7 @@ router.delete('/room/:id', authenticateToken, endRoom);
  * @access  Private (Requires purchase or creator access)
  * @params  id - Live class ID
  */
-router.get('/room/:id', authenticateToken, checkContentAccess, getRoomInfo);
+router.get('/room/:id', authenticateToken, checkZegoCloudAccessByParam, getRoomInfo);
 
 // Participant Management Routes
 
@@ -60,7 +60,7 @@ router.get('/room/:id', authenticateToken, checkContentAccess, getRoomInfo);
  * @access  Private (Requires purchase or creator access)
  * @body    { liveClassId, role?, invitationCode? }
  */
-router.post('/join-room', authenticateToken, checkContentAccess, joinRoom);
+router.post('/join-room', authenticateToken, checkZegoCloudAccess, joinRoom);
 
 /**
  * @route   GET /api/live/zegocloud/participants/:id
@@ -68,7 +68,7 @@ router.post('/join-room', authenticateToken, checkContentAccess, joinRoom);
  * @access  Private (Requires purchase or creator access)
  * @params  id - Live class ID
  */
-router.get('/participants/:id', authenticateToken, checkContentAccess, getParticipants);
+router.get('/participants/:id', authenticateToken, checkZegoCloudAccessByParam, getParticipants);
 
 /**
  * @route   POST /api/live/zegocloud/remove-participant

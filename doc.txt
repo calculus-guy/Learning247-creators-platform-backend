@@ -13,7 +13,7 @@
 
 https://prod-api.aahbibi.com
 
-  ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.
+  ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
 
 I saw that to join room in the zego class, you need invitation code in the req.body, but how do i get the invitation code? does the creator have access to it immediately after creating the live class?
 
