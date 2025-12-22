@@ -139,7 +139,7 @@ class ZegoCloudService {
 
       const token = `${encodedHeader}.${encodedPayload}.${signature}`;
       
-      console.log(`ZegoCloud token generated for user ${userId} in room ${roomId} with role ${role}`);
+      console.log(`ZegoCloud SDK token generated for user ${userId} in room ${roomId} with role ${role}`);
       
       return token;
     } catch (error) {
@@ -147,6 +147,61 @@ class ZegoCloudService {
       throw new ZegoCloudError(
         'Failed to generate access token',
         'TOKEN_GENERATION_FAILED',
+        { roomId, userId, role, error: error.message }
+      );
+    }
+  }
+
+  /**
+   * Generate UI Kit token for ZegoCloud UI Kit
+   * @param {string} roomId - Room identifier
+   * @param {number} userId - User ID requesting access
+   * @param {string} role - User role: 'host', 'participant', 'audience'
+   * @returns {string} Kit token for ZegoCloud UI Kit
+   */
+  generateKitToken(roomId, userId, role = 'participant') {
+    try {
+      if (!roomId || !userId) {
+        throw new Error('Room ID and User ID are required');
+      }
+
+      const appId = parseInt(ZEGO_APP_ID);
+      const userIdStr = userId.toString();
+      const serverSecret = ZEGO_SERVER_SECRET;
+      const effectiveTimeInSeconds = ZEGO_TOKEN_EXPIRY || 3600;
+      
+      // Current timestamp
+      const now = Math.floor(Date.now() / 1000);
+      const exp = now + effectiveTimeInSeconds;
+      
+      // UI Kit specific payload structure
+      const payload = {
+        app_id: appId,
+        user_id: userIdStr,
+        room_id: roomId,
+        privilege: this.getUIKitPrivileges(role),
+        expire_time: exp
+      };
+
+      // Create the kit token using a different algorithm for UI Kit
+      const payloadStr = JSON.stringify(payload);
+      const signature = crypto
+        .createHmac('sha256', serverSecret)
+        .update(payloadStr)
+        .digest('hex');
+
+      // UI Kit token format: base64(payload) + signature
+      const encodedPayload = Buffer.from(payloadStr).toString('base64');
+      const kitToken = `04${encodedPayload}${signature}`;
+      
+      console.log(`ZegoCloud UI Kit token generated for user ${userId} in room ${roomId} with role ${role}`);
+      
+      return kitToken;
+    } catch (error) {
+      console.error('ZegoCloud generateKitToken error:', error);
+      throw new ZegoCloudError(
+        'Failed to generate UI Kit token',
+        'KIT_TOKEN_GENERATION_FAILED',
         { roomId, userId, role, error: error.message }
       );
     }
@@ -689,6 +744,27 @@ class ZegoCloudService {
     } else {
       privileges[PRIVILEGE_KEY_PUBLISH] = 0;  // Cannot publish (audience)
     }
+
+    return privileges;
+  }
+
+  /**
+   * Get UI Kit specific privileges for token generation
+   * @param {string} role - User role
+   * @returns {Object} UI Kit privilege object
+   */
+  getUIKitPrivileges(role) {
+    // UI Kit privilege mapping
+    const privileges = {
+      // Basic privileges
+      1: 1, // Login privilege (always granted)
+      2: role === 'host' || role === 'participant' ? 1 : 0, // Publish privilege
+      3: 1, // Subscribe privilege (always granted)
+      
+      // Advanced privileges for hosts
+      4: role === 'host' ? 1 : 0, // Room management
+      5: role === 'host' ? 1 : 0, // User management (kick, mute)
+    };
 
     return privileges;
   }

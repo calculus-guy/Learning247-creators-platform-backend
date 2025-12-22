@@ -59,6 +59,13 @@ router.get('/room/:id', authenticateToken, checkZegoCloudAccessByParam, getRoomI
  * @desc    Join a ZegoCloud room as participant
  * @access  Private (Requires purchase or creator access)
  * @body    { liveClassId, role?, invitationCode? }
+ * @query   format - 'uikit' for UI Kit format, default for SDK format
+ * 
+ * UI Kit Format (?format=uikit):
+ * Response: { success: true, data: { kitToken, role, roomId, userId, userName } }
+ * 
+ * SDK Format (default):
+ * Response: { success: true, data: { token, appId, roomId, role, userInfo, liveClass } }
  */
 router.post('/join-room', authenticateToken, checkZegoCloudAccess, joinRoom);
 

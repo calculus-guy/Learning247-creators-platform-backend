@@ -322,6 +322,9 @@ const joinRoom = async (req, res) => {
   try {
     const { liveClassId, role = 'participant', invitationCode } = req.body;
     const userId = req.user.id;
+    
+    // ✅ Check format preference from query parameter
+    const format = req.query.format; // 'uikit' or default (SDK)
 
     // Validate required fields
     if (!liveClassId) {
@@ -362,7 +365,6 @@ const joinRoom = async (req, res) => {
     if (liveClass.max_participants) {
       // Note: In a real implementation, you'd check current participant count
       // For now, we'll assume the check passes
-      // chore
       console.log(`Checking participant limit: ${liveClass.max_participants}`);
     }
 
@@ -377,31 +379,57 @@ const joinRoom = async (req, res) => {
     // Determine role - creator gets host role
     const participantRole = liveClass.userId === userId ? 'host' : role;
 
-    // Add participant to room
-    const joinResult = await zegoCloudService.addParticipant(
-      liveClass.zego_room_id,
-      userId,
-      participantRole,
-      userInfo
-    );
+    // ✅ Generate token based on format preference
+    let token;
+    if (format === 'uikit') {
+      // Generate UI Kit token
+      token = zegoCloudService.generateKitToken(
+        liveClass.zego_room_id,
+        userId,
+        participantRole
+      );
+    } else {
+      // Generate SDK token (default)
+      token = zegoCloudService.generateToken(
+        liveClass.zego_room_id,
+        userId,
+        participantRole
+      );
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'Successfully joined live class',
-      data: {
-        roomId: liveClass.zego_room_id,
-        appId: liveClass.zego_app_id,
-        token: joinResult.token,
-        role: participantRole,
-        userInfo: joinResult.userInfo,
-        liveClass: {
-          id: liveClass.id,
-          title: liveClass.title,
-          description: liveClass.description,
-          privacy: liveClass.privacy
+    // ✅ Return response based on format preference
+    if (format === 'uikit') {
+      // UI Kit format response
+      res.status(200).json({
+        success: true,
+        data: {
+          kitToken: token,
+          role: participantRole,
+          roomId: liveClass.zego_room_id,
+          userId: userId.toString(),
+          userName: userInfo.displayName
         }
-      }
-    });
+      });
+    } else {
+      // SDK format response (default)
+      res.status(200).json({
+        success: true,
+        message: 'Successfully joined live class',
+        data: {
+          roomId: liveClass.zego_room_id,
+          appId: liveClass.zego_app_id,
+          token: token,
+          role: participantRole,
+          userInfo: userInfo,
+          liveClass: {
+            id: liveClass.id,
+            title: liveClass.title,
+            description: liveClass.description,
+            privacy: liveClass.privacy
+          }
+        }
+      });
+    }
 
   } catch (error) {
     console.error('Join room error:', error);
