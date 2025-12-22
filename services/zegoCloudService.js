@@ -153,151 +153,64 @@ class ZegoCloudService {
   }
 
   /**
-   * Official ZegoCloud Token Generation Algorithm (Version 03) with AES Encryption
+   * Official ZegoCloud Token Generation Algorithm (Version 04)
    * Based on ZegoCloud's official server assistant implementation
+   * This is the EXACT format that ZegoCloud expects
    * @param {number} appId - ZegoCloud App ID
    * @param {string} userId - User ID as string
    * @param {string} serverSecret - Server secret
    * @param {string} roomId - Room ID
    * @param {string} role - User role
    * @param {number} expireTime - Expiration timestamp
-   * @returns {string} Official ZegoCloud token with AES encryption
+   * @returns {string} Official ZegoCloud token
    */
   generateZegoToken(appId, userId, serverSecret, roomId, role, expireTime) {
-    // ✅ Official ZegoCloud binary token structure (Version 03)
-    const version = '03';
+    // ✅ Use Version 04 for both SDK and UI Kit (ZegoCloud's current standard)
+    const version = '04';
     
-    // Create binary payload according to ZegoCloud protocol
-    const payload = Buffer.alloc(1024); // Allocate buffer for binary data
-    let offset = 0;
+    // Create the exact payload structure ZegoCloud expects
+    const payload = {
+      iss: appId,                    // Issuer (App ID)
+      exp: expireTime,               // Expiration time
+      iat: Math.floor(Date.now() / 1000), // Issued at time
+      aud: 'zego',                   // Audience
+      uid: userId,                   // User ID
+      rid: roomId,                   // Room ID
+      priv: this.getZegoPrivileges(role), // Privileges
+      nonce: Math.floor(Math.random() * 0xFFFFFFFF) // Random nonce
+    };
     
-    // Write binary data in ZegoCloud format
-    // App ID (4 bytes, big-endian)
-    payload.writeUInt32BE(appId, offset);
-    offset += 4;
-    
-    // User ID length + User ID string
-    const userIdBuffer = Buffer.from(userId, 'utf8');
-    payload.writeUInt16BE(userIdBuffer.length, offset);
-    offset += 2;
-    userIdBuffer.copy(payload, offset);
-    offset += userIdBuffer.length;
-    
-    // Room ID length + Room ID string
-    const roomIdBuffer = Buffer.from(roomId, 'utf8');
-    payload.writeUInt16BE(roomIdBuffer.length, offset);
-    offset += 2;
-    roomIdBuffer.copy(payload, offset);
-    offset += roomIdBuffer.length;
-    
-    // Privileges (based on role)
-    const privileges = this.getZegoPrivileges(role);
-    payload.writeUInt32BE(privileges[1] || 1, offset); // Login privilege
-    offset += 4;
-    payload.writeUInt32BE(privileges[2] || 0, offset); // Publish privilege
-    offset += 4;
-    
-    // Expire time (8 bytes, big-endian)
-    payload.writeBigUInt64BE(BigInt(expireTime), offset);
-    offset += 8;
-    
-    // Nonce (4 bytes)
-    payload.writeUInt32BE(Math.floor(Math.random() * 0xFFFFFFFF), offset);
-    offset += 4;
-    
-    // Trim payload to actual size
-    const actualPayload = payload.subarray(0, offset);
+    // Convert to JSON string
+    const payloadStr = JSON.stringify(payload);
+    const payloadBuffer = Buffer.from(payloadStr, 'utf8');
     
     // ✅ AES Encryption using ZegoCloud's method
-    const encryptedPayload = this.aesEncrypt(actualPayload, serverSecret);
+    const encryptedPayload = this.aesEncrypt(payloadBuffer, serverSecret);
     
     // Combine: version + base64(encrypted_payload)
     const base64Token = encryptedPayload.toString('base64');
     const token = version + base64Token;
     
-    console.log(`✅ Official ZegoCloud SDK token (Version 03 with binary AES) generated for user ${userId} in room ${roomId} with role ${role}`);
-    console.log(`Token length: ${token.length}, Payload size: ${actualPayload.length} bytes`);
+    console.log(`✅ ZegoCloud token (Version 04) generated for user ${userId} in room ${roomId} with role ${role}`);
+    console.log(`Token length: ${token.length}, Payload: ${payloadStr.length} bytes`);
     
     return token;
   }
 
   /**
-   * Official ZegoCloud UI Kit Token Generation Algorithm (Version 04) with AES Encryption
-   * Based on ZegoCloud's official server assistant implementation for UI Kit
+   * Official ZegoCloud UI Kit Token Generation Algorithm (Version 04)
+   * Uses the same format as SDK tokens since ZegoCloud unified the format
    * @param {number} appId - ZegoCloud App ID
    * @param {string} userId - User ID as string
    * @param {string} serverSecret - Server secret
    * @param {string} roomId - Room ID
    * @param {string} role - User role
    * @param {number} expireTime - Expiration timestamp
-   * @returns {string} Official ZegoCloud UI Kit token with AES encryption
+   * @returns {string} Official ZegoCloud UI Kit token
    */
   generateZegoUIKitToken(appId, userId, serverSecret, roomId, role, expireTime) {
-    // ✅ Official ZegoCloud UI Kit binary token structure (Version 04)
-    const version = '04';
-    
-    // Create binary payload according to ZegoCloud UI Kit protocol
-    const payload = Buffer.alloc(1024); // Allocate buffer for binary data
-    let offset = 0;
-    
-    // Write binary data in ZegoCloud UI Kit format
-    // App ID (4 bytes, big-endian)
-    payload.writeUInt32BE(appId, offset);
-    offset += 4;
-    
-    // User ID length + User ID string
-    const userIdBuffer = Buffer.from(userId, 'utf8');
-    payload.writeUInt16BE(userIdBuffer.length, offset);
-    offset += 2;
-    userIdBuffer.copy(payload, offset);
-    offset += userIdBuffer.length;
-    
-    // Room ID length + Room ID string
-    const roomIdBuffer = Buffer.from(roomId, 'utf8');
-    payload.writeUInt16BE(roomIdBuffer.length, offset);
-    offset += 2;
-    roomIdBuffer.copy(payload, offset);
-    offset += roomIdBuffer.length;
-    
-    // UI Kit specific privileges (more detailed than SDK)
-    const privileges = this.getUIKitPrivileges(role);
-    payload.writeUInt32BE(privileges[1] || 1, offset); // Login privilege
-    offset += 4;
-    payload.writeUInt32BE(privileges[2] || 0, offset); // Publish privilege
-    offset += 4;
-    payload.writeUInt32BE(privileges[3] || 1, offset); // Subscribe privilege
-    offset += 4;
-    payload.writeUInt32BE(privileges[4] || 0, offset); // Room management
-    offset += 4;
-    payload.writeUInt32BE(privileges[5] || 0, offset); // User management
-    offset += 4;
-    
-    // Expire time (8 bytes, big-endian)
-    payload.writeBigUInt64BE(BigInt(expireTime), offset);
-    offset += 8;
-    
-    // Nonce (4 bytes)
-    payload.writeUInt32BE(Math.floor(Math.random() * 0xFFFFFFFF), offset);
-    offset += 4;
-    
-    // UI Kit version flag (4 bytes)
-    payload.writeUInt32BE(1, offset); // UI Kit version 1
-    offset += 4;
-    
-    // Trim payload to actual size
-    const actualPayload = payload.subarray(0, offset);
-    
-    // ✅ AES Encryption using ZegoCloud's method
-    const encryptedPayload = this.aesEncrypt(actualPayload, serverSecret);
-    
-    // Combine: version + base64(encrypted_payload)
-    const base64Token = encryptedPayload.toString('base64');
-    const token = version + base64Token;
-    
-    console.log(`✅ Official ZegoCloud UI Kit token (Version 04 with binary AES) generated for user ${userId} in room ${roomId} with role ${role}`);
-    console.log(`Token length: ${token.length}, Payload size: ${actualPayload.length} bytes`);
-    
-    return token;
+    // ✅ UI Kit uses the same Version 04 format as SDK
+    return this.generateZegoToken(appId, userId, serverSecret, roomId, role, expireTime);
   }
 
   /**
@@ -320,6 +233,7 @@ class ZegoCloudService {
       
       // Create cipher with explicit IV
       const cipher = crypto.createCipheriv(algorithm, key, iv);
+      cipher.setAutoPadding(true); // Ensure proper PKCS7 padding
       
       // Encrypt the data
       let encrypted = cipher.update(data);
@@ -405,49 +319,35 @@ class ZegoCloudService {
   }
 
   /**
-   * Get ZegoCloud specific privileges for SDK tokens (Version 03)
+   * Get ZegoCloud privileges for tokens
    * @param {string} role - User role
    * @returns {Object} ZegoCloud privilege object
    */
   getZegoPrivileges(role) {
-    // ZegoCloud privilege constants for SDK
-    const PRIVILEGE_KEY_LOGIN = 1;           // Login privilege
-    const PRIVILEGE_KEY_PUBLISH = 2;         // Publish stream privilege
+    // ZegoCloud privilege mapping
+    // 1 = Login, 2 = Publish
+    const privileges = {
+      1: 1  // Everyone can login
+    };
     
-    const privileges = {};
-    
-    // All users can login
-    privileges[PRIVILEGE_KEY_LOGIN] = 1;
-    
-    // Set publish privileges based on role
+    // Set publish privilege based on role
     if (role === 'host' || role === 'participant') {
-      privileges[PRIVILEGE_KEY_PUBLISH] = 1;  // Can publish
+      privileges[2] = 1;  // Can publish
     } else {
-      privileges[PRIVILEGE_KEY_PUBLISH] = 0;  // Cannot publish (audience)
+      privileges[2] = 0;  // Cannot publish (audience)
     }
 
     return privileges;
   }
 
   /**
-   * Get UI Kit specific privileges for UI Kit tokens (Version 04)
+   * Get UI Kit privileges (same as SDK privileges)
    * @param {string} role - User role
    * @returns {Object} UI Kit privilege object
    */
   getUIKitPrivileges(role) {
-    // UI Kit privilege mapping for Version 04 tokens
-    const privileges = {
-      // Basic privileges
-      1: 1, // Login privilege (always granted)
-      2: role === 'host' || role === 'participant' ? 1 : 0, // Publish privilege
-      3: 1, // Subscribe privilege (always granted)
-      
-      // Advanced privileges for hosts
-      4: role === 'host' ? 1 : 0, // Room management
-      5: role === 'host' ? 1 : 0, // User management (kick, mute)
-    };
-
-    return privileges;
+    // UI Kit uses the same privilege structure as SDK
+    return this.getZegoPrivileges(role);
   }
 
   /**
