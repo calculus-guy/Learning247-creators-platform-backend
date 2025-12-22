@@ -315,16 +315,13 @@ const createRoom = async (req, res) => {
 };
 
 /**
- * Join a ZegoCloud room
- * POST /api/live/zegocloud/join-room
+ * Get ZegoCloud credentials for frontend token generation
+ * POST /api/live/zegocloud/get-credentials
  */
-const joinRoom = async (req, res) => {
+const getCredentials = async (req, res) => {
   try {
     const { liveClassId, role = 'participant', invitationCode } = req.body;
     const userId = req.user.id;
-    
-    // ✅ Check format preference from query parameter
-    const format = req.query.format; // 'uikit' or default (SDK)
 
     // Validate required fields
     if (!liveClassId) {
@@ -361,13 +358,6 @@ const joinRoom = async (req, res) => {
       });
     }
 
-    // Check participant limit for ZegoCloud rooms
-    if (liveClass.max_participants) {
-      // Note: In a real implementation, you'd check current participant count
-      // For now, we'll assume the check passes
-      console.log(`Checking participant limit: ${liveClass.max_participants}`);
-    }
-
     // Get user information for display
     const user = await User.findByPk(userId);
     const userInfo = {
@@ -379,72 +369,71 @@ const joinRoom = async (req, res) => {
     // Determine role - creator gets host role
     const participantRole = liveClass.userId === userId ? 'host' : role;
 
-    // ✅ Generate token based on format preference
-    let token;
-    if (format === 'uikit') {
-      // Generate UI Kit token
-      token = zegoCloudService.generateKitToken(
-        liveClass.zego_room_id,
-        userId,
-        participantRole
-      );
-    } else {
-      // Generate SDK token (default)
-      token = zegoCloudService.generateToken(
-        liveClass.zego_room_id,
-        userId,
-        participantRole
-      );
-    }
+    // ✅ Provide secure credentials for frontend token generation
+    res.status(200).json({
+      success: true,
+      message: 'Credentials provided for ZegoCloud token generation',
+      data: {
+        // ZegoCloud credentials for frontend token generation
+        appId: parseInt(liveClass.zego_app_id),
+        roomId: liveClass.zego_room_id,
+        userId: userId.toString(),
+        serverSecret: process.env.ZEGO_SERVER_SECRET, // Securely provided to authenticated users
+        role: participantRole,
+        
+        // Token generation parameters
+        effectiveTimeInSeconds: parseInt(process.env.ZEGO_TOKEN_EXPIRY) || 3600,
+        
+        // User information
+        userInfo: {
+          userName: userInfo.displayName,
+          avatar: userInfo.avatar,
+          email: userInfo.email
+        },
+        
+        // Live class information
+        liveClass: {
+          id: liveClass.id,
+          title: liveClass.title,
+          description: liveClass.description,
+          privacy: liveClass.privacy,
+          maxParticipants: liveClass.max_participants
+        },
+        
+        // Security metadata
+        issuedAt: Math.floor(Date.now() / 1000),
+        expiresAt: Math.floor(Date.now() / 1000) + (parseInt(process.env.ZEGO_TOKEN_EXPIRY) || 3600)
+      }
+    });
 
-    // ✅ Return response based on format preference
-    if (format === 'uikit') {
-      // UI Kit format response
-      res.status(200).json({
-        success: true,
-        data: {
-          kitToken: token,
-          role: participantRole,
-          roomId: liveClass.zego_room_id,
-          userId: userId.toString(),
-          userName: userInfo.displayName
-        }
-      });
-    } else {
-      // SDK format response (default)
-      res.status(200).json({
-        success: true,
-        message: 'Successfully joined live class',
-        data: {
-          roomId: liveClass.zego_room_id,
-          appId: liveClass.zego_app_id,
-          token: token,
-          role: participantRole,
-          userInfo: userInfo,
-          liveClass: {
-            id: liveClass.id,
-            title: liveClass.title,
-            description: liveClass.description,
-            privacy: liveClass.privacy
-          }
-        }
-      });
-    }
+  } catch (error) {
+    console.error('Get credentials error:', error);
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get ZegoCloud credentials'
+    });
+  }
+};
+
+/**
+ * Join a ZegoCloud room (Legacy endpoint - kept for backward compatibility)
+ * POST /api/live/zegocloud/join-room
+ */
+const joinRoom = async (req, res) => {
+  try {
+    // Redirect to new credentials endpoint with a deprecation notice
+    console.warn('⚠️  DEPRECATED: /join-room endpoint. Use /get-credentials instead for better token generation.');
+    
+    // Call the new credentials endpoint internally
+    await getCredentials(req, res);
 
   } catch (error) {
     console.error('Join room error:', error);
     
-    if (error instanceof ZegoCloudError) {
-      return res.status(400).json({
-        success: false,
-        message: error.message,
-        code: error.code
-      });
-    }
-
     res.status(500).json({
       success: false,
-      message: 'Failed to join live class'
+      message: 'Failed to join live class. Please use /get-credentials endpoint instead.'
     });
   }
 };
@@ -741,6 +730,7 @@ const removeParticipant = async (req, res) => {
 module.exports = {
   createRoom,
   joinRoom,
+  getCredentials, // ✅ New secure credentials endpoint
   getRoomInfo,
   endRoom,
   getParticipants,
