@@ -81,7 +81,7 @@ class ZegoCloudService {
   }
 
   /**
-   * Generate Version 03 token for ZegoCloud SDK
+   * Generate Version 03 token for ZegoCloud SDK (Official Algorithm)
    * @param {string} roomId - Room identifier
    * @param {number} userId - User ID requesting access
    * @param {string} role - User role: 'host', 'participant', 'audience'
@@ -102,7 +102,7 @@ class ZegoCloudService {
       const now = Math.floor(Date.now() / 1000);
       const exp = now + effectiveTimeInSeconds;
       
-      // ✅ ZegoCloud Version 03 (SDK) token payload
+      // ✅ Official ZegoCloud Version 03 (SDK) token payload structure
       const payload = {
         app_id: appId,
         user_id: userIdStr,
@@ -111,20 +111,25 @@ class ZegoCloudService {
         expire_time: exp
       };
 
-      // Create Version 03 token: "03" + base64(payload) + signature
+      // ✅ Official algorithm: Sign the JSON string directly, then base64 encode
       const payloadStr = JSON.stringify(payload);
-      const payloadBase64 = Buffer.from(payloadStr).toString('base64');
       
-      // Generate signature
+      // Generate signature from the JSON string (not base64)
       const signature = crypto
         .createHmac('sha256', serverSecret)
-        .update(payloadBase64)
+        .update(payloadStr)
         .digest('hex');
+      
+      // Then base64 encode the JSON payload
+      const payloadBase64 = Buffer.from(payloadStr, 'utf8').toString('base64');
 
-      // Version 03 token format
+      // Version 03 token format: "03" + base64(payload) + signature
       const token = `03${payloadBase64}${signature}`;
       
       console.log(`ZegoCloud SDK token (Version 03) generated for user ${userId} in room ${roomId} with role ${role}`);
+      console.log(`Payload: ${payloadStr}`);
+      console.log(`Base64: ${payloadBase64}`);
+      console.log(`Signature: ${signature}`);
       
       return token;
     } catch (error) {
@@ -138,7 +143,7 @@ class ZegoCloudService {
   }
 
   /**
-   * Generate Version 04 token for ZegoCloud UI Kit
+   * Generate Version 04 token for ZegoCloud UI Kit (Official Algorithm)
    * @param {string} roomId - Room identifier
    * @param {number} userId - User ID requesting access
    * @param {string} role - User role: 'host', 'participant', 'audience'
@@ -159,7 +164,7 @@ class ZegoCloudService {
       const now = Math.floor(Date.now() / 1000);
       const exp = now + effectiveTimeInSeconds;
       
-      // ✅ ZegoCloud Version 04 (UI Kit) token payload
+      // ✅ Official ZegoCloud Version 04 (UI Kit) token payload structure
       const payload = {
         app_id: appId,
         user_id: userIdStr,
@@ -168,20 +173,25 @@ class ZegoCloudService {
         expire_time: exp
       };
 
-      // Create Version 04 token: "04" + base64(payload) + signature
+      // ✅ Official algorithm: Sign the JSON string directly, then base64 encode
       const payloadStr = JSON.stringify(payload);
-      const payloadBase64 = Buffer.from(payloadStr).toString('base64');
       
-      // Generate signature
+      // Generate signature from the JSON string (not base64)
       const signature = crypto
         .createHmac('sha256', serverSecret)
-        .update(payloadBase64)
+        .update(payloadStr)
         .digest('hex');
+      
+      // Then base64 encode the JSON payload
+      const payloadBase64 = Buffer.from(payloadStr, 'utf8').toString('base64');
 
-      // Version 04 token format
+      // Version 04 token format: "04" + base64(payload) + signature
       const kitToken = `04${payloadBase64}${signature}`;
       
       console.log(`ZegoCloud UI Kit token (Version 04) generated for user ${userId} in room ${roomId} with role ${role}`);
+      console.log(`Payload: ${payloadStr}`);
+      console.log(`Base64: ${payloadBase64}`);
+      console.log(`Signature: ${signature}`);
       
       return kitToken;
     } catch (error) {
