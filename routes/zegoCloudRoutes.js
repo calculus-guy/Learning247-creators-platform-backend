@@ -12,7 +12,6 @@ const zegoCloudController = require('../controllers/zegoCloudController');
 const {
   createRoom,
   joinRoom,
-  getCredentials, // ✅ New secure credentials endpoint
   getRoomInfo,
   endRoom,
   getParticipants,
@@ -56,30 +55,17 @@ router.get('/room/:id', authenticateToken, checkZegoCloudAccessByParam, getRoomI
 // Participant Management Routes
 
 /**
- * @route   POST /api/live/zegocloud/get-credentials
- * @desc    Get secure ZegoCloud credentials for frontend token generation
+ * @route   POST /api/live/zegocloud/join-room
+ * @desc    Join a ZegoCloud room as participant (uses official ZegoCloud tokens)
  * @access  Private (Requires purchase or creator access)
  * @body    { liveClassId, role?, invitationCode? }
  * 
  * Response: { 
  *   success: true, 
  *   data: { 
- *     appId, roomId, userId, serverSecret, role, 
- *     effectiveTimeInSeconds, userInfo, liveClass 
+ *     roomId, appId, token, role, userInfo, liveClass 
  *   } 
  * }
- */
-router.post('/get-credentials', authenticateToken, checkZegoCloudAccess, getCredentials);
-
-/**
- * @route   POST /api/live/zegocloud/join-room
- * @desc    Join a ZegoCloud room as participant (DEPRECATED - use /get-credentials)
- * @access  Private (Requires purchase or creator access)
- * @body    { liveClassId, role?, invitationCode? }
- * @query   format - 'uikit' for UI Kit format, default for SDK format
- * 
- * ⚠️  DEPRECATED: This endpoint is kept for backward compatibility.
- * Use /get-credentials for better frontend token generation.
  */
 router.post('/join-room', authenticateToken, checkZegoCloudAccess, joinRoom);
 

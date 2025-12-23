@@ -315,10 +315,10 @@ const createRoom = async (req, res) => {
 };
 
 /**
- * Get ZegoCloud credentials for frontend token generation
- * POST /api/live/zegocloud/get-credentials
+ * Join a ZegoCloud room with official token generation
+ * POST /api/live/zegocloud/join-room
  */
-const getCredentials = async (req, res) => {
+const joinRoom = async (req, res) => {
   try {
     const { liveClassId, role = 'participant', invitationCode } = req.body;
     const userId = req.user.id;
@@ -369,71 +369,46 @@ const getCredentials = async (req, res) => {
     // Determine role - creator gets host role
     const participantRole = liveClass.userId === userId ? 'host' : role;
 
-    // ✅ Provide secure credentials for frontend token generation
+    // ✅ Generate official ZegoCloud token
+    const token = zegoCloudService.generateToken(
+      liveClass.zego_room_id,
+      userId,
+      participantRole
+    );
+
+    // Return response with official token
     res.status(200).json({
       success: true,
-      message: 'Credentials provided for ZegoCloud token generation',
+      message: 'Successfully joined live class',
       data: {
-        // ZegoCloud credentials for frontend token generation
-        appId: parseInt(liveClass.zego_app_id),
         roomId: liveClass.zego_room_id,
-        userId: userId.toString(),
-        serverSecret: process.env.ZEGO_SERVER_SECRET, // Securely provided to authenticated users
+        appId: liveClass.zego_app_id,
+        token: token, // ✅ Official ZegoCloud token
         role: participantRole,
-        
-        // Token generation parameters
-        effectiveTimeInSeconds: parseInt(process.env.ZEGO_TOKEN_EXPIRY) || 3600,
-        
-        // User information
-        userInfo: {
-          userName: userInfo.displayName,
-          avatar: userInfo.avatar,
-          email: userInfo.email
-        },
-        
-        // Live class information
+        userInfo: userInfo,
         liveClass: {
           id: liveClass.id,
           title: liveClass.title,
           description: liveClass.description,
-          privacy: liveClass.privacy,
-          maxParticipants: liveClass.max_participants
-        },
-        
-        // Security metadata
-        issuedAt: Math.floor(Date.now() / 1000),
-        expiresAt: Math.floor(Date.now() / 1000) + (parseInt(process.env.ZEGO_TOKEN_EXPIRY) || 3600)
+          privacy: liveClass.privacy
+        }
       }
     });
 
   } catch (error) {
-    console.error('Get credentials error:', error);
-    
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get ZegoCloud credentials'
-    });
-  }
-};
-
-/**
- * Join a ZegoCloud room (Legacy endpoint - kept for backward compatibility)
- * POST /api/live/zegocloud/join-room
- */
-const joinRoom = async (req, res) => {
-  try {
-    // Redirect to new credentials endpoint with a deprecation notice
-    console.warn('⚠️  DEPRECATED: /join-room endpoint. Use /get-credentials instead for better token generation.');
-    
-    // Call the new credentials endpoint internally
-    await getCredentials(req, res);
-
-  } catch (error) {
     console.error('Join room error:', error);
     
+    if (error instanceof ZegoCloudError) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        code: error.code
+      });
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Failed to join live class. Please use /get-credentials endpoint instead.'
+      message: 'Failed to join live class'
     });
   }
 };
@@ -730,7 +705,6 @@ const removeParticipant = async (req, res) => {
 module.exports = {
   createRoom,
   joinRoom,
-  getCredentials, // ✅ New secure credentials endpoint
   getRoomInfo,
   endRoom,
   getParticipants,

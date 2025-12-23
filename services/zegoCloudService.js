@@ -1,4 +1,4 @@
-const crypto = require('crypto');
+const { generateTokenWithRoomPrivileges, ErrorCode } = require('../utils/zegoServerAssistant');
 const { 
   ZegoCloudError, 
   createError, 
@@ -18,8 +18,8 @@ if (!ZEGO_APP_ID || !ZEGO_SERVER_SECRET) {
 }
 
 /**
- * ZegoCloud Service using Official Token Generation Algorithm
- * Based on ZegoCloud's official server assistant implementation
+ * ZegoCloud Service using Official Token Generation
+ * Now uses ZegoCloud's official server assistant for token generation
  */
 class ZegoCloudService {
   
@@ -47,7 +47,7 @@ class ZegoCloudService {
       // Generate unique room ID
       const roomId = this.generateRoomId(liveClassId);
       
-      // Generate creator token with host privileges (Version 03 for SDK)
+      // Generate creator token with host privileges using official ZegoCloud method
       const creatorToken = this.generateToken(roomId, creatorId, 'host');
       
       // Room configuration
@@ -81,8 +81,7 @@ class ZegoCloudService {
   }
 
   /**
-   * Generate Official ZegoCloud Token (Version 03 for SDK)
-   * Uses the exact algorithm from ZegoCloud's official implementation
+   * Generate Official ZegoCloud Token using their server assistant
    * @param {string} roomId - Room identifier
    * @param {number} userId - User ID requesting access
    * @param {string} role - User role: 'host', 'participant', 'audience'
@@ -99,15 +98,37 @@ class ZegoCloudService {
       const serverSecret = ZEGO_SERVER_SECRET;
       const effectiveTimeInSeconds = ZEGO_TOKEN_EXPIRY;
       
-      // Current timestamp
-      const now = Math.floor(Date.now() / 1000);
-      const exp = now + effectiveTimeInSeconds;
+      // Validate server secret length (ZegoCloud requires exactly 32 bytes)
+      if (!serverSecret || serverSecret.length !== 32) {
+        throw new Error(`Server secret must be exactly 32 bytes. Current length: ${serverSecret ? serverSecret.length : 0}`);
+      }
       
-      // ✅ Official ZegoCloud binary token generation
-      return this.generateZegoToken(appId, userIdStr, serverSecret, roomId, role, exp);
+      // ✅ Use ZegoCloud's official token generation
+      const token = generateTokenWithRoomPrivileges(
+        appId,
+        userIdStr,
+        serverSecret,
+        effectiveTimeInSeconds,
+        roomId,
+        role
+      );
+      
+      console.log(`✅ Official ZegoCloud token generated for user ${userId} in room ${roomId} with role ${role}`);
+      
+      return token;
       
     } catch (error) {
       console.error('ZegoCloud generateToken error:', error);
+      
+      // Handle ZegoCloud specific errors
+      if (error.errorCode !== undefined) {
+        throw new ZegoCloudError(
+          `ZegoCloud Error: ${error.errorMessage}`,
+          'ZEGO_TOKEN_ERROR',
+          { roomId, userId, role, zegoErrorCode: error.errorCode }
+        );
+      }
+      
       throw new ZegoCloudError(
         'Failed to generate SDK token',
         'TOKEN_GENERATION_FAILED',
@@ -117,138 +138,15 @@ class ZegoCloudService {
   }
 
   /**
-   * Generate Official ZegoCloud UI Kit Token (Version 04)
-   * Uses the exact algorithm from ZegoCloud's official implementation
+   * Generate Official ZegoCloud UI Kit Token (same as SDK token)
    * @param {string} roomId - Room identifier
    * @param {number} userId - User ID requesting access
    * @param {string} role - User role: 'host', 'participant', 'audience'
    * @returns {string} Official ZegoCloud UI Kit token
    */
   generateKitToken(roomId, userId, role = 'participant') {
-    try {
-      if (!roomId || !userId) {
-        throw new Error('Room ID and User ID are required');
-      }
-
-      const appId = parseInt(ZEGO_APP_ID);
-      const userIdStr = userId.toString();
-      const serverSecret = ZEGO_SERVER_SECRET;
-      const effectiveTimeInSeconds = ZEGO_TOKEN_EXPIRY;
-      
-      // Current timestamp
-      const now = Math.floor(Date.now() / 1000);
-      const exp = now + effectiveTimeInSeconds;
-      
-      // ✅ Official ZegoCloud UI Kit binary token generation
-      return this.generateZegoUIKitToken(appId, userIdStr, serverSecret, roomId, role, exp);
-      
-    } catch (error) {
-      console.error('ZegoCloud generateKitToken error:', error);
-      throw new ZegoCloudError(
-        'Failed to generate UI Kit token',
-        'KIT_TOKEN_GENERATION_FAILED',
-        { roomId, userId, role, error: error.message }
-      );
-    }
-  }
-
-  /**
-   * Official ZegoCloud Token Generation Algorithm (Version 04)
-   * Based on ZegoCloud's official server assistant implementation
-   * This is the EXACT format that ZegoCloud expects
-   * @param {number} appId - ZegoCloud App ID
-   * @param {string} userId - User ID as string
-   * @param {string} serverSecret - Server secret
-   * @param {string} roomId - Room ID
-   * @param {string} role - User role
-   * @param {number} expireTime - Expiration timestamp
-   * @returns {string} Official ZegoCloud token
-   */
-  generateZegoToken(appId, userId, serverSecret, roomId, role, expireTime) {
-    // ✅ Use Version 04 for both SDK and UI Kit (ZegoCloud's current standard)
-    const version = '04';
-    
-    // Create the exact payload structure ZegoCloud expects
-    const payload = {
-      iss: appId,                    // Issuer (App ID)
-      exp: expireTime,               // Expiration time
-      iat: Math.floor(Date.now() / 1000), // Issued at time
-      aud: 'zego',                   // Audience
-      uid: userId,                   // User ID
-      rid: roomId,                   // Room ID
-      priv: this.getZegoPrivileges(role), // Privileges
-      nonce: Math.floor(Math.random() * 0xFFFFFFFF) // Random nonce
-    };
-    
-    // Convert to JSON string
-    const payloadStr = JSON.stringify(payload);
-    const payloadBuffer = Buffer.from(payloadStr, 'utf8');
-    
-    // ✅ AES Encryption using ZegoCloud's method
-    const encryptedPayload = this.aesEncrypt(payloadBuffer, serverSecret);
-    
-    // Combine: version + base64(encrypted_payload)
-    const base64Token = encryptedPayload.toString('base64');
-    const token = version + base64Token;
-    
-    console.log(`✅ ZegoCloud token (Version 04) generated for user ${userId} in room ${roomId} with role ${role}`);
-    console.log(`Token length: ${token.length}, Payload: ${payloadStr.length} bytes`);
-    
-    return token;
-  }
-
-  /**
-   * Official ZegoCloud UI Kit Token Generation Algorithm (Version 04)
-   * Uses the same format as SDK tokens since ZegoCloud unified the format
-   * @param {number} appId - ZegoCloud App ID
-   * @param {string} userId - User ID as string
-   * @param {string} serverSecret - Server secret
-   * @param {string} roomId - Room ID
-   * @param {string} role - User role
-   * @param {number} expireTime - Expiration timestamp
-   * @returns {string} Official ZegoCloud UI Kit token
-   */
-  generateZegoUIKitToken(appId, userId, serverSecret, roomId, role, expireTime) {
-    // ✅ UI Kit uses the same Version 04 format as SDK
-    return this.generateZegoToken(appId, userId, serverSecret, roomId, role, expireTime);
-  }
-
-  /**
-   * AES Encryption using ZegoCloud's Official Method
-   * Based on ZegoCloud's server assistant implementation
-   * @param {Buffer} data - Data to encrypt
-   * @param {string} serverSecret - Server secret as encryption key
-   * @returns {Buffer} Encrypted data in ZegoCloud format
-   */
-  aesEncrypt(data, serverSecret) {
-    try {
-      // ✅ ZegoCloud official AES-128-CBC implementation
-      const algorithm = 'aes-128-cbc';
-      
-      // Derive 128-bit key from server secret (MD5 hash)
-      const key = crypto.createHash('md5').update(serverSecret).digest();
-      
-      // Generate random IV (16 bytes for AES-128-CBC)
-      const iv = crypto.randomBytes(16);
-      
-      // Create cipher with explicit IV
-      const cipher = crypto.createCipheriv(algorithm, key, iv);
-      cipher.setAutoPadding(true); // Ensure proper PKCS7 padding
-      
-      // Encrypt the data
-      let encrypted = cipher.update(data);
-      encrypted = Buffer.concat([encrypted, cipher.final()]);
-      
-      // ZegoCloud format: IV + encrypted_data
-      const result = Buffer.concat([iv, encrypted]);
-      
-      console.log(`✅ ZegoCloud AES encryption completed. Key: ${key.length} bytes, IV: ${iv.length} bytes, Encrypted: ${encrypted.length} bytes, Total: ${result.length} bytes`);
-      
-      return result;
-    } catch (error) {
-      console.error('❌ ZegoCloud AES encryption error:', error);
-      throw new Error(`AES encryption failed: ${error.message}`);
-    }
+    // UI Kit uses the same token format as SDK
+    return this.generateToken(roomId, userId, role);
   }
 
   /**
@@ -314,40 +212,8 @@ class ZegoCloudService {
    */
   generateRoomId(liveClassId) {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substr(2, 9);
+    const random = Math.random().toString(36).substring(2, 9);
     return `live_${liveClassId}_${timestamp}_${random}`;
-  }
-
-  /**
-   * Get ZegoCloud privileges for tokens
-   * @param {string} role - User role
-   * @returns {Object} ZegoCloud privilege object
-   */
-  getZegoPrivileges(role) {
-    // ZegoCloud privilege mapping
-    // 1 = Login, 2 = Publish
-    const privileges = {
-      1: 1  // Everyone can login
-    };
-    
-    // Set publish privilege based on role
-    if (role === 'host' || role === 'participant') {
-      privileges[2] = 1;  // Can publish
-    } else {
-      privileges[2] = 0;  // Cannot publish (audience)
-    }
-
-    return privileges;
-  }
-
-  /**
-   * Get UI Kit privileges (same as SDK privileges)
-   * @param {string} role - User role
-   * @returns {Object} UI Kit privilege object
-   */
-  getUIKitPrivileges(role) {
-    // UI Kit uses the same privilege structure as SDK
-    return this.getZegoPrivileges(role);
   }
 
   /**
@@ -363,6 +229,8 @@ class ZegoCloudService {
     
     if (!ZEGO_SERVER_SECRET) {
       issues.push('ZEGO_SERVER_SECRET is not configured');
+    } else if (ZEGO_SERVER_SECRET.length !== 32) {
+      issues.push(`ZEGO_SERVER_SECRET must be exactly 32 bytes (current: ${ZEGO_SERVER_SECRET.length})`);
     }
     
     if (ZEGO_TOKEN_EXPIRY < 300) {
@@ -374,7 +242,7 @@ class ZegoCloudService {
       issues,
       configuration: {
         appId: ZEGO_APP_ID ? 'configured' : 'missing',
-        serverSecret: ZEGO_SERVER_SECRET ? 'configured' : 'missing',
+        serverSecret: ZEGO_SERVER_SECRET ? `configured (${ZEGO_SERVER_SECRET.length} bytes)` : 'missing',
         tokenExpiry: ZEGO_TOKEN_EXPIRY
       }
     };
