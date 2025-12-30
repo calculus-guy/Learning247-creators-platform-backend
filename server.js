@@ -85,3 +85,4 @@ sequelize.sync({ force: false })
     );
   })
   .catch(err => console.error('DB Connection Failed:', err));
+  
