@@ -280,3 +280,50 @@ exports.sendWithdrawalFailureEmail = async (to, firstname, amount, reason) => {
     html,
   });
 };
+
+/**
+ * PASSWORD RESET OTP EMAIL
+ */
+exports.sendPasswordResetOTP = async (to, firstname, otp) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Password Reset Request 🔐</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        You requested to reset your password for your Aahbibi account. 
+        Use the verification code below to proceed:
+      </p>
+
+      <div style="background-color: #f4f4f4; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px;">
+        <h1 style="color: #333; font-size: 32px; letter-spacing: 8px; margin: 0;">
+          ${otp}
+        </h1>
+      </div>
+
+      <p><strong>Important:</strong></p>
+      <ul>
+        <li>This code expires in <strong>10 minutes</strong></li>
+        <li>Do not share this code with anyone</li>
+        <li>If you didn't request this, please ignore this email</li>
+      </ul>
+
+      <p>
+        Enter this code on the password reset page to create your new password.
+      </p>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: 'Password Reset Code - Aahbibi',
+    html,
+  });
+};

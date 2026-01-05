@@ -8,6 +8,7 @@ const session = require('express-session');
 const cookieParser = require('cookie-parser');
 const webhookRoutes = require('./routes/webhookRoutes');
 const authRoutes = require('./routes/authRoutes');
+const passwordResetRoutes = require('./routes/passwordResetRoutes');
 const registrationRoutes = require('./routes/registrationRoutes');
 const videoRoutes = require('./routes/videoRoutes');
 const liveRoutes = require('./routes/liveRoutes');
@@ -63,6 +64,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use('/auth', authRoutes);
+app.use('/auth', passwordResetRoutes); // ✅ Password reset routes
 app.use('/register', rateLimiter);
 app.use('/event', registrationRoutes);
 app.use('/live', liveRoutes);
