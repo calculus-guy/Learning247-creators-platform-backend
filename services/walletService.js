@@ -301,7 +301,7 @@ async function completeWithdrawal(userId, amount) {
 
     return wallet;
   } catch (error) {
-    console.error('Complete withdrawal error:', error);
+    console.error('Complete withdrawal error:', error); 
     throw error;
   }
 }
