@@ -3,11 +3,12 @@ const router = express.Router();
 const liveController = require('../controllers/liveController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { checkContentAccess } = require('../middleware/purchaseMiddleware');
+const { upload } = require('../utils/multerConfig');
 
 // Get all live classes (public endpoint with optional filters)
 router.get('/getLive', liveController.getAllLiveClasses);
 
-router.post('/create', authMiddleware, liveController.createLiveClass);
+router.post('/create', authMiddleware, upload.fields([{ name: 'thumbnail', maxCount: 1 }]), liveController.createLiveClass);
 router.post('/:id/add-host', authMiddleware, liveController.addHost);
 router.post('/:id/add-attendee', authMiddleware, liveController.addAttendee);
 router.get('/:id', checkContentAccess, liveController.getLiveClassById);

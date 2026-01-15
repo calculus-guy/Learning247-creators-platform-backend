@@ -47,7 +47,11 @@ const handleError = (res, error) => {
 exports.createLiveClass = async (req, res) => {
   try {
     const { title, description, price, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
-    const userId = req.user.id; 
+    const userId = req.user.id;
+    
+    // Handle thumbnail - either from file upload or URL string
+    const thumbnailFile = req.files?.thumbnail?.[0];
+    const finalThumbnailUrl = thumbnailFile ? `/uploads/${thumbnailFile.filename}` : thumbnailUrl || null; 
 
     // Basic check before calling services
     if (!title) return res.status(400).json({ success: false, message: "Title is required" });
@@ -89,7 +93,7 @@ exports.createLiveClass = async (req, res) => {
       title,
       description,
       price,
-      thumbnailUrl,
+      thumbnailUrl: finalThumbnailUrl,
       startTime,
       endTime,
       privacy,
