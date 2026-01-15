@@ -1,7 +1,5 @@
 const mux = require('../config/mux');
 const VideoModel = require('../models/Video');
-const fs = require('fs');
-const path = require('path');
 
 exports.uploadVideoService = async ({
   userId,
@@ -39,8 +37,8 @@ exports.uploadVideoService = async ({
       status: 'uploading',
     });
 
-    // 3. Delete local thumbnail if needed
-    if (thumbnailFile) fs.unlinkSync(thumbnailFile.path);
+    // Note: Thumbnail file is kept in /uploads folder for serving
+    // Do NOT delete it - it's needed for the thumbnailUrl to work
 
     return {
       success: true,
