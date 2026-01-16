@@ -11,6 +11,7 @@ const LiveClass = sequelize.define('LiveClass', {
   title: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: true },
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  category: { type: DataTypes.STRING, allowNull: true },
   thumbnailUrl: { type: DataTypes.STRING, allowNull: true },
   startTime: { type: DataTypes.DATE, allowNull: true },
   endTime: { type: DataTypes.DATE, allowNull: true },

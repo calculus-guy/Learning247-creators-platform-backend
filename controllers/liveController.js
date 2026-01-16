@@ -46,7 +46,7 @@ const handleError = (res, error) => {
 
 exports.createLiveClass = async (req, res) => {
   try {
-    const { title, description, price, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
+    const { title, description, price, category, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
     const userId = req.user.id;
     
     // Handle thumbnail - either from file upload or URL string
@@ -93,6 +93,7 @@ exports.createLiveClass = async (req, res) => {
       title,
       description,
       price,
+      category,
       thumbnailUrl: finalThumbnailUrl,
       startTime,
       endTime,
@@ -400,7 +401,7 @@ exports.endZegoCloudSession = async (req, res) => {
 
 exports.getAllLiveClasses = async (req, res) => {
   try {
-    const { status, privacy } = req.query;
+    const { status, privacy, category } = req.query;
     
     const filters = {};
     
@@ -413,6 +414,9 @@ exports.getAllLiveClasses = async (req, res) => {
     
     // Filter by status if provided
     if (status) filters.status = status;
+    
+    // Filter by category if provided
+    if (category) filters.category = category;
 
     const liveClasses = await LiveClass.findAll({
       where: filters,
