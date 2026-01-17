@@ -50,11 +50,20 @@ async function runWalletMigration() {
       )
     `);
     
-    await sequelize.query(`
-      ALTER TABLE wallet_accounts 
-      ADD CONSTRAINT IF NOT EXISTS wallet_accounts_user_currency_unique 
-      UNIQUE (user_id, currency)
-    `);
+    // Add unique constraint (check if it exists first)
+    try {
+      await sequelize.query(`
+        ALTER TABLE wallet_accounts 
+        ADD CONSTRAINT wallet_accounts_user_currency_unique 
+        UNIQUE (user_id, currency)
+      `);
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        console.log('   ⚠️  Unique constraint already exists');
+      } else {
+        throw error;
+      }
+    }
     
     await sequelize.query('CREATE INDEX IF NOT EXISTS idx_wallet_accounts_user_id ON wallet_accounts(user_id)');
     await sequelize.query('CREATE INDEX IF NOT EXISTS idx_wallet_accounts_currency ON wallet_accounts(currency)');
@@ -133,17 +142,33 @@ async function runWalletMigration() {
       )
     `);
     
-    await sequelize.query(`
-      ALTER TABLE financial_transactions 
-      ADD CONSTRAINT IF NOT EXISTS financial_transactions_reference_unique 
-      UNIQUE (reference)
-    `);
+    try {
+      await sequelize.query(`
+        ALTER TABLE financial_transactions 
+        ADD CONSTRAINT financial_transactions_reference_unique 
+        UNIQUE (reference)
+      `);
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        console.log('   ⚠️  Reference unique constraint already exists');
+      } else {
+        throw error;
+      }
+    }
     
-    await sequelize.query(`
-      ALTER TABLE financial_transactions 
-      ADD CONSTRAINT IF NOT EXISTS financial_transactions_idempotency_key_unique 
-      UNIQUE (idempotency_key)
-    `);
+    try {
+      await sequelize.query(`
+        ALTER TABLE financial_transactions 
+        ADD CONSTRAINT financial_transactions_idempotency_key_unique 
+        UNIQUE (idempotency_key)
+      `);
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        console.log('   ⚠️  Idempotency key unique constraint already exists');
+      } else {
+        throw error;
+      }
+    }
     
     await sequelize.query('CREATE INDEX IF NOT EXISTS idx_financial_transactions_wallet_id ON financial_transactions(wallet_id)');
     await sequelize.query('CREATE INDEX IF NOT EXISTS idx_financial_transactions_type ON financial_transactions(transaction_type)');
@@ -195,11 +220,19 @@ async function runWalletMigration() {
       )
     `);
     
-    await sequelize.query(`
-      ALTER TABLE withdrawal_limits 
-      ADD CONSTRAINT IF NOT EXISTS withdrawal_limits_user_currency_unique 
-      UNIQUE (user_id, currency)
-    `);
+    try {
+      await sequelize.query(`
+        ALTER TABLE withdrawal_limits 
+        ADD CONSTRAINT withdrawal_limits_user_currency_unique 
+        UNIQUE (user_id, currency)
+      `);
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        console.log('   ⚠️  Withdrawal limits unique constraint already exists');
+      } else {
+        throw error;
+      }
+    }
     console.log('✅ withdrawal_limits table created\n');
     
     // Create fraud detection tables
@@ -285,11 +318,19 @@ async function runWalletMigration() {
       )
     `);
     
-    await sequelize.query(`
-      ALTER TABLE webhook_events 
-      ADD CONSTRAINT IF NOT EXISTS webhook_events_gateway_event_unique 
-      UNIQUE (gateway, event_id)
-    `);
+    try {
+      await sequelize.query(`
+        ALTER TABLE webhook_events 
+        ADD CONSTRAINT webhook_events_gateway_event_unique 
+        UNIQUE (gateway, event_id)
+      `);
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        console.log('   ⚠️  Webhook events unique constraint already exists');
+      } else {
+        throw error;
+      }
+    }
     
     // bank_accounts table
     await sequelize.query(`
