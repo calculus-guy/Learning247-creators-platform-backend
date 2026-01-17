@@ -4,12 +4,51 @@ const User = require('../models/User');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
 const { Op } = require('sequelize');
+const { DatabaseTransactionService } = require('./databaseTransactionService');
+const sequelize = require('../config/db');
+
+// Initialize transaction service
+const transactionService = new DatabaseTransactionService(sequelize);
 
 /**
- * Get or create wallet for a user
+ * Get or create wallet for a user (with multi-currency support)
  */
-async function getOrCreateWallet(userId) {
+async function getOrCreateWallet(userId, currency = 'NGN') {
   try {
+    // First check if new multi-currency wallet exists
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      let walletAccount = await WalletAccount.findOne({ 
+        where: { user_id: userId, currency } 
+      });
+
+      if (!walletAccount) {
+        // Create new multi-currency wallet account
+        walletAccount = await transactionService.executeWithTransaction(
+          async (transaction) => {
+            return await transactionService.createWalletInTransaction(
+              userId, 
+              currency, 
+              transaction
+            );
+          },
+          { operationType: 'create_wallet', userId }
+        );
+      }
+
+      return {
+        id: walletAccount.id,
+        userId: walletAccount.user_id,
+        currency: walletAccount.currency,
+        totalEarnings: walletAccount.balance_available + walletAccount.balance_pending,
+        withdrawnAmount: 0, // This would need to be calculated from transaction history
+        pendingAmount: walletAccount.balance_pending,
+        availableBalance: walletAccount.balance_available,
+        getAvailableBalance: () => walletAccount.balance_available
+      };
+    }
+
+    // Fallback to legacy wallet system
     let wallet = await Wallet.findOne({ where: { userId } });
 
     if (!wallet) {
@@ -18,7 +57,7 @@ async function getOrCreateWallet(userId) {
         totalEarnings: 0,
         withdrawnAmount: 0,
         pendingAmount: 0,
-        currency: 'NGN'
+        currency: currency
       });
     }
 
@@ -30,12 +69,59 @@ async function getOrCreateWallet(userId) {
 }
 
 /**
- * Add earnings to wallet
+ * Add earnings to wallet (with transaction safety)
  */
-async function addEarnings({ userId, amount, purchaseId }) {
+async function addEarnings({ userId, amount, purchaseId, currency = 'NGN' }) {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    const amountInCents = Math.round(parseFloat(amount) * 100); // Convert to smallest currency unit
 
+    // Use new transaction service for multi-currency wallets
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      const result = await transactionService.executeWalletOperation(
+        userId,
+        currency,
+        async (wallet, transaction) => {
+          // Add earnings to available balance
+          await transactionService.updateWalletBalance(
+            wallet,
+            amountInCents, // Credit available balance
+            0, // No change to pending
+            transaction
+          );
+
+          // Log the transaction
+          const WalletTransaction = sequelize.models.WalletTransaction;
+          if (WalletTransaction) {
+            await WalletTransaction.create({
+              wallet_account_id: wallet.id,
+              transaction_type: 'credit',
+              amount: amountInCents,
+              balance_before: wallet.balance_available - amountInCents,
+              balance_after: wallet.balance_available,
+              reference: purchaseId ? `purchase_${purchaseId}` : null,
+              description: 'Earnings from content purchase',
+              metadata: { purchaseId, currency }
+            }, { transaction });
+          }
+
+          return {
+            id: wallet.id,
+            userId: wallet.user_id,
+            currency: wallet.currency,
+            totalEarnings: wallet.balance_available + wallet.balance_pending,
+            availableBalance: wallet.balance_available,
+            pendingAmount: wallet.balance_pending
+          };
+        },
+        { operationType: 'add_earnings' }
+      );
+
+      return result;
+    }
+
+    // Fallback to legacy system
+    const wallet = await getOrCreateWallet(userId, currency);
     wallet.totalEarnings = parseFloat(wallet.totalEarnings) + parseFloat(amount);
     await wallet.save();
 
@@ -47,11 +133,74 @@ async function addEarnings({ userId, amount, purchaseId }) {
 }
 
 /**
- * Get available balance for a user
+ * Get multi-currency wallet balances for a user
  */
-async function getAvailableBalance(userId) {
+async function getMultiCurrencyBalances(userId) {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (!WalletAccount) {
+      // Fallback to single currency
+      const balance = await getAvailableBalance(userId, 'NGN');
+      return { NGN: balance };
+    }
+
+    const walletAccounts = await WalletAccount.findAll({
+      where: { user_id: userId }
+    });
+
+    const balances = {};
+    for (const account of walletAccounts) {
+      balances[account.currency] = {
+        totalEarnings: account.balance_available + account.balance_pending,
+        withdrawnAmount: 0, // Would need calculation from transaction history
+        pendingAmount: account.balance_pending,
+        availableBalance: account.balance_available,
+        currency: account.currency
+      };
+    }
+
+    // Ensure both currencies exist (create if needed)
+    if (!balances.NGN) {
+      await getOrCreateWallet(userId, 'NGN');
+      balances.NGN = await getAvailableBalance(userId, 'NGN');
+    }
+    if (!balances.USD) {
+      await getOrCreateWallet(userId, 'USD');
+      balances.USD = await getAvailableBalance(userId, 'USD');
+    }
+
+    return balances;
+  } catch (error) {
+    console.error('Get multi-currency balances error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get available balance for a user (multi-currency support)
+ */
+async function getAvailableBalance(userId, currency = 'NGN') {
+  try {
+    // Try new multi-currency system first
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      const walletAccount = await WalletAccount.findOne({ 
+        where: { user_id: userId, currency } 
+      });
+
+      if (walletAccount) {
+        return {
+          totalEarnings: walletAccount.balance_available + walletAccount.balance_pending,
+          withdrawnAmount: 0, // Would need to be calculated from transaction history
+          pendingAmount: walletAccount.balance_pending,
+          availableBalance: walletAccount.balance_available,
+          currency: walletAccount.currency
+        };
+      }
+    }
+
+    // Fallback to legacy system
+    const wallet = await getOrCreateWallet(userId, currency);
     
     const availableBalance = parseFloat(wallet.totalEarnings) - 
                             parseFloat(wallet.withdrawnAmount) - 
@@ -71,11 +220,12 @@ async function getAvailableBalance(userId) {
 }
 
 /**
- * Get earnings breakdown for a creator
+ * Get earnings breakdown for a creator (updated for multi-currency)
  */
 async function getEarningsBreakdown(userId) {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    // Get multi-currency balances
+    const balances = await getMultiCurrencyBalances(userId);
 
     // Get all purchases for creator's content
     const videoPurchases = await Purchase.findAll({
@@ -133,25 +283,35 @@ async function getEarningsBreakdown(userId) {
 
     const allPurchases = [...creatorVideoPurchases, ...creatorLiveClassPurchases];
 
-    // Calculate totals
-    const totalFromVideos = creatorVideoPurchases.reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    const totalFromLiveClasses = creatorLiveClassPurchases.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    // Calculate totals by currency
+    const totalsByCurrency = {};
+    allPurchases.forEach(purchase => {
+      const currency = purchase.currency || 'NGN';
+      if (!totalsByCurrency[currency]) {
+        totalsByCurrency[currency] = {
+          totalFromVideos: 0,
+          totalFromLiveClasses: 0,
+          totalSales: 0,
+          videoSales: 0,
+          liveClassSales: 0
+        };
+      }
+
+      const amount = parseFloat(purchase.amount);
+      totalsByCurrency[currency].totalSales++;
+      
+      if (purchase.contentType === 'video') {
+        totalsByCurrency[currency].totalFromVideos += amount;
+        totalsByCurrency[currency].videoSales++;
+      } else {
+        totalsByCurrency[currency].totalFromLiveClasses += amount;
+        totalsByCurrency[currency].liveClassSales++;
+      }
+    });
 
     return {
-      wallet: {
-        totalEarnings: parseFloat(wallet.totalEarnings),
-        withdrawnAmount: parseFloat(wallet.withdrawnAmount),
-        pendingAmount: parseFloat(wallet.pendingAmount),
-        availableBalance: wallet.getAvailableBalance(),
-        currency: wallet.currency
-      },
-      breakdown: {
-        totalFromVideos,
-        totalFromLiveClasses,
-        totalSales: allPurchases.length,
-        videoSales: creatorVideoPurchases.length,
-        liveClassSales: creatorLiveClassPurchases.length
-      },
+      wallets: balances,
+      breakdown: totalsByCurrency,
       recentSales: allPurchases.slice(0, 10) // Last 10 sales
     };
   } catch (error) {
@@ -249,11 +409,57 @@ async function getCreatorPurchases(userId, { limit = 50, offset = 0, contentType
 }
 
 /**
- * Lock amount in wallet for pending withdrawal
+ * Lock amount in wallet for pending withdrawal (with transaction safety)
  */
-async function lockAmountForWithdrawal(userId, amount) {
+async function lockAmountForWithdrawal(userId, amount, currency = 'NGN') {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    const amountInCents = Math.round(parseFloat(amount) * 100);
+
+    // Use new transaction service for multi-currency wallets
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      const result = await transactionService.executeWalletOperation(
+        userId,
+        currency,
+        async (wallet, transaction) => {
+          // Move amount from available to pending
+          await transactionService.updateWalletBalance(
+            wallet,
+            -amountInCents, // Debit available balance
+            amountInCents,  // Credit pending balance
+            transaction
+          );
+
+          // Log the transaction
+          const WalletTransaction = sequelize.models.WalletTransaction;
+          if (WalletTransaction) {
+            await WalletTransaction.create({
+              wallet_account_id: wallet.id,
+              transaction_type: 'transfer_out',
+              amount: amountInCents,
+              balance_before: wallet.balance_available + amountInCents,
+              balance_after: wallet.balance_available,
+              description: 'Amount locked for withdrawal',
+              metadata: { currency, operation: 'lock_for_withdrawal' }
+            }, { transaction });
+          }
+
+          return {
+            id: wallet.id,
+            userId: wallet.user_id,
+            currency: wallet.currency,
+            availableBalance: wallet.balance_available,
+            pendingAmount: wallet.balance_pending
+          };
+        },
+        { operationType: 'lock_withdrawal' }
+      );
+
+      return result;
+    }
+
+    // Fallback to legacy system
+    const wallet = await getOrCreateWallet(userId, currency);
 
     const availableBalance = wallet.getAvailableBalance();
     
@@ -272,11 +478,57 @@ async function lockAmountForWithdrawal(userId, amount) {
 }
 
 /**
- * Release locked amount (if withdrawal fails)
+ * Release locked amount (if withdrawal fails) - with transaction safety
  */
-async function releaseLockedAmount(userId, amount) {
+async function releaseLockedAmount(userId, amount, currency = 'NGN') {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    const amountInCents = Math.round(parseFloat(amount) * 100);
+
+    // Use new transaction service for multi-currency wallets
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      const result = await transactionService.executeWalletOperation(
+        userId,
+        currency,
+        async (wallet, transaction) => {
+          // Move amount from pending back to available
+          await transactionService.updateWalletBalance(
+            wallet,
+            amountInCents,  // Credit available balance
+            -amountInCents, // Debit pending balance
+            transaction
+          );
+
+          // Log the transaction
+          const WalletTransaction = sequelize.models.WalletTransaction;
+          if (WalletTransaction) {
+            await WalletTransaction.create({
+              wallet_account_id: wallet.id,
+              transaction_type: 'transfer_in',
+              amount: amountInCents,
+              balance_before: wallet.balance_available - amountInCents,
+              balance_after: wallet.balance_available,
+              description: 'Released locked amount (withdrawal failed)',
+              metadata: { currency, operation: 'release_locked_amount' }
+            }, { transaction });
+          }
+
+          return {
+            id: wallet.id,
+            userId: wallet.user_id,
+            currency: wallet.currency,
+            availableBalance: wallet.balance_available,
+            pendingAmount: wallet.balance_pending
+          };
+        },
+        { operationType: 'release_locked' }
+      );
+
+      return result;
+    }
+
+    // Fallback to legacy system
+    const wallet = await getOrCreateWallet(userId, currency);
 
     wallet.pendingAmount = parseFloat(wallet.pendingAmount) - parseFloat(amount);
     await wallet.save();
@@ -289,11 +541,57 @@ async function releaseLockedAmount(userId, amount) {
 }
 
 /**
- * Complete withdrawal (move from pending to withdrawn)
+ * Complete withdrawal (move from pending to withdrawn) - with transaction safety
  */
-async function completeWithdrawal(userId, amount) {
+async function completeWithdrawal(userId, amount, currency = 'NGN') {
   try {
-    const wallet = await getOrCreateWallet(userId);
+    const amountInCents = Math.round(parseFloat(amount) * 100);
+
+    // Use new transaction service for multi-currency wallets
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (WalletAccount) {
+      const result = await transactionService.executeWalletOperation(
+        userId,
+        currency,
+        async (wallet, transaction) => {
+          // Remove amount from pending balance (it's already been withdrawn)
+          await transactionService.updateWalletBalance(
+            wallet,
+            0,              // No change to available balance
+            -amountInCents, // Debit pending balance
+            transaction
+          );
+
+          // Log the transaction
+          const WalletTransaction = sequelize.models.WalletTransaction;
+          if (WalletTransaction) {
+            await WalletTransaction.create({
+              wallet_account_id: wallet.id,
+              transaction_type: 'debit',
+              amount: amountInCents,
+              balance_before: wallet.balance_pending + amountInCents,
+              balance_after: wallet.balance_pending,
+              description: 'Withdrawal completed',
+              metadata: { currency, operation: 'complete_withdrawal' }
+            }, { transaction });
+          }
+
+          return {
+            id: wallet.id,
+            userId: wallet.user_id,
+            currency: wallet.currency,
+            availableBalance: wallet.balance_available,
+            pendingAmount: wallet.balance_pending
+          };
+        },
+        { operationType: 'complete_withdrawal' }
+      );
+
+      return result;
+    }
+
+    // Fallback to legacy system
+    const wallet = await getOrCreateWallet(userId, currency);
 
     wallet.withdrawnAmount = parseFloat(wallet.withdrawnAmount) + parseFloat(amount);
     wallet.pendingAmount = parseFloat(wallet.pendingAmount) - parseFloat(amount);
@@ -310,6 +608,7 @@ module.exports = {
   getOrCreateWallet,
   addEarnings,
   getAvailableBalance,
+  getMultiCurrencyBalances,
   getEarningsBreakdown,
   getCreatorPurchases,
   lockAmountForWithdrawal,

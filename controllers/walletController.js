@@ -1,5 +1,6 @@
 const {
   getAvailableBalance,
+  getMultiCurrencyBalances,
   getEarningsBreakdown,
   getCreatorPurchases,
   releaseLockedAmount
@@ -17,19 +18,29 @@ const User = require('../models/User');
 const { sendWithdrawalConfirmationEmail } = require('../utils/email');
 
 /**
- * Get wallet balance
- * GET /api/wallet/balance
+ * Get wallet balance (supports multi-currency)
+ * GET /api/wallet/balance?currency=NGN
  */
 exports.getWalletBalance = async (req, res) => {
   try {
     const userId = req.user.id;
+    const { currency } = req.query;
 
-    const balance = await getAvailableBalance(userId);
-
-    return res.status(200).json({
-      success: true,
-      balance
-    });
+    if (currency && ['NGN', 'USD'].includes(currency)) {
+      // Get specific currency balance
+      const balance = await getAvailableBalance(userId, currency);
+      return res.status(200).json({
+        success: true,
+        balance
+      });
+    } else {
+      // Get all currency balances
+      const balances = await getMultiCurrencyBalances(userId);
+      return res.status(200).json({
+        success: true,
+        balances
+      });
+    }
   } catch (error) {
     console.error('Get wallet balance error:', error);
     return res.status(500).json({
@@ -93,19 +104,48 @@ exports.getCreatorSales = async (req, res) => {
 module.exports = exports;
 
 /**
- * Initiate withdrawal
+ * Initiate withdrawal (enhanced with currency support)
  * POST /api/wallet/withdraw
  */
 exports.initiateWithdrawal = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { amount, bankName, accountNumber, accountName, gateway = 'paystack' } = req.body;
+    const { 
+      amount, 
+      bankName, 
+      accountNumber, 
+      accountName, 
+      gateway = 'paystack',
+      currency = 'NGN' 
+    } = req.body;
 
     // Validate input
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
         message: 'Invalid withdrawal amount'
+      });
+    }
+
+    if (!['NGN', 'USD'].includes(currency)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid currency. Supported currencies: NGN, USD'
+      });
+    }
+
+    // Validate gateway-currency pairing
+    if (currency === 'NGN' && gateway !== 'paystack') {
+      return res.status(400).json({
+        success: false,
+        message: 'NGN withdrawals must use Paystack gateway'
+      });
+    }
+
+    if (currency === 'USD' && gateway !== 'stripe') {
+      return res.status(400).json({
+        success: false,
+        message: 'USD withdrawals must use Stripe gateway'
       });
     }
 
@@ -116,32 +156,27 @@ exports.initiateWithdrawal = async (req, res) => {
       });
     }
 
-    if (!['paystack', 'stripe'].includes(gateway)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid payment gateway'
-      });
-    }
-
-    // Check available balance
-    const balance = await getAvailableBalance(userId);
+    // Check available balance for specific currency
+    const balance = await getAvailableBalance(userId, currency);
     
     if (balance.availableBalance < amount) {
       return res.status(400).json({
         success: false,
-        message: 'Insufficient balance',
+        message: `Insufficient ${currency} balance`,
         availableBalance: balance.availableBalance,
-        requestedAmount: amount
+        requestedAmount: amount,
+        currency
       });
     }
 
     // Calculate fees
     const fees = calculatePayoutFees(amount, gateway);
 
-    // Initiate withdrawal
+    // Initiate withdrawal with currency
     const payout = await initiateWithdrawal({
       userId,
       amount,
+      currency,
       bankDetails: { bankName, accountNumber, accountName },
       gateway
     });
@@ -159,16 +194,18 @@ exports.initiateWithdrawal = async (req, res) => {
         success: true,
         message: 'Withdrawal initiated successfully',
         payout: result.payout,
-        fees
+        fees,
+        currency
       });
     } catch (processingError) {
       // If processing fails, release the locked amount
-      await releaseLockedAmount(userId, amount);
+      await releaseLockedAmount(userId, amount, currency);
       
       return res.status(500).json({
         success: false,
         message: processingError.message || 'Failed to process withdrawal',
-        payout
+        payout,
+        currency
       });
     }
   } catch (error) {
@@ -176,7 +213,8 @@ exports.initiateWithdrawal = async (req, res) => {
     
     // Try to release locked amount if it was locked
     try {
-      await releaseLockedAmount(req.user.id, req.body.amount);
+      const { currency = 'NGN' } = req.body;
+      await releaseLockedAmount(req.user.id, req.body.amount, currency);
     } catch (releaseError) {
       console.error('Failed to release locked amount:', releaseError);
     }

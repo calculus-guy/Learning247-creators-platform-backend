@@ -327,3 +327,62 @@ exports.sendPasswordResetOTP = async (to, firstname, otp) => {
     html,
   });
 };
+
+/**
+ * WITHDRAWAL CONFIRMATION OTP EMAIL
+ */
+exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAccount) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Withdrawal Confirmation Required 💰</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        You requested to withdraw <strong>${currency} ${amount.toLocaleString()}</strong> from your Aahbibi wallet.
+        For your security, please confirm this withdrawal with the verification code below:
+      </p>
+
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        <h3 style="color: #333; margin-top: 0;">Withdrawal Details:</h3>
+        <p><strong>Amount:</strong> ${currency} ${amount.toLocaleString()}</p>
+        <p><strong>Bank Account:</strong> ${bankAccount}</p>
+        <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+      </div>
+
+      <div style="background-color: #e8f5e8; padding: 20px; text-align: center; margin: 20px 0; border-radius: 8px; border: 2px solid #28a745;">
+        <h1 style="color: #28a745; font-size: 36px; letter-spacing: 6px; margin: 0;">
+          ${otp}
+        </h1>
+      </div>
+
+      <p><strong>Security Notice:</strong></p>
+      <ul>
+        <li>This code expires in <strong>10 minutes</strong></li>
+        <li>Never share this code with anyone</li>
+        <li>If you didn't request this withdrawal, contact support immediately</li>
+        <li>Only enter this code on the official Aahbibi website</li>
+      </ul>
+
+      <p>
+        Enter this code on the withdrawal confirmation page to complete your transaction.
+      </p>
+
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0;"><strong>⚠️ Security Tip:</strong> Always verify withdrawal details carefully before confirming.</p>
+      </div>
+
+      <p><strong>The Aahbibi Team</strong></p>
+
+      <hr/>
+      <em>Secure. Trusted. Reliable.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Aahbibi Security" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Withdrawal Confirmation - ${currency} ${amount.toLocaleString()}`,
+    html,
+  });
+};

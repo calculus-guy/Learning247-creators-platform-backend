@@ -1,30 +1,28 @@
-const {
-  initializePaystackPayment,
-  initializeStripePayment,
-  verifyPaystackPayment,
-  verifyStripePayment,
-  processSuccessfulPayment
-} = require('../services/paymentService');
+const PaymentRoutingService = require('../services/paymentRoutingService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
 const User = require('../models/User');
 const { Op } = require('sequelize');
 
+// Initialize payment routing service
+const paymentRoutingService = new PaymentRoutingService();
+
 /**
- * Initialize payment checkout
+ * Initialize payment checkout with automatic currency routing
  * POST /api/payments/initialize
  */
 exports.initializeCheckout = async (req, res) => {
   try {
-    const { contentType, contentId, gateway } = req.body;
+    const { contentType, contentId, currency: forceCurrency } = req.body;
     const userId = req.user.id;
+    const idempotencyKey = req.headers['idempotency-key'];
 
     // Validate input
-    if (!contentType || !contentId || !gateway) {
+    if (!contentType || !contentId) {
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: contentType, contentId, gateway'
+        message: 'Missing required fields: contentType, contentId'
       });
     }
 
@@ -35,90 +33,40 @@ exports.initializeCheckout = async (req, res) => {
       });
     }
 
-    if (!['paystack', 'stripe'].includes(gateway)) {
+    if (!idempotencyKey) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid gateway. Must be "paystack" or "stripe"'
-      });
-    }
-
-    // Check if user already purchased this content
-    const existingPurchase = await Purchase.findOne({
-      where: {
-        userId,
-        contentType,
-        contentId,
-        paymentStatus: 'completed'
-      }
-    });
-
-    if (existingPurchase) {
-      return res.status(400).json({
-        success: false,
-        message: 'You have already purchased this content'
-      });
-    }
-
-    // Get content details
-    let content, amount, currency;
-    if (contentType === 'video') {
-      content = await Video.findByPk(contentId);
-      if (!content) {
-        return res.status(404).json({
-          success: false,
-          message: 'Video not found'
-        });
-      }
-      amount = parseFloat(content.price);
-    } else if (contentType === 'live_class') {
-      content = await LiveClass.findByPk(contentId);
-      if (!content) {
-        return res.status(404).json({
-          success: false,
-          message: 'Live class not found'
-        });
-      }
-      amount = parseFloat(content.price);
-    }
-
-    // Check if content is free
-    if (amount === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'This content is free. No payment required.'
+        message: 'Idempotency-Key header is required'
       });
     }
 
     // Get user email
     const user = await User.findByPk(userId);
-    const email = user.email;
-
-    // Initialize payment based on gateway
-    let paymentData;
-    if (gateway === 'paystack') {
-      paymentData = await initializePaystackPayment({
-        userId,
-        contentType,
-        contentId,
-        amount,
-        currency: 'NGN',
-        email
-      });
-    } else if (gateway === 'stripe') {
-      paymentData = await initializeStripePayment({
-        userId,
-        contentType,
-        contentId,
-        amount,
-        currency: 'usd',
-        email
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
       });
     }
 
+    // Initialize payment with automatic routing
+    const result = await paymentRoutingService.initializePayment({
+      userId,
+      contentType,
+      contentId,
+      userEmail: user.email,
+      idempotencyKey,
+      forceCurrency
+    });
+
     return res.status(200).json({
       success: true,
-      message: 'Payment initialized successfully',
-      data: paymentData
+      message: result.cached ? 'Payment already initialized (cached)' : 'Payment initialized successfully',
+      currency: result.currency,
+      gateway: result.gateway,
+      requiredGateway: result.requiredGateway,
+      cached: result.cached || false,
+      data: result.data
     });
   } catch (error) {
     console.error('Initialize checkout error:', error);
@@ -130,91 +78,45 @@ exports.initializeCheckout = async (req, res) => {
 };
 
 /**
- * Verify payment
+ * Verify payment with automatic gateway detection
  * GET/POST /api/payments/verify/:reference
  */
 exports.verifyPayment = async (req, res) => {
   try {
     const { reference } = req.params;
-    const { gateway } = req.query;
+    const { currency } = req.query;
+    const idempotencyKey = req.headers['idempotency-key'];
 
-    if (!gateway || !['paystack', 'stripe'].includes(gateway)) {
+    if (!currency) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid or missing gateway parameter. Use ?gateway=paystack or ?gateway=stripe'
+        message: 'Currency parameter is required. Use ?currency=NGN or ?currency=USD'
       });
     }
 
-    console.log(`[Payment Verification] Starting verification for reference: ${reference}, gateway: ${gateway}`);
-
-    // Check if purchase already exists (webhook may have already processed it)
-    const existingPurchase = await Purchase.findOne({
-      where: { paymentReference: reference }
-    });
-
-    if (existingPurchase) {
-      console.log(`[Payment Verification] Purchase already exists for reference: ${reference}`);
-      return res.status(200).json({
-        success: true,
-        message: 'Payment already verified',
-        purchase: existingPurchase,
-        alreadyProcessed: true
-      });
-    }
-
-    // Verify payment based on gateway
-    let verificationResult;
-    if (gateway === 'paystack') {
-      verificationResult = await verifyPaystackPayment(reference);
-    } else if (gateway === 'stripe') {
-      verificationResult = await verifyStripePayment(reference);
-    }
-
-    if (!verificationResult.success) {
-      console.log(`[Payment Verification] Verification failed for reference: ${reference}`);
+    if (!idempotencyKey) {
       return res.status(400).json({
         success: false,
-        message: verificationResult.message || 'Payment verification failed'
+        message: 'Idempotency-Key header is required'
       });
     }
 
-    // Extract payment data
-    const paymentData = verificationResult.data;
-    let userId, contentType, contentId, amount, currency;
+    console.log(`[Payment Verification] Starting verification for reference: ${reference}, currency: ${currency}`);
 
-    if (gateway === 'paystack') {
-      userId = parseInt(paymentData.metadata.userId);
-      contentType = paymentData.metadata.contentType;
-      contentId = paymentData.metadata.contentId;
-      amount = paymentData.amount / 100; // Convert from kobo
-      currency = paymentData.currency;
-    } else if (gateway === 'stripe') {
-      userId = parseInt(paymentData.metadata.userId);
-      contentType = paymentData.metadata.contentType;
-      contentId = paymentData.metadata.contentId;
-      amount = paymentData.amount_total / 100; // Convert from cents
-      currency = paymentData.currency;
+    // Verify payment with automatic routing
+    const result = await paymentRoutingService.verifyPayment(reference, currency.toUpperCase(), idempotencyKey);
+
+    if (result.cached) {
+      console.log(`[Payment Verification] Returning cached result for reference: ${reference}`);
     }
 
-    console.log(`[Payment Verification] Processing payment for user ${userId}, ${contentType} ${contentId}`);
-
-    // Process the payment (this will create the purchase record)
-    const result = await processSuccessfulPayment({
-      userId,
-      contentType,
-      contentId,
-      amount,
-      currency,
-      reference,
-      gateway
-    });
-
-    console.log(`[Payment Verification] Payment processed successfully for reference: ${reference}`);
-
-    return res.status(200).json({
-      success: true,
-      message: result.message,
-      purchase: result.purchase
+    return res.status(result.success ? 200 : 400).json({
+      success: result.success,
+      message: result.message || (result.success ? 'Payment verified successfully' : 'Payment verification failed'),
+      purchase: result.purchase,
+      currency: currency.toUpperCase(),
+      cached: result.cached || false,
+      alreadyProcessed: result.alreadyProcessed || false
     });
   } catch (error) {
     console.error('[Payment Verification] Error:', error);
@@ -338,22 +240,56 @@ exports.checkOwnership = async (req, res) => {
         success: true,
         hasAccess: true,
         reason: 'purchased',
-        purchaseDate: purchase.createdAt
+        purchaseDate: purchase.createdAt,
+        currency: purchase.currency
       });
     }
+
+    // Get content currency and required gateway
+    const contentCurrency = content.currency || 'NGN';
+    const requiredGateway = paymentRoutingService.getGatewayForCurrency(contentCurrency);
 
     return res.status(200).json({
       success: true,
       hasAccess: false,
       reason: 'not_purchased',
       price: content.price,
-      currency: 'NGN'
+      currency: contentCurrency,
+      requiredGateway
     });
   } catch (error) {
     console.error('Check ownership error:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to check content access'
+    });
+  }
+};
+
+/**
+ * Get payment configuration (supported currencies and gateways)
+ * GET /api/payments/config
+ */
+exports.getPaymentConfig = async (req, res) => {
+  try {
+    const supportedCurrencies = paymentRoutingService.getSupportedCurrencies();
+    const gatewayMapping = {};
+    
+    supportedCurrencies.forEach(currency => {
+      gatewayMapping[currency] = paymentRoutingService.getGatewayForCurrency(currency);
+    });
+
+    return res.status(200).json({
+      success: true,
+      supportedCurrencies,
+      gatewayMapping,
+      defaultCurrency: 'NGN'
+    });
+  } catch (error) {
+    console.error('Get payment config error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get payment configuration'
     });
   }
 };

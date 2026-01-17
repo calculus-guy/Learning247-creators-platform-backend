@@ -2,9 +2,14 @@ const express = require('express');
 const router = express.Router();
 const paymentController = require('../controllers/paymentController');
 const authMiddleware = require('../middleware/authMiddleware');
+const { payments } = require('../middleware/financialRateLimiter');
+const fraudDetectionMiddleware = require('../middleware/fraudDetectionMiddleware');
 
-// Initialize payment checkout
-router.post('/initialize', authMiddleware, paymentController.initializeCheckout);
+// Get payment configuration (supported currencies and gateways)
+router.get('/config', paymentController.getPaymentConfig);
+
+// Initialize payment checkout (with rate limiting and fraud detection)
+router.post('/initialize', authMiddleware, payments, fraudDetectionMiddleware.payments, paymentController.initializeCheckout);
 
 // Verify payment (GET and POST, no auth required since reference is unique)
 router.get('/verify/:reference', paymentController.verifyPayment);

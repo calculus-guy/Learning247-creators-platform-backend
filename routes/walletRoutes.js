@@ -1,7 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const walletController = require('../controllers/walletController');
+const withdrawal2FAController = require('../controllers/withdrawal2FAController');
+const currencyWithdrawalController = require('../controllers/currencyWithdrawalController');
+const transactionHistoryController = require('../controllers/transactionHistoryController');
 const authMiddleware = require('../middleware/authMiddleware');
+const fraudDetectionMiddleware = require('../middleware/fraudDetectionMiddleware');
+const withdrawalLimitMiddleware = require('../middleware/withdrawalLimitMiddleware');
+const withdrawal2FAMiddleware = require('../middleware/withdrawal2FAMiddleware');
 
 // Get wallet balance
 router.get('/balance', authMiddleware, walletController.getWalletBalance);
@@ -12,8 +18,64 @@ router.get('/earnings', authMiddleware, walletController.getEarnings);
 // Get creator sales (who bought what)
 router.get('/sales', authMiddleware, walletController.getCreatorSales);
 
-// Initiate withdrawal
-router.post('/withdraw', authMiddleware, walletController.initiateWithdrawal);
+// Initiate withdrawal (with fraud detection, withdrawal limits, and 2FA)
+router.post('/withdraw', 
+  authMiddleware, 
+  withdrawalLimitMiddleware.checkLimits,
+  fraudDetectionMiddleware.withdrawals,
+  withdrawal2FAMiddleware.check2FA, // This will handle 2FA requirement
+  walletController.initiateWithdrawal,
+  withdrawalLimitMiddleware.recordWithdrawal
+);
+
+// Currency-specific withdrawal processing
+router.post('/process-currency-withdrawal',
+  authMiddleware,
+  currencyWithdrawalController.processCurrencyWithdrawal
+);
+
+// Verify withdrawal OTP and complete withdrawal
+router.post('/verify-withdrawal', 
+  authMiddleware,
+  withdrawal2FAController.verifyWithdrawalOTP
+);
+
+// Resend withdrawal OTP
+router.post('/resend-withdrawal-otp', 
+  authMiddleware,
+  withdrawal2FAController.resendWithdrawalOTP
+);
+
+// Cancel pending withdrawal
+router.post('/cancel-withdrawal', 
+  authMiddleware,
+  withdrawal2FAController.cancelWithdrawal
+);
+
+// Get withdrawal status
+router.get('/withdrawal-status/:withdrawalId', 
+  authMiddleware,
+  withdrawal2FAController.getWithdrawalStatus
+);
+
+// Check currency-specific withdrawal status
+router.get('/withdrawal-status/:reference/:currency',
+  authMiddleware,
+  currencyWithdrawalController.checkWithdrawalStatus
+);
+
+// Get 2FA configuration
+router.get('/2fa-config', 
+  authMiddleware,
+  withdrawal2FAController.get2FAConfig
+);
+
+// Currency-specific endpoints
+router.get('/currency-config', currencyWithdrawalController.getCurrencyConfig);
+router.get('/withdrawal-limits/:currency', currencyWithdrawalController.getWithdrawalLimits);
+router.get('/supported-banks/:currency', currencyWithdrawalController.getSupportedBanks);
+router.post('/calculate-withdrawal-fees', currencyWithdrawalController.calculateWithdrawalFees);
+router.post('/validate-bank-account', currencyWithdrawalController.validateBankAccount);
 
 // Get withdrawal history
 router.get('/withdrawals', authMiddleware, walletController.getWithdrawals);
@@ -30,13 +92,22 @@ router.get('/test-paystack', authMiddleware, walletController.testPaystack);
 // Resolve account number to get account name
 router.post('/resolve-account', authMiddleware, walletController.resolveAccount);
 
-// Get transaction history
+// Get transaction history (legacy endpoint - kept for backward compatibility)
 router.get('/transactions', authMiddleware, walletController.getTransactions);
+
+// Enhanced transaction history endpoints
+router.get('/history', authMiddleware, transactionHistoryController.getTransactionHistory);
+router.get('/analytics', authMiddleware, transactionHistoryController.getTransactionAnalytics);
+router.get('/transaction/:id', authMiddleware, transactionHistoryController.getTransactionById);
+router.post('/search-transactions', authMiddleware, transactionHistoryController.searchTransactions);
+router.get('/summary', authMiddleware, transactionHistoryController.getTransactionSummary);
+router.get('/export', authMiddleware, transactionHistoryController.exportTransactionHistory);
+router.get('/config', authMiddleware, transactionHistoryController.getConfiguration);
 
 // Get transaction statistics
 router.get('/transaction-stats', authMiddleware, walletController.getTransactionStats);
 
-// Export transactions to CSV
+// Export transactions to CSV (legacy endpoint - kept for backward compatibility)
 router.get('/export-transactions', authMiddleware, walletController.exportTransactions);
 
 module.exports = router;
