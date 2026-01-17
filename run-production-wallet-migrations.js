@@ -1,17 +1,63 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
-// Database configuration
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-  dialect: 'postgres',
-  logging: console.log,
-  dialectOptions: {
-    ssl: process.env.NODE_ENV === 'production' ? {
-      require: true,
-      rejectUnauthorized: false
-    } : false
+// Database configuration with fallback options
+let sequelize;
+
+if (process.env.DATABASE_URL) {
+  // Use DATABASE_URL if available
+  sequelize = new Sequelize(process.env.DATABASE_URL, {
+    dialect: 'postgres',
+    logging: console.log,
+    dialectOptions: {
+      ssl: process.env.NODE_ENV === 'production' ? {
+        require: true,
+        rejectUnauthorized: false
+      } : false
+    }
+  });
+} else {
+  // Fallback to individual environment variables
+  const dbConfig = {
+    database: process.env.DB_NAME || process.env.POSTGRES_DB,
+    username: process.env.DB_USER || process.env.POSTGRES_USER,
+    password: process.env.DB_PASSWORD || process.env.POSTGRES_PASSWORD,
+    host: process.env.DB_HOST || process.env.POSTGRES_HOST || 'localhost',
+    port: process.env.DB_PORT || process.env.POSTGRES_PORT || 5432,
+    dialect: 'postgres',
+    logging: console.log,
+    dialectOptions: {
+      ssl: process.env.NODE_ENV === 'production' ? {
+        require: true,
+        rejectUnauthorized: false
+      } : false
+    }
+  };
+
+  // Check if we have the required database credentials
+  if (!dbConfig.database || !dbConfig.username || !dbConfig.password) {
+    console.error('❌ Database configuration error!');
+    console.error('\nMissing required environment variables. Please set one of:');
+    console.error('\nOption 1 - DATABASE_URL:');
+    console.error('  DATABASE_URL=postgresql://username:password@host:port/database');
+    console.error('\nOption 2 - Individual variables:');
+    console.error('  DB_NAME or POSTGRES_DB');
+    console.error('  DB_USER or POSTGRES_USER');
+    console.error('  DB_PASSWORD or POSTGRES_PASSWORD');
+    console.error('  DB_HOST or POSTGRES_HOST (optional, defaults to localhost)');
+    console.error('  DB_PORT or POSTGRES_PORT (optional, defaults to 5432)');
+    console.error('\nCurrent environment variables:');
+    console.error(`  DATABASE_URL: ${process.env.DATABASE_URL ? 'SET' : 'NOT SET'}`);
+    console.error(`  DB_NAME/POSTGRES_DB: ${dbConfig.database || 'NOT SET'}`);
+    console.error(`  DB_USER/POSTGRES_USER: ${dbConfig.username || 'NOT SET'}`);
+    console.error(`  DB_PASSWORD/POSTGRES_PASSWORD: ${dbConfig.password ? 'SET' : 'NOT SET'}`);
+    console.error(`  DB_HOST/POSTGRES_HOST: ${dbConfig.host}`);
+    console.error(`  DB_PORT/POSTGRES_PORT: ${dbConfig.port}`);
+    process.exit(1);
   }
-});
+
+  sequelize = new Sequelize(dbConfig);
+}
 
 async function runProductionWalletMigrations() {
   try {
