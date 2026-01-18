@@ -17,6 +17,14 @@ const Payout = require('../models/Payout');
 const User = require('../models/User');
 const { sendWithdrawalConfirmationEmail } = require('../utils/email');
 
+// Multi-Currency Services
+const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
+const MultiCurrencyBalanceService = require('../services/multiCurrencyBalanceService');
+
+// Initialize multi-currency services
+const multiCurrencyWalletService = new MultiCurrencyWalletService();
+const multiCurrencyBalanceService = new MultiCurrencyBalanceService();
+
 /**
  * Get wallet balance (supports multi-currency)
  * GET /api/wallet/balance?currency=NGN
@@ -520,6 +528,336 @@ exports.exportTransactions = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to export transactions'
+    });
+  }
+};
+
+// ===== MULTI-CURRENCY WALLET FUNCTIONS (New) =====
+// These functions provide enhanced multi-currency functionality
+// while maintaining backward compatibility
+
+/**
+ * Initialize multi-currency wallets for user
+ * POST /api/wallet/initialize
+ */
+exports.initializeWallets = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const wallets = await multiCurrencyWalletService.initializeUserWallets(userId);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Multi-currency wallets initialized successfully',
+      wallets
+    });
+  } catch (error) {
+    console.error('Initialize wallets error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to initialize wallets'
+    });
+  }
+};
+
+/**
+ * Credit wallet with earnings or refunds
+ * POST /api/wallet/credit
+ */
+exports.creditWallet = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currency, amount, reference, description, metadata } = req.body;
+
+    // Validate input
+    if (!currency || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Currency and amount are required'
+      });
+    }
+
+    const result = await multiCurrencyWalletService.creditWallet({
+      userId,
+      currency: currency.toUpperCase(),
+      amount: parseFloat(amount),
+      reference,
+      description: description || 'Wallet credit',
+      metadata: metadata || {}
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully credited ${amount} ${currency.toUpperCase()}`,
+      wallet: result
+    });
+  } catch (error) {
+    console.error('Credit wallet error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to credit wallet'
+    });
+  }
+};
+
+/**
+ * Transfer between wallets (same currency only)
+ * POST /api/wallet/transfer
+ */
+exports.transferBetweenWallets = async (req, res) => {
+  try {
+    const fromUserId = req.user.id;
+    const { toUserId, currency, amount, description } = req.body;
+
+    // Validate input
+    if (!toUserId || !currency || !amount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Recipient user ID, currency, and amount are required'
+      });
+    }
+
+    if (fromUserId === parseInt(toUserId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot transfer to yourself'
+      });
+    }
+
+    const reference = `transfer_${Date.now()}_${fromUserId}_${toUserId}`;
+
+    const result = await multiCurrencyWalletService.transferBetweenWallets({
+      fromUserId,
+      toUserId: parseInt(toUserId),
+      currency: currency.toUpperCase(),
+      amount: parseFloat(amount),
+      reference,
+      description: description || 'Wallet transfer'
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Successfully transferred ${amount} ${currency.toUpperCase()}`,
+      transfer: result
+    });
+  } catch (error) {
+    console.error('Transfer between wallets error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to transfer funds'
+    });
+  }
+};
+
+/**
+ * Get balance for specific currency with transaction history
+ * GET /api/wallet/balance/:currency/history
+ */
+exports.getCurrencyBalanceWithHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currency } = req.params;
+    const { startDate, endDate, limit = 50, offset = 0 } = req.query;
+
+    // Validate currency
+    multiCurrencyWalletService.validateCurrency(currency);
+
+    const result = await multiCurrencyBalanceService.getCurrencyBalanceWithHistory({
+      userId,
+      currency: currency.toUpperCase(),
+      startDate,
+      endDate,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get currency balance with history error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to fetch currency balance with history'
+    });
+  }
+};
+
+/**
+ * Get all currency balances with optional history
+ * GET /api/wallet/balances/detailed
+ */
+exports.getAllBalancesDetailed = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currencies, includeHistory = false, historyLimit = 10 } = req.query;
+
+    let targetCurrencies = null;
+    if (currencies) {
+      targetCurrencies = currencies.split(',').map(c => c.trim().toUpperCase());
+    }
+
+    const result = await multiCurrencyBalanceService.getAllCurrencyBalances({
+      userId,
+      currencies: targetCurrencies,
+      includeHistory: includeHistory === 'true',
+      historyLimit: parseInt(historyLimit)
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get all balances detailed error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to fetch detailed balances'
+    });
+  }
+};
+
+/**
+ * Get filtered transaction history
+ * GET /api/wallet/transactions/filtered
+ */
+exports.getFilteredTransactions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { 
+      currency, 
+      types, 
+      startDate, 
+      endDate, 
+      limit = 50, 
+      offset = 0 
+    } = req.query;
+
+    let transactionTypes = null;
+    if (types) {
+      transactionTypes = types.split(',').map(t => t.trim());
+    }
+
+    const result = await multiCurrencyBalanceService.getFilteredTransactionHistory({
+      userId,
+      currency: currency ? currency.toUpperCase() : null,
+      transactionTypes,
+      startDate,
+      endDate,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get filtered transactions error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to fetch filtered transactions'
+    });
+  }
+};
+
+/**
+ * Get balance analytics for a currency
+ * GET /api/wallet/analytics/:currency
+ */
+exports.getBalanceAnalytics = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currency } = req.params;
+    const { period = 'day', periods = 30 } = req.query;
+
+    // Validate currency
+    multiCurrencyWalletService.validateCurrency(currency);
+
+    // Validate period
+    const validPeriods = ['day', 'week', 'month'];
+    if (!validPeriods.includes(period)) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid period. Must be one of: ${validPeriods.join(', ')}`
+      });
+    }
+
+    const result = await multiCurrencyBalanceService.getBalanceAnalytics({
+      userId,
+      currency: currency.toUpperCase(),
+      period,
+      periods: Math.min(parseInt(periods), 365) // Cap at 365 periods
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: result
+    });
+  } catch (error) {
+    console.error('Get balance analytics error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to fetch balance analytics'
+    });
+  }
+};
+
+/**
+ * Get required gateway for currency
+ * GET /api/wallet/gateway/:currency
+ */
+exports.getRequiredGateway = async (req, res) => {
+  try {
+    const { currency } = req.params;
+
+    multiCurrencyWalletService.validateCurrency(currency);
+
+    const gateway = multiCurrencyWalletService.getRequiredGateway(currency.toUpperCase());
+
+    return res.status(200).json({
+      success: true,
+      currency: currency.toUpperCase(),
+      requiredGateway: gateway
+    });
+  } catch (error) {
+    console.error('Get required gateway error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Failed to get gateway information'
+    });
+  }
+};
+
+/**
+ * Validate currency-gateway pairing
+ * POST /api/wallet/validate-gateway
+ */
+exports.validateGatewayPairing = async (req, res) => {
+  try {
+    const { currency, gateway } = req.body;
+
+    if (!currency || !gateway) {
+      return res.status(400).json({
+        success: false,
+        message: 'Currency and gateway are required'
+      });
+    }
+
+    multiCurrencyWalletService.validateCurrencyGatewayPairing(currency.toUpperCase(), gateway);
+
+    return res.status(200).json({
+      success: true,
+      message: `${currency.toUpperCase()} and ${gateway} pairing is valid`,
+      currency: currency.toUpperCase(),
+      gateway
+    });
+  } catch (error) {
+    console.error('Validate gateway pairing error:', error);
+    return res.status(400).json({
+      success: false,
+      message: error.message || 'Invalid gateway pairing'
     });
   }
 };

@@ -16,7 +16,6 @@ const zegoCloudRoutes = require('./routes/zegoCloudRoutes');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const walletRoutes = require('./routes/walletRoutes');
-const multiCurrencyWalletRoutes = require('./routes/multiCurrencyWalletRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
@@ -74,7 +73,6 @@ app.use('/api/live/zegocloud', zegoCloudRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
-app.use('/api/multi-wallet', multiCurrencyWalletRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use('/uploads', express.static('uploads'));

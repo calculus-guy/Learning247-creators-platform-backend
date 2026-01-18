@@ -352,74 +352,73 @@ exports.handleStripeWebhook = async (req, res) => {
 
     console.log('[Stripe Webhook] Processing event type:', event.type);
 
-    try {
-      // Handle checkout.session.completed event (payment completed)
-      if (event.type === 'checkout.session.completed') {
-        const session = event.data.object;
+    // Handle checkout.session.completed event (payment completed)
+    if (event.type === 'checkout.session.completed') {
+      const session = event.data.object;
 
-        // Extract metadata
-        const userId = parseInt(session.metadata.userId);
-        const contentType = session.metadata.contentType;
-        const contentId = session.metadata.contentId;
-        const email = session.metadata.email;
+      // Extract metadata
+      const userId = parseInt(session.metadata.userId);
+      const contentType = session.metadata.contentType;
+      const contentId = session.metadata.contentId;
+      const email = session.metadata.email;
 
-        // Check if already processed
-        const existingPurchase = await Purchase.findOne({
-          where: { paymentReference: session.id }
-        });
+      // Check if already processed
+      const existingPurchase = await Purchase.findOne({
+        where: { paymentReference: session.id }
+      });
 
-        if (existingPurchase) {
-          console.log('[Stripe Webhook] Payment already processed:', session.id);
-          return res.status(200).json({ received: true });
-        }
-
-        // Process the payment using routing service
-        const result = await paymentRoutingService.processSuccessfulPayment({
-          paymentData: session,
-          currency: session.currency.toUpperCase(),
-          gateway: 'stripe',
-          reference: session.id
-        });
-
-        // Log transaction
-        await Transaction.create({
-          userId,
-          transactionType: 'purchase',
-          amount: session.amount_total / 100,
-          currency: session.currency.toUpperCase(),
-          referenceType: 'purchase',
-          referenceId: result.purchase.id,
-          description: `Purchase of ${contentType} via Stripe`,
-          metadata: { sessionId: session.id, gateway: 'stripe' }
-        });
-
-        // Send email notifications
-        try {
-          const user = await User.findByPk(userId);
-          let content;
-          if (contentType === 'video') {
-            content = await Video.findByPk(contentId);
-          } else if (contentType === 'live_class') {
-            content = await LiveClass.findByPk(contentId);
-          }
-
-          if (user && content) {
-            // Send confirmation to student
-            await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, session.amount_total / 100);
-            
-            // Send notification to creator
-            const creator = await User.findByPk(content.userId);
-            if (creator) {
-              await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, session.amount_total / 100);
-            }
-          }
-        } catch (emailError) {
-          console.error('[Stripe Webhook] Email notification error:', emailError);
-          // Don't fail the webhook if email fails
-        }
-
-        console.log('[Stripe Webhook] Payment processed successfully:', session.id);
+      if (existingPurchase) {
+        console.log('[Stripe Webhook] Payment already processed:', session.id);
+        return res.status(200).json({ received: true });
       }
+
+      // Process the payment using routing service
+      const result = await paymentRoutingService.processSuccessfulPayment({
+        paymentData: session,
+        currency: session.currency.toUpperCase(),
+        gateway: 'stripe',
+        reference: session.id
+      });
+
+      // Log transaction
+      await Transaction.create({
+        userId,
+        transactionType: 'purchase',
+        amount: session.amount_total / 100,
+        currency: session.currency.toUpperCase(),
+        referenceType: 'purchase',
+        referenceId: result.purchase.id,
+        description: `Purchase of ${contentType} via Stripe`,
+        metadata: { sessionId: session.id, gateway: 'stripe' }
+      });
+
+      // Send email notifications
+      try {
+        const user = await User.findByPk(userId);
+        let content;
+        if (contentType === 'video') {
+          content = await Video.findByPk(contentId);
+        } else if (contentType === 'live_class') {
+          content = await LiveClass.findByPk(contentId);
+        }
+
+        if (user && content) {
+          // Send confirmation to student
+          await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, session.amount_total / 100);
+          
+          // Send notification to creator
+          const creator = await User.findByPk(content.userId);
+          if (creator) {
+            await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, session.amount_total / 100);
+          }
+        }
+      } catch (emailError) {
+        console.error('[Stripe Webhook] Email notification error:', emailError);
+        // Don't fail the webhook if email fails
+      }
+
+      console.log('[Stripe Webhook] Payment processed successfully:', session.id);
+    }
 
     // Handle transfer.created event (payout initiated)
     if (event.type === 'transfer.created') {
