@@ -6,6 +6,7 @@ exports.uploadVideoService = async ({
   title,
   description,
   price,
+  currency,
   type,
   category,
   tags,
@@ -22,11 +23,18 @@ exports.uploadVideoService = async ({
       },
     });
 
+    // Validate currency if provided
+    const validCurrencies = ['NGN', 'USD'];
+    const finalCurrency = currency && validCurrencies.includes(currency.toUpperCase()) 
+      ? currency.toUpperCase() 
+      : 'NGN';
+
     const video = await VideoModel.create({
       userId,
       title,
       description,
       price,
+      currency: finalCurrency,
       type,
       category,
       tags: (typeof tags === 'string' && tags.length > 0) ? tags.split(',').map(tag => tag.trim()) : (Array.isArray(tags) ? tags : []),

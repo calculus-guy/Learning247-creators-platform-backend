@@ -46,7 +46,7 @@ const handleError = (res, error) => {
 
 exports.createLiveClass = async (req, res) => {
   try {
-    const { title, description, price, category, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
+    const { title, description, price, currency, category, thumbnailUrl, startTime, endTime, privacy, streamingProvider = 'mux' } = req.body;
     const userId = req.user.id;
     
     // Handle thumbnail - either from file upload or URL string
@@ -55,6 +55,12 @@ exports.createLiveClass = async (req, res) => {
 
     // Basic check before calling services
     if (!title) return res.status(400).json({ success: false, message: "Title is required" });
+
+    // Validate currency if provided
+    const validCurrencies = ['NGN', 'USD'];
+    const finalCurrency = currency && validCurrencies.includes(currency.toUpperCase()) 
+      ? currency.toUpperCase() 
+      : 'NGN';
 
     // Validate streaming provider
     if (!['mux', 'zegocloud'].includes(streamingProvider)) {
@@ -93,6 +99,7 @@ exports.createLiveClass = async (req, res) => {
       title,
       description,
       price,
+      currency: finalCurrency,
       category,
       thumbnailUrl: finalThumbnailUrl,
       startTime,

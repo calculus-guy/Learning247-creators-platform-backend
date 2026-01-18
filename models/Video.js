@@ -14,6 +14,14 @@ const Video = sequelize.define('Video', {
   title: { type: DataTypes.STRING, allowNull: false },
   description: { type: DataTypes.TEXT, allowNull: true },
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  currency: { 
+    type: DataTypes.STRING(3), 
+    allowNull: false, 
+    defaultValue: 'NGN',
+    validate: {
+      isIn: [['NGN', 'USD']]
+    }
+  },
   type: { type: DataTypes.ENUM('short','long'), defaultValue: 'short' },
   category: { type: DataTypes.STRING, allowNull: true },
   tags: { type: DataTypes.ARRAY(DataTypes.STRING), allowNull: true },
