@@ -62,16 +62,18 @@ class PaymentRoutingService {
   async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null }) {
     try {
       // Validate idempotency
-      const idempotencyResult = await this.idempotencyService.checkIdempotency(
+      const idempotencyResult = await this.idempotencyService.checkAndStore(
         idempotencyKey,
-        { userId, contentType, contentId }
+        userId,
+        'payment_initialization',
+        { contentType, contentId, forceCurrency }
       );
 
-      if (!idempotencyResult.isUnique) {
+      if (!idempotencyResult.isNew) {
         return {
           success: true,
           cached: true,
-          data: idempotencyResult.cachedResponse
+          data: idempotencyResult.storedResult
         };
       }
 
@@ -155,16 +157,18 @@ class PaymentRoutingService {
   async verifyPayment(reference, currency, idempotencyKey) {
     try {
       // Validate idempotency
-      const idempotencyResult = await this.idempotencyService.checkIdempotency(
+      const idempotencyResult = await this.idempotencyService.checkAndStore(
         idempotencyKey,
+        null, // userId not available at this point
+        'payment_verification',
         { reference, currency }
       );
 
-      if (!idempotencyResult.isUnique) {
+      if (!idempotencyResult.isNew) {
         return {
           success: true,
           cached: true,
-          data: idempotencyResult.cachedResponse
+          data: idempotencyResult.storedResult
         };
       }
 
