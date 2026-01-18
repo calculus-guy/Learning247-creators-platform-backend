@@ -175,29 +175,28 @@ class AuditTrailService {
     try {
       await sequelize.query(`
         INSERT INTO audit_logs (
-          id, timestamp, event_type, category, user_id, session_id,
-          ip_address, user_agent, data, metadata, entry_hash, 
-          chain_hash, previous_hash, created_at
+          id, user_id, operation_type, resource_type, resource_id,
+          old_values, new_values, ip_address, user_agent, request_id, 
+          session_id, hash_chain, created_at
         ) VALUES (
-          :id, :timestamp, :eventType, :category, :userId, :sessionId,
-          :ipAddress, :userAgent, :data, :metadata, :entryHash,
-          :chainHash, :previousHash, CURRENT_TIMESTAMP
+          :id, :userId, :operationType, :resourceType, :resourceId,
+          :oldValues, :newValues, :ipAddress, :userAgent, :requestId,
+          :sessionId, :chainHash, CURRENT_TIMESTAMP
         )
       `, {
         replacements: {
           id: auditEntry.id,
-          timestamp: auditEntry.timestamp,
-          eventType: auditEntry.eventType,
-          category: auditEntry.category,
           userId: auditEntry.userId,
-          sessionId: auditEntry.sessionId,
+          operationType: auditEntry.eventType,
+          resourceType: auditEntry.category,
+          resourceId: auditEntry.resourceId,
+          oldValues: JSON.stringify(auditEntry.data),
+          newValues: JSON.stringify(auditEntry.metadata),
           ipAddress: auditEntry.ipAddress,
           userAgent: auditEntry.userAgent,
-          data: JSON.stringify(auditEntry.data),
-          metadata: JSON.stringify(auditEntry.metadata),
-          entryHash: auditEntry.entryHash,
-          chainHash: auditEntry.chainHash,
-          previousHash: auditEntry.previousHash
+          requestId: auditEntry.requestId,
+          sessionId: auditEntry.sessionId,
+          chainHash: auditEntry.chainHash
         },
         transaction
       });
@@ -246,23 +245,23 @@ class AuditTrailService {
       }
 
       if (startDate) {
-        whereClause += ' AND timestamp >= :startDate';
+        whereClause += ' AND created_at >= :startDate';
         replacements.startDate = startDate;
       }
 
       if (endDate) {
-        whereClause += ' AND timestamp <= :endDate';
+        whereClause += ' AND created_at <= :endDate';
         replacements.endDate = endDate;
       }
 
       const [results] = await sequelize.query(`
         SELECT 
-          id, timestamp, event_type, category, user_id, session_id,
-          ip_address, user_agent, data, metadata, entry_hash,
-          chain_hash, previous_hash, created_at
+          id, user_id, operation_type, resource_type, resource_id,
+          old_values, new_values, ip_address, user_agent, request_id,
+          session_id, hash_chain, created_at
         FROM audit_logs 
         ${whereClause}
-        ORDER BY timestamp DESC
+        ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
       `, {
         replacements: {
@@ -275,8 +274,8 @@ class AuditTrailService {
 
       return results.map(entry => ({
         ...entry,
-        data: this.parseJSON(entry.data),
-        metadata: this.parseJSON(entry.metadata)
+        data: this.parseJSON(entry.old_values),
+        metadata: this.parseJSON(entry.new_values)
       }));
     } catch (error) {
       console.error('[Audit Trail] Get logs error:', error);
@@ -328,9 +327,9 @@ class AuditTrailService {
       // Verify chain integrity if previous entry exists
       if (entry.previous_hash) {
         const [previousEntry] = await sequelize.query(`
-          SELECT chain_hash FROM audit_logs 
-          WHERE chain_hash = :previousHash
-          ORDER BY timestamp DESC LIMIT 1
+          SELECT hash_chain FROM audit_logs 
+          WHERE hash_chain = :previousHash
+          ORDER BY created_at DESC LIMIT 1
         `, {
           replacements: { previousHash: entry.previous_hash },
           type: sequelize.QueryTypes.SELECT
@@ -416,8 +415,8 @@ class AuditTrailService {
 
         const [result] = await sequelize.query(`
           DELETE FROM audit_logs 
-          WHERE category = :category 
-          AND timestamp < :cutoffDate
+          WHERE resource_type = :category 
+          AND created_at < :cutoffDate
         `, {
           replacements: {
             category,
@@ -479,13 +478,13 @@ class AuditTrailService {
   async initializeHashChain() {
     try {
       const [lastEntry] = await sequelize.query(`
-        SELECT chain_hash FROM audit_logs 
-        ORDER BY timestamp DESC LIMIT 1
+        SELECT hash_chain FROM audit_logs 
+        ORDER BY created_at DESC LIMIT 1
       `, {
         type: sequelize.QueryTypes.SELECT
       });
 
-      this.lastHash = lastEntry ? lastEntry.chain_hash : null;
+      this.lastHash = lastEntry ? lastEntry.hash_chain : null;
       console.log(`[Audit Trail] Hash chain initialized. Last hash: ${this.lastHash || 'None'}`);
     } catch (error) {
       console.error('[Audit Trail] Hash chain initialization error:', error);

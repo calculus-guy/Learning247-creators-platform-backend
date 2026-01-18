@@ -1,7 +1,7 @@
 const { paystackClient } = require('../config/paystack');
 const { stripeClient } = require('../config/stripe');
 const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
-const { IdempotencyService } = require('./idempotencyService');
+const { idempotencyService } = require('./idempotencyService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
@@ -23,7 +23,7 @@ const sequelize = require('../config/db');
 class PaymentRoutingService {
   constructor() {
     this.walletService = new MultiCurrencyWalletService();
-    this.idempotencyService = new IdempotencyService();
+    this.idempotencyService = idempotencyService;
     
     // Gateway routing configuration
     this.gatewayRouting = {

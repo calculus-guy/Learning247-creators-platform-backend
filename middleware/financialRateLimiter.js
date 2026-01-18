@@ -1,4 +1,4 @@
-const { IdempotencyService } = require('../services/idempotencyService');
+const { idempotencyService } = require('../services/idempotencyService');
 
 /**
  * Financial Rate Limiting Middleware
@@ -15,7 +15,7 @@ const { IdempotencyService } = require('../services/idempotencyService');
 
 class FinancialRateLimiter {
   constructor() {
-    this.idempotencyService = new IdempotencyService();
+    this.idempotencyService = idempotencyService;
     
     // Rate limiting configuration
     this.config = {

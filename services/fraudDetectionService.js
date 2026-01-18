@@ -1,4 +1,4 @@
-const { IdempotencyService } = require('./idempotencyService');
+const { idempotencyService } = require('./idempotencyService');
 
 /**
  * Fraud Detection Engine
@@ -15,7 +15,7 @@ const { IdempotencyService } = require('./idempotencyService');
 
 class FraudDetectionService {
   constructor() {
-    this.idempotencyService = new IdempotencyService();
+    this.idempotencyService = idempotencyService;
     
     // Fraud detection configuration
     this.config = {

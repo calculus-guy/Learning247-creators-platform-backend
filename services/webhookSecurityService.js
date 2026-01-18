@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { IdempotencyService } = require('./idempotencyService');
+const { idempotencyService } = require('./idempotencyService');
 
 /**
  * Enhanced Webhook Security Service
@@ -16,7 +16,7 @@ const { IdempotencyService } = require('./idempotencyService');
 
 class WebhookSecurityService {
   constructor() {
-    this.idempotencyService = new IdempotencyService();
+    this.idempotencyService = idempotencyService;
     
     // Webhook security configuration
     this.config = {
