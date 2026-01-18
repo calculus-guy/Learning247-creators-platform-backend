@@ -118,7 +118,7 @@ class PaymentRoutingService {
       });
 
       // Cache successful result
-      await this.idempotencyService.cacheResponse(idempotencyKey, paymentResult);
+      await this.idempotencyService.storeResult(idempotencyKey, paymentResult, 'completed');
 
       return {
         success: true,
@@ -138,7 +138,7 @@ class PaymentRoutingService {
       };
       
       try {
-        await this.idempotencyService.cacheResponse(idempotencyKey, errorResponse);
+        await this.idempotencyService.storeResult(idempotencyKey, errorResponse, 'failed');
       } catch (cacheError) {
         console.error('[Payment Routing] Failed to cache error response:', cacheError);
       }
@@ -184,7 +184,7 @@ class PaymentRoutingService {
           purchase: existingPurchase
         };
         
-        await this.idempotencyService.cacheResponse(idempotencyKey, result);
+        await this.idempotencyService.storeResult(idempotencyKey, result, 'completed');
         return result;
       }
 
@@ -207,7 +207,7 @@ class PaymentRoutingService {
           message: verificationResult.message || 'Payment verification failed'
         };
         
-        await this.idempotencyService.cacheResponse(idempotencyKey, errorResult);
+        await this.idempotencyService.storeResult(idempotencyKey, errorResult, 'failed');
         return errorResult;
       }
 
@@ -221,7 +221,7 @@ class PaymentRoutingService {
       });
 
       // Cache successful result
-      await this.idempotencyService.cacheResponse(idempotencyKey, processedPayment);
+      await this.idempotencyService.storeResult(idempotencyKey, processedPayment, 'completed');
 
       return processedPayment;
 
@@ -234,7 +234,7 @@ class PaymentRoutingService {
       };
       
       try {
-        await this.idempotencyService.cacheResponse(idempotencyKey, errorResponse);
+        await this.idempotencyService.storeResult(idempotencyKey, errorResponse, 'failed');
       } catch (cacheError) {
         console.error('[Payment Routing] Failed to cache error response:', cacheError);
       }

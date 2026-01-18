@@ -26,7 +26,12 @@ class IdempotencyService {
         throw new Error('Invalid idempotency key format');
       }
       
-      if (!userId || !operationType || !operationData) {
+      if (!operationType || !operationData) {
+        throw new Error('Missing required parameters for idempotency check');
+      }
+      
+      // For payment verification, userId might not be available initially
+      if (operationType !== 'payment_verification' && !userId) {
         throw new Error('Missing required parameters for idempotency check');
       }
       
@@ -52,8 +57,8 @@ class IdempotencyService {
           );
         }
         
-        // Validate that the user matches
-        if (existingRecord.user_id !== userId) {
+        // Validate that the user matches (skip for payment verification)
+        if (operationType !== 'payment_verification' && existingRecord.user_id !== userId) {
           throw new IdempotencyConflictError(
             `Idempotency key ${key} belongs to a different user`
           );
