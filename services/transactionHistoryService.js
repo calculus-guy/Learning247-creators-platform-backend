@@ -86,55 +86,60 @@ class TransactionHistoryService {
       const replacements = {};
 
       if (userId) {
-        whereConditions.push('user_id = :userId');
+        whereConditions.push('wa.user_id = :userId');
         replacements.userId = userId;
       }
 
       if (currency) {
-        whereConditions.push('currency = :currency');
+        whereConditions.push('ft.currency = :currency');
         replacements.currency = currency.toUpperCase();
       }
 
       if (type) {
-        // Map generic types to transaction_type values
+        // Map generic types to financial transaction types
         let mappedType = type;
         if (type === 'credit' || type === 'deposit') {
-          mappedType = 'purchase'; // Credits come from purchases
+          mappedType = 'credit';
         } else if (type === 'debit' || type === 'withdrawal') {
-          mappedType = 'payout'; // Debits are payouts
+          mappedType = 'debit';
         }
-        whereConditions.push('transaction_type = :type');
+        whereConditions.push('ft.transaction_type = :type');
         replacements.type = mappedType;
       }
 
-      // Note: status, reference, gateway_reference don't exist in this table
-      // Skipping these filters for now
+      if (status) {
+        whereConditions.push('ft.status = :status');
+        replacements.status = status;
+      }
 
       if (startDate) {
-        whereConditions.push('created_at >= :startDate');
+        whereConditions.push('ft.created_at >= :startDate');
         replacements.startDate = startDate;
       }
 
       if (endDate) {
-        whereConditions.push('created_at <= :endDate');
+        whereConditions.push('ft.created_at <= :endDate');
         replacements.endDate = endDate;
       }
 
       if (minAmount !== undefined) {
-        whereConditions.push('amount >= :minAmount');
-        replacements.minAmount = parseFloat(minAmount);
+        // Convert to smallest currency unit
+        whereConditions.push('ft.amount >= :minAmount');
+        replacements.minAmount = parseFloat(minAmount) * 100;
       }
 
       if (maxAmount !== undefined) {
-        whereConditions.push('amount <= :maxAmount');
-        replacements.maxAmount = parseFloat(maxAmount);
+        // Convert to smallest currency unit
+        whereConditions.push('ft.amount <= :maxAmount');
+        replacements.maxAmount = parseFloat(maxAmount) * 100;
       }
 
       if (search) {
         whereConditions.push(`(
-          reference_type ILIKE :search OR 
-          description ILIKE :search OR
-          metadata::text ILIKE :search
+          ft.reference ILIKE :search OR 
+          ft.description ILIKE :search OR
+          ft.external_reference ILIKE :search OR
+          ft.metadata::text ILIKE :search
         )`);
         replacements.search = `%${search}%`;
       }
@@ -143,8 +148,8 @@ class TransactionHistoryService {
         ? `WHERE ${whereConditions.join(' AND ')}`
         : '';
 
-      // Validate sort parameters
-      const validSortFields = ['created_at', 'amount', 'transaction_type', 'currency', 'reference_type'];
+      // Validate sort parameters (update for financial_transactions table)
+      const validSortFields = ['created_at', 'amount', 'transaction_type', 'currency', 'status'];
       const validSortOrders = ['ASC', 'DESC'];
       
       const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
@@ -153,8 +158,9 @@ class TransactionHistoryService {
       // Get total count
       const [countResult] = await sequelize.query(`
         SELECT COUNT(*) as total
-        FROM transactions 
-        ${whereClause}
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
+        ${whereClause.replace(/user_id/g, 'wa.user_id')}
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -165,20 +171,22 @@ class TransactionHistoryService {
       // Get transactions
       const transactions = await sequelize.query(`
         SELECT 
-          id,
-          user_id,
-          transaction_type as type,
-          amount,
-          currency,
-          reference_type,
-          reference_id,
-          description,
-          metadata,
-          created_at,
-          updated_at
-        FROM transactions 
-        ${whereClause}
-        ORDER BY ${safeSortBy} ${safeSortOrder}
+          ft.id,
+          wa.user_id,
+          ft.transaction_type as type,
+          ft.amount,
+          ft.currency,
+          ft.status,
+          ft.reference,
+          ft.external_reference as gateway_reference,
+          ft.description,
+          ft.metadata,
+          ft.created_at,
+          ft.completed_at as updated_at
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
+        ${whereClause.replace(/user_id/g, 'wa.user_id')}
+        ORDER BY ft.${safeSortBy} ${safeSortOrder}
         LIMIT :limit OFFSET :offset
       `, {
         replacements: {
@@ -193,12 +201,11 @@ class TransactionHistoryService {
       const parsedTransactions = transactions.map(tx => ({
         ...tx,
         metadata: this.parseJSON(tx.metadata),
-        amount: parseFloat(tx.amount),
-        // Add status field for compatibility (since it doesn't exist in DB)
-        status: 'completed', // Assume all transactions in this table are completed
-        // Add reference field for compatibility
-        reference: tx.reference_id || `${tx.type}_${tx.id}`,
-        gateway_reference: null // Not available in this table
+        // Convert from smallest currency unit (kobo/cents) to main unit
+        amount: parseFloat(tx.amount) / 100,
+        // Remove compatibility fields since we have real data now
+        reference: tx.reference,
+        gateway_reference: tx.gateway_reference
       }));
 
       // Calculate summary statistics
@@ -249,22 +256,22 @@ class TransactionHistoryService {
       const replacements = {};
 
       if (userId) {
-        whereConditions.push('user_id = :userId');
+        whereConditions.push('wa.user_id = :userId');
         replacements.userId = userId;
       }
 
       if (currency) {
-        whereConditions.push('currency = :currency');
+        whereConditions.push('ft.currency = :currency');
         replacements.currency = currency.toUpperCase();
       }
 
       if (startDate) {
-        whereConditions.push('created_at >= :startDate');
+        whereConditions.push('ft.created_at >= :startDate');
         replacements.startDate = startDate;
       }
 
       if (endDate) {
-        whereConditions.push('created_at <= :endDate');
+        whereConditions.push('ft.created_at <= :endDate');
         replacements.endDate = endDate;
       }
 
@@ -276,39 +283,40 @@ class TransactionHistoryService {
       let dateGrouping;
       switch (groupBy) {
         case 'hour':
-          dateGrouping = "DATE_TRUNC('hour', created_at)";
+          dateGrouping = "DATE_TRUNC('hour', ft.created_at)";
           break;
         case 'day':
-          dateGrouping = "DATE_TRUNC('day', created_at)";
+          dateGrouping = "DATE_TRUNC('day', ft.created_at)";
           break;
         case 'week':
-          dateGrouping = "DATE_TRUNC('week', created_at)";
+          dateGrouping = "DATE_TRUNC('week', ft.created_at)";
           break;
         case 'month':
-          dateGrouping = "DATE_TRUNC('month', created_at)";
+          dateGrouping = "DATE_TRUNC('month', ft.created_at)";
           break;
         case 'year':
-          dateGrouping = "DATE_TRUNC('year', created_at)";
+          dateGrouping = "DATE_TRUNC('year', ft.created_at)";
           break;
         default:
-          dateGrouping = "DATE_TRUNC('day', created_at)";
+          dateGrouping = "DATE_TRUNC('day', ft.created_at)";
       }
 
       // Get time-series data
       const timeSeriesData = await sequelize.query(`
         SELECT 
           ${dateGrouping} as period,
-          currency,
-          transaction_type as type,
+          ft.currency,
+          ft.transaction_type as type,
           COUNT(*) as transaction_count,
-          SUM(amount) as total_amount,
-          AVG(amount) as avg_amount,
-          MIN(amount) as min_amount,
-          MAX(amount) as max_amount
-        FROM transactions 
+          SUM(ft.amount) as total_amount,
+          AVG(ft.amount) as avg_amount,
+          MIN(ft.amount) as min_amount,
+          MAX(ft.amount) as max_amount
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
         ${whereClause}
-        GROUP BY ${dateGrouping}, currency, transaction_type
-        ORDER BY period DESC, currency, transaction_type
+        GROUP BY ${dateGrouping}, ft.currency, ft.transaction_type
+        ORDER BY period DESC, ft.currency, ft.transaction_type
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -317,16 +325,17 @@ class TransactionHistoryService {
       // Get overall statistics
       const overallStats = await sequelize.query(`
         SELECT 
-          currency,
-          transaction_type as type,
-          'completed' as status,
+          ft.currency,
+          ft.transaction_type as type,
+          ft.status,
           COUNT(*) as count,
-          SUM(amount) as total_amount,
-          AVG(amount) as avg_amount
-        FROM transactions 
+          SUM(ft.amount) as total_amount,
+          AVG(ft.amount) as avg_amount
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
         ${whereClause}
-        GROUP BY currency, transaction_type
-        ORDER BY currency, transaction_type
+        GROUP BY ft.currency, ft.transaction_type, ft.status
+        ORDER BY ft.currency, ft.transaction_type, ft.status
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -335,15 +344,16 @@ class TransactionHistoryService {
       // Get top transactions
       const topTransactions = await sequelize.query(`
         SELECT 
-          id,
-          transaction_type as type,
-          amount,
-          currency,
-          description,
-          created_at
-        FROM transactions 
+          ft.id,
+          ft.transaction_type as type,
+          ft.amount,
+          ft.currency,
+          ft.description,
+          ft.created_at
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
         ${whereClause}
-        ORDER BY amount DESC
+        ORDER BY ft.amount DESC
         LIMIT 10
       `, {
         replacements,
@@ -356,21 +366,24 @@ class TransactionHistoryService {
           timeSeries: timeSeriesData.map(row => ({
             ...row,
             period: row.period,
-            total_amount: parseFloat(row.total_amount),
-            avg_amount: parseFloat(row.avg_amount),
-            min_amount: parseFloat(row.min_amount),
-            max_amount: parseFloat(row.max_amount),
+            // Convert from smallest currency unit to main unit
+            total_amount: parseFloat(row.total_amount) / 100,
+            avg_amount: parseFloat(row.avg_amount) / 100,
+            min_amount: parseFloat(row.min_amount) / 100,
+            max_amount: parseFloat(row.max_amount) / 100,
             transaction_count: parseInt(row.transaction_count)
           })),
           overallStats: overallStats.map(row => ({
             ...row,
             count: parseInt(row.count),
-            total_amount: parseFloat(row.total_amount),
-            avg_amount: parseFloat(row.avg_amount)
+            // Convert from smallest currency unit to main unit
+            total_amount: parseFloat(row.total_amount) / 100,
+            avg_amount: parseFloat(row.avg_amount) / 100
           })),
           topTransactions: topTransactions.map(row => ({
             ...row,
-            amount: parseFloat(row.amount)
+            // Convert from smallest currency unit to main unit
+            amount: parseFloat(row.amount) / 100
           }))
         },
         filters: {
@@ -392,28 +405,30 @@ class TransactionHistoryService {
    */
   async getTransactionById(transactionId, userId = null) {
     try {
-      const whereConditions = ['id = :transactionId'];
+      const whereConditions = ['ft.id = :transactionId'];
       const replacements = { transactionId };
 
       if (userId) {
-        whereConditions.push('user_id = :userId');
+        whereConditions.push('wa.user_id = :userId');
         replacements.userId = userId;
       }
 
       const [transaction] = await sequelize.query(`
         SELECT 
-          id,
-          user_id,
-          transaction_type as type,
-          amount,
-          currency,
-          reference_type,
-          reference_id,
-          description,
-          metadata,
-          created_at,
-          updated_at
-        FROM transactions 
+          ft.id,
+          wa.user_id,
+          ft.transaction_type as type,
+          ft.amount,
+          ft.currency,
+          ft.status,
+          ft.reference,
+          ft.external_reference as gateway_reference,
+          ft.description,
+          ft.metadata,
+          ft.created_at,
+          ft.completed_at as updated_at
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
         WHERE ${whereConditions.join(' AND ')}
       `, {
         replacements,
@@ -432,11 +447,8 @@ class TransactionHistoryService {
         transaction: {
           ...transaction,
           metadata: this.parseJSON(transaction.metadata),
-          amount: parseFloat(transaction.amount),
-          // Add compatibility fields
-          status: 'completed',
-          reference: transaction.reference_id || `${transaction.type}_${transaction.id}`,
-          gateway_reference: null
+          // Convert from smallest currency unit to main unit
+          amount: parseFloat(transaction.amount) / 100
         }
       };
     } catch (error) {
@@ -534,17 +546,18 @@ class TransactionHistoryService {
     try {
       const [summaryResult] = await sequelize.query(`
         SELECT 
-          currency,
-          transaction_type as type,
-          'completed' as status,
+          ft.currency,
+          ft.transaction_type as type,
+          ft.status,
           COUNT(*) as count,
-          SUM(amount) as total_amount,
-          AVG(amount) as avg_amount,
-          MIN(amount) as min_amount,
-          MAX(amount) as max_amount
-        FROM transactions 
+          SUM(ft.amount) as total_amount,
+          AVG(ft.amount) as avg_amount,
+          MIN(ft.amount) as min_amount,
+          MAX(ft.amount) as max_amount
+        FROM financial_transactions ft
+        JOIN wallet_accounts wa ON ft.wallet_id = wa.id
         ${whereClause}
-        GROUP BY currency, transaction_type
+        GROUP BY ft.currency, ft.transaction_type, ft.status
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -566,7 +579,8 @@ class TransactionHistoryService {
         const type = row.type;
         const status = row.status;
         const count = parseInt(row.count);
-        const totalAmount = parseFloat(row.total_amount);
+        // Convert from smallest currency unit to main unit
+        const totalAmount = parseFloat(row.total_amount) / 100;
 
         // By currency
         if (!summary.byCurrency[currency]) {
