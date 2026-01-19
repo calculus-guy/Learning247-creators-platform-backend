@@ -181,7 +181,10 @@ class PaymentRoutingService {
         const result = {
           success: true,
           alreadyProcessed: true,
-          purchase: existingPurchase
+          purchase: existingPurchase,
+          currency,
+          gateway: existingPurchase.paymentGateway,
+          message: 'Payment already processed'
         };
         
         await this.idempotencyService.storeResult(idempotencyKey, result, 'completed');
@@ -390,6 +393,23 @@ class PaymentRoutingService {
    * Process successful payment and update multi-currency wallet
    */
   async processSuccessfulPayment({ paymentData, currency, gateway, reference }) {
+    // Check if payment was already processed (idempotent check)
+    const existingPurchase = await Purchase.findOne({
+      where: { paymentReference: reference }
+    });
+
+    if (existingPurchase) {
+      console.log(`[Payment Routing] Payment ${reference} already processed, returning existing purchase`);
+      return {
+        success: true,
+        purchase: existingPurchase,
+        currency,
+        gateway,
+        message: 'Payment already processed',
+        alreadyProcessed: true
+      };
+    }
+
     const transaction = await sequelize.transaction();
     
     try {
