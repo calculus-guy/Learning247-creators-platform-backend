@@ -153,35 +153,35 @@ router.get('/review/config', manualReviewController.getReviewConfig);
 router.get('/transactions/analytics', (req, res, next) => {
   // Remove userId filter for admin access
   req.query.adminAccess = true;
-  transactionHistoryController.getTransactionAnalytics(req, res);
+  transactionHistoryController.getTransactionAnalytics.call(transactionHistoryController, req, res);
 });
 
 // Get transaction by ID (admin can access any transaction)
 router.get('/transactions/:id', (req, res, next) => {
   // Admin can access any transaction without user restriction
   req.adminAccess = true;
-  transactionHistoryController.getTransactionById(req, res);
+  transactionHistoryController.getTransactionById.call(transactionHistoryController, req, res);
 });
 
 // Search all transactions (admin access)
 router.post('/transactions/search', (req, res, next) => {
   // Remove userId filter for admin access
   req.body.adminAccess = true;
-  transactionHistoryController.searchTransactions(req, res);
+  transactionHistoryController.searchTransactions.call(transactionHistoryController, req, res);
 });
 
 // Export system-wide transaction history
 router.get('/transactions/export', (req, res, next) => {
   // Remove userId filter for admin access
   req.query.adminAccess = true;
-  transactionHistoryController.exportTransactionHistory(req, res);
+  transactionHistoryController.exportTransactionHistory.call(transactionHistoryController, req, res);
 });
 
 // Get system-wide transaction summary
 router.get('/transactions/summary', (req, res, next) => {
   // Remove userId filter for admin access
   req.query.adminAccess = true;
-  transactionHistoryController.getTransactionSummary(req, res);
+  transactionHistoryController.getTransactionSummary.call(transactionHistoryController, req, res);
 });
 
 module.exports = router;

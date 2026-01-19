@@ -103,13 +103,13 @@ router.post('/resolve-account', authMiddleware, walletController.resolveAccount)
 router.get('/transactions', authMiddleware, walletController.getTransactions);
 
 // Enhanced transaction history endpoints
-router.get('/history', authMiddleware, transactionHistoryController.getTransactionHistory);
-router.get('/analytics', authMiddleware, transactionHistoryController.getTransactionAnalytics);
-router.get('/transaction/:id', authMiddleware, transactionHistoryController.getTransactionById);
-router.post('/search-transactions', authMiddleware, transactionHistoryController.searchTransactions);
-router.get('/summary', authMiddleware, transactionHistoryController.getTransactionSummary);
-router.get('/export', authMiddleware, transactionHistoryController.exportTransactionHistory);
-router.get('/config', authMiddleware, transactionHistoryController.getConfiguration);
+router.get('/history', authMiddleware, transactionHistoryController.getTransactionHistory.bind(transactionHistoryController));
+router.get('/analytics', authMiddleware, transactionHistoryController.getTransactionAnalytics.bind(transactionHistoryController));
+router.get('/transaction/:id', authMiddleware, transactionHistoryController.getTransactionById.bind(transactionHistoryController));
+router.post('/search-transactions', authMiddleware, transactionHistoryController.searchTransactions.bind(transactionHistoryController));
+router.get('/summary', authMiddleware, transactionHistoryController.getTransactionSummary.bind(transactionHistoryController));
+router.get('/export', authMiddleware, transactionHistoryController.exportTransactionHistory.bind(transactionHistoryController));
+router.get('/config', authMiddleware, transactionHistoryController.getConfiguration.bind(transactionHistoryController));
 
 // Get transaction statistics
 router.get('/transaction-stats', authMiddleware, walletController.getTransactionStats);
