@@ -4,7 +4,7 @@ const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
 const { idempotencyService } = require('./idempotencyService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
-const LiveClass = require('../models/liveClass');
+const LiveClass = require('../models/LiveClass');
 const sequelize = require('../config/db');
 
 /**
@@ -156,10 +156,39 @@ class PaymentRoutingService {
    */
   async verifyPayment(reference, currency, idempotencyKey) {
     try {
-      // Validate idempotency
+      // First, get payment data to extract userId for idempotency
+      this.walletService.validateCurrency(currency);
+      const gatewayConfig = this.gatewayRouting[currency];
+      
+      if (!gatewayConfig) {
+        throw new Error(`No gateway configuration found for currency: ${currency}`);
+      }
+
+      // Verify with gateway to get payment data (including userId)
+      const verificationResult = await gatewayConfig.verifier(reference);
+      
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.message || 'Payment verification failed');
+      }
+
+      // Extract userId from payment data
+      const paymentData = verificationResult.data;
+      let userId;
+      
+      if (gatewayConfig.gateway === 'paystack') {
+        userId = parseInt(paymentData.metadata.userId);
+      } else if (gatewayConfig.gateway === 'stripe') {
+        userId = parseInt(paymentData.metadata.userId);
+      }
+
+      if (!userId) {
+        throw new Error('Unable to extract user ID from payment data');
+      }
+
+      // Now validate idempotency with proper userId
       const idempotencyResult = await this.idempotencyService.checkAndStore(
         idempotencyKey,
-        null, // userId not available at this point
+        userId,
         'payment_verification',
         { reference, currency }
       );
@@ -192,18 +221,9 @@ class PaymentRoutingService {
       }
 
       // Route to appropriate gateway for verification
-      this.walletService.validateCurrency(currency);
-      const gatewayConfig = this.gatewayRouting[currency];
-      
-      if (!gatewayConfig) {
-        throw new Error(`No gateway configuration found for currency: ${currency}`);
-      }
-
       console.log(`[Payment Routing] Verifying ${currency} payment via ${gatewayConfig.gateway}`);
 
-      // Verify with selected gateway
-      const verificationResult = await gatewayConfig.verifier(reference);
-      
+      // We already verified above, so use the existing result
       if (!verificationResult.success) {
         const errorResult = {
           success: false,
@@ -215,7 +235,6 @@ class PaymentRoutingService {
       }
 
       // Process successful payment
-      const paymentData = verificationResult.data;
       const processedPayment = await this.processSuccessfulPayment({
         paymentData,
         currency,
