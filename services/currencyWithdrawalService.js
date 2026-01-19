@@ -16,7 +16,14 @@ class CurrencyWithdrawalService {
   constructor() {
     // Gateway configuration
     this.config = {
+      // Platform commission (applied to all withdrawals)
+      platform: {
+        commission: 0.20, // 20% platform fee
+        description: 'Platform operational fee'
+      },
+      
       // Paystack configuration for NGN
+      paystack: {
       paystack: {
         baseURL: 'https://api.paystack.co',
         secretKey: process.env.PAYSTACK_SECRET_KEY,
@@ -302,37 +309,51 @@ class CurrencyWithdrawalService {
   calculateFees(amount, currency) {
     const config = currency === 'NGN' ? this.config.paystack : this.config.stripe;
     
-    let fee = 0;
+    // Calculate platform commission (20% of withdrawal amount)
+    const platformCommission = amount * this.config.platform.commission;
+    
+    // Calculate gateway fees on the remaining amount after platform commission
+    const amountAfterCommission = amount - platformCommission;
+    let gatewayFee = 0;
     
     if (currency === 'NGN') {
       // Paystack: percentage with cap and minimum
-      fee = Math.max(
+      gatewayFee = Math.max(
         config.fees.minimum,
         Math.min(
-          amount * config.fees.percentage,
+          amountAfterCommission * config.fees.percentage,
           config.fees.cap
         )
       );
     } else if (currency === 'USD') {
       // Stripe: percentage + fixed fee with minimum
-      fee = Math.max(
+      gatewayFee = Math.max(
         config.fees.minimum,
-        (amount * config.fees.percentage) + config.fees.fixed
+        (amountAfterCommission * config.fees.percentage) + config.fees.fixed
       );
     }
+
+    const totalFees = platformCommission + gatewayFee;
+    const netAmount = amount - totalFees;
 
     return {
       amount: amount,
       currency: currency,
-      feePercentage: config.fees.percentage,
-      feeFixed: config.fees.fixed || 0,
-      totalFee: Math.round(fee * 100) / 100, // Round to 2 decimal places
-      netAmount: amount - fee,
+      platformCommission: Math.round(platformCommission * 100) / 100,
+      platformCommissionPercentage: this.config.platform.commission,
+      gatewayFee: Math.round(gatewayFee * 100) / 100,
+      gatewayFeePercentage: config.fees.percentage,
+      gatewayFeeFixed: config.fees.fixed || 0,
+      totalFee: Math.round(totalFees * 100) / 100,
+      netAmount: Math.round(netAmount * 100) / 100,
       breakdown: {
-        percentageFee: currency === 'NGN' ? amount * config.fees.percentage : amount * config.fees.percentage,
-        fixedFee: config.fees.fixed || 0,
-        minimum: config.fees.minimum,
-        cap: config.fees.cap || null
+        platformCommission: Math.round(platformCommission * 100) / 100,
+        platformCommissionPercentage: this.config.platform.commission,
+        gatewayPercentageFee: Math.round((amountAfterCommission * config.fees.percentage) * 100) / 100,
+        gatewayFixedFee: config.fees.fixed || 0,
+        gatewayMinimum: config.fees.minimum,
+        gatewayCap: config.fees.cap || null,
+        description: `Platform fee (${this.config.platform.commission * 100}%) + ${currency === 'NGN' ? 'Paystack' : 'Stripe'} fees`
       }
     };
   }
