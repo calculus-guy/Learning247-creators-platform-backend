@@ -57,7 +57,12 @@ function check2FARequirement() {
       const withdrawalData = {
         amount: parseFloat(amount),
         currency: currency.toUpperCase(),
-        bankAccount: req.body.bankAccount || req.body.account_number,
+        bankAccount: req.body.bankAccount || {
+          bankCode: req.body.bankCode,
+          accountNumber: req.body.accountNumber,
+          accountName: req.body.accountName,
+          bankName: req.body.bankName
+        },
         reference: req.body.reference || `withdrawal_${Date.now()}`
       };
 

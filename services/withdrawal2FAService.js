@@ -398,8 +398,17 @@ class Withdrawal2FAService {
       return bankAccount;
     }
     
-    if (bankAccount && bankAccount.accountNumber && bankAccount.bankName) {
-      return `${bankAccount.accountNumber} (${bankAccount.bankName})`;
+    if (bankAccount && bankAccount.accountNumber) {
+      // Handle NGN format (bankCode)
+      if (bankAccount.bankCode) {
+        return `${bankAccount.accountNumber} (${bankAccount.accountName || 'Bank Account'})`;
+      }
+      // Handle USD format (bankName)
+      if (bankAccount.bankName) {
+        return `${bankAccount.accountNumber} (${bankAccount.bankName})`;
+      }
+      // Fallback
+      return `${bankAccount.accountNumber} (${bankAccount.accountName || 'Bank Account'})`;
     }
     
     return 'Bank Account';
