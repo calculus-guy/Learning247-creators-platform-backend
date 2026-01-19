@@ -1,4 +1,5 @@
 const Withdrawal2FAService = require('../services/withdrawal2FAService');
+const User = require('../models/User');
 
 /**
  * Withdrawal 2FA Middleware
@@ -54,6 +55,18 @@ function check2FARequirement() {
       // 2FA is required - initiate 2FA process
       console.log(`[Withdrawal 2FA Middleware] 2FA required for ${amount} ${currency}`);
 
+      // Fetch full user data from database (req.user only has JWT payload)
+      const fullUser = await User.findByPk(req.user.id, {
+        attributes: ['id', 'email', 'firstname', 'lastname']
+      });
+
+      if (!fullUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found'
+        });
+      }
+
       const withdrawalData = {
         amount: parseFloat(amount),
         currency: currency.toUpperCase(),
@@ -66,7 +79,7 @@ function check2FARequirement() {
         reference: req.body.reference || `withdrawal_${Date.now()}`
       };
 
-      const result = await withdrawal2FAService.initiate2FA(withdrawalData, req.user);
+      const result = await withdrawal2FAService.initiate2FA(withdrawalData, fullUser);
 
       if (!result.success) {
         return res.status(500).json({

@@ -72,9 +72,22 @@ class Withdrawal2FAService {
   async initiate2FA(withdrawalData, user) {
     try {
       const { amount, currency, bankAccount, reference } = withdrawalData;
+      
+      // Debug logging to see what's in the user object
+      console.log(`[Withdrawal 2FA] User object received:`, JSON.stringify(user, null, 2));
+      
       const { id: userId, email, firstname } = user;
 
-      console.log(`[Withdrawal 2FA] Initiating 2FA for user ${userId}: ${amount} ${currency}`);
+      // Validate required user fields
+      if (!email) {
+        throw new Error('User email is required for 2FA');
+      }
+      
+      if (!firstname) {
+        console.log(`[Withdrawal 2FA] Warning: firstname not available for user ${userId}, using fallback`);
+      }
+
+      console.log(`[Withdrawal 2FA] Initiating 2FA for user ${userId} (${email}): ${amount} ${currency}`);
 
       // Generate withdrawal ID and OTP
       const withdrawalId = this.generateWithdrawalId();
@@ -110,7 +123,7 @@ class Withdrawal2FAService {
       // Send OTP email
       await sendWithdrawalOTP(
         email,
-        firstname,
+        firstname || 'User', // Fallback if firstname is not available
         otp,
         amount,
         currency,
