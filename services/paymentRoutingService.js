@@ -4,7 +4,7 @@ const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
 const { idempotencyService } = require('./idempotencyService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
-const LiveClass = require('../models/LiveClass');
+const LiveClass = require('../models/liveClass');
 const sequelize = require('../config/db');
 
 /**
