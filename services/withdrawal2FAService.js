@@ -120,6 +120,14 @@ class Withdrawal2FAService {
       
       this.otpCodes.set(withdrawalId, otpData);
 
+      // Debug logging to confirm OTP storage
+      console.log(`[Withdrawal 2FA] OTP stored successfully:`);
+      console.log(`  - withdrawalId: ${withdrawalId}`);
+      console.log(`  - OTP code: ${otp}`);
+      console.log(`  - userId: ${userId}`);
+      console.log(`  - expiresAt: ${new Date(otpData.expiresAt).toISOString()}`);
+      console.log(`  - Total stored OTPs: ${this.otpCodes.size}`);
+
       // Send OTP email
       await sendWithdrawalOTP(
         email,
@@ -141,6 +149,14 @@ class Withdrawal2FAService {
       };
     } catch (error) {
       console.error('[Withdrawal 2FA] Initiation error:', error);
+      console.error('[Withdrawal 2FA] Error stack:', error.stack);
+      
+      // Clean up any partial data
+      if (typeof withdrawalId !== 'undefined') {
+        this.pendingWithdrawals.delete(withdrawalId);
+        this.otpCodes.delete(withdrawalId);
+      }
+      
       throw new Error('Failed to initiate withdrawal confirmation');
     }
   }
@@ -155,10 +171,22 @@ class Withdrawal2FAService {
   async verifyOTP(withdrawalId, code, userId) {
     try {
       console.log(`[Withdrawal 2FA] Verifying OTP for withdrawal ${withdrawalId}`);
+      console.log(`[Withdrawal 2FA] Looking for OTP with:`);
+      console.log(`  - withdrawalId: ${withdrawalId}`);
+      console.log(`  - code: ${code}`);
+      console.log(`  - userId: ${userId}`);
+      console.log(`  - Total stored OTPs: ${this.otpCodes.size}`);
+      
+      // Debug: List all stored withdrawal IDs
+      const storedIds = Array.from(this.otpCodes.keys());
+      console.log(`[Withdrawal 2FA] Stored withdrawal IDs: ${JSON.stringify(storedIds)}`);
 
       // Get OTP data
       const otpData = this.otpCodes.get(withdrawalId);
+      console.log(`[Withdrawal 2FA] Found OTP data:`, otpData ? 'YES' : 'NO');
+      
       if (!otpData) {
+        console.log(`[Withdrawal 2FA] OTP not found for withdrawalId: ${withdrawalId}`);
         return {
           success: false,
           message: 'Invalid or expired confirmation code',
