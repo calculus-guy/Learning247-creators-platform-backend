@@ -48,10 +48,9 @@ class IdempotencyService {
       });
       
       if (existingRecord) {
-        await transaction.commit();
-        
         // Validate that the operation parameters match
         if (!this.operationsMatch(existingRecord.operation_data, operationData)) {
+          await transaction.rollback();
           throw new IdempotencyConflictError(
             `Idempotency key ${key} already used with different parameters`
           );
@@ -59,6 +58,7 @@ class IdempotencyService {
         
         // Validate that the user matches (skip for payment verification)
         if (operationType !== 'payment_verification' && existingRecord.user_id !== userId) {
+          await transaction.rollback();
           throw new IdempotencyConflictError(
             `Idempotency key ${key} belongs to a different user`
           );
@@ -69,10 +69,13 @@ class IdempotencyService {
         expirationTime.setHours(expirationTime.getHours() + 24);
         
         if (new Date() > expirationTime) {
+          await transaction.rollback();
           // Key has expired, allow new operation
           await this.invalidateKey(key);
           return await this.checkAndStore(key, userId, operationType, operationData);
         }
+        
+        await transaction.commit();
         
         return {
           isNew: false,
