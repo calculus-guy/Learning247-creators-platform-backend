@@ -238,19 +238,25 @@ class DatabaseTransactionService {
    * @returns {Promise<Object>} Updated wallet
    */
   async updateWalletBalance(wallet, availableChange, pendingChange, transaction) {
-    const newAvailable = wallet.balance_available + availableChange;
-    const newPending = wallet.balance_pending + pendingChange;
+    // Ensure all values are numbers (BIGINT might be returned as strings)
+    const currentAvailable = parseInt(wallet.balance_available) || 0;
+    const currentPending = parseInt(wallet.balance_pending) || 0;
+    const availableChangeNum = parseInt(availableChange) || 0;
+    const pendingChangeNum = parseInt(pendingChange) || 0;
+    
+    const newAvailable = currentAvailable + availableChangeNum;
+    const newPending = currentPending + pendingChangeNum;
 
     // Validate that balances don't go negative
     if (newAvailable < 0) {
       throw new InsufficientFundsError(
-        `Insufficient available balance. Current: ${wallet.balance_available}, Required: ${Math.abs(availableChange)}`
+        `Insufficient available balance. Current: ${currentAvailable}, Required: ${Math.abs(availableChangeNum)}`
       );
     }
 
     if (newPending < 0) {
       throw new InsufficientFundsError(
-        `Insufficient pending balance. Current: ${wallet.balance_pending}, Required: ${Math.abs(pendingChange)}`
+        `Insufficient pending balance. Current: ${currentPending}, Required: ${Math.abs(pendingChangeNum)}`
       );
     }
 
@@ -261,7 +267,7 @@ class DatabaseTransactionService {
       updated_at: new Date()
     }, { transaction });
 
-    console.log(`[Transaction Service] Updated wallet balance - Available: ${wallet.balance_available} -> ${newAvailable}, Pending: ${wallet.balance_pending} -> ${newPending}`);
+    console.log(`[Transaction Service] Updated wallet balance - Available: ${currentAvailable} -> ${newAvailable}, Pending: ${currentPending} -> ${newPending}`);
     
     return wallet;
   }

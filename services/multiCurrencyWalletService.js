@@ -446,14 +446,18 @@ class MultiCurrencyWalletService {
    * @returns {Object} Formatted response
    */
   formatWalletResponse(wallet) {
+    // Ensure balance values are numbers (BIGINT might be returned as strings)
+    const availableBalance = parseInt(wallet.balance_available) || 0;
+    const pendingBalance = parseInt(wallet.balance_pending) || 0;
+    
     return {
       id: wallet.id,
       userId: wallet.user_id,
       currency: wallet.currency,
-      availableBalance: this.convertFromCents(wallet.balance_available, wallet.currency),
-      pendingBalance: this.convertFromCents(wallet.balance_pending, wallet.currency),
+      availableBalance: this.convertFromCents(availableBalance, wallet.currency),
+      pendingBalance: this.convertFromCents(pendingBalance, wallet.currency),
       totalBalance: this.convertFromCents(
-        wallet.balance_available + wallet.balance_pending, 
+        availableBalance + pendingBalance, 
         wallet.currency
       ),
       createdAt: wallet.created_at,
