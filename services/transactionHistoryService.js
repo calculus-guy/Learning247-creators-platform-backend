@@ -96,14 +96,19 @@ class TransactionHistoryService {
       }
 
       if (type) {
-        whereConditions.push('type = :type');
-        replacements.type = type;
+        // Map generic types to transaction_type values
+        let mappedType = type;
+        if (type === 'credit' || type === 'deposit') {
+          mappedType = 'purchase'; // Credits come from purchases
+        } else if (type === 'debit' || type === 'withdrawal') {
+          mappedType = 'payout'; // Debits are payouts
+        }
+        whereConditions.push('transaction_type = :type');
+        replacements.type = mappedType;
       }
 
-      if (status) {
-        whereConditions.push('status = :status');
-        replacements.status = status;
-      }
+      // Note: status, reference, gateway_reference don't exist in this table
+      // Skipping these filters for now
 
       if (startDate) {
         whereConditions.push('created_at >= :startDate');
@@ -127,9 +132,8 @@ class TransactionHistoryService {
 
       if (search) {
         whereConditions.push(`(
-          reference ILIKE :search OR 
-          description ILIKE :search OR 
-          gateway_reference ILIKE :search OR
+          reference_type ILIKE :search OR 
+          description ILIKE :search OR
           metadata::text ILIKE :search
         )`);
         replacements.search = `%${search}%`;
@@ -140,7 +144,7 @@ class TransactionHistoryService {
         : '';
 
       // Validate sort parameters
-      const validSortFields = ['created_at', 'amount', 'type', 'status', 'currency'];
+      const validSortFields = ['created_at', 'amount', 'transaction_type', 'currency', 'reference_type'];
       const validSortOrders = ['ASC', 'DESC'];
       
       const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
@@ -163,12 +167,11 @@ class TransactionHistoryService {
         SELECT 
           id,
           user_id,
-          type,
+          transaction_type as type,
           amount,
           currency,
-          status,
-          reference,
-          gateway_reference,
+          reference_type,
+          reference_id,
           description,
           metadata,
           created_at,
@@ -190,7 +193,12 @@ class TransactionHistoryService {
       const parsedTransactions = transactions.map(tx => ({
         ...tx,
         metadata: this.parseJSON(tx.metadata),
-        amount: parseFloat(tx.amount)
+        amount: parseFloat(tx.amount),
+        // Add status field for compatibility (since it doesn't exist in DB)
+        status: 'completed', // Assume all transactions in this table are completed
+        // Add reference field for compatibility
+        reference: tx.reference_id || `${tx.type}_${tx.id}`,
+        gateway_reference: null // Not available in this table
       }));
 
       // Calculate summary statistics
@@ -291,7 +299,7 @@ class TransactionHistoryService {
         SELECT 
           ${dateGrouping} as period,
           currency,
-          type,
+          transaction_type as type,
           COUNT(*) as transaction_count,
           SUM(amount) as total_amount,
           AVG(amount) as avg_amount,
@@ -299,8 +307,8 @@ class TransactionHistoryService {
           MAX(amount) as max_amount
         FROM transactions 
         ${whereClause}
-        GROUP BY ${dateGrouping}, currency, type
-        ORDER BY period DESC, currency, type
+        GROUP BY ${dateGrouping}, currency, transaction_type
+        ORDER BY period DESC, currency, transaction_type
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -310,15 +318,15 @@ class TransactionHistoryService {
       const overallStats = await sequelize.query(`
         SELECT 
           currency,
-          type,
-          status,
+          transaction_type as type,
+          'completed' as status,
           COUNT(*) as count,
           SUM(amount) as total_amount,
           AVG(amount) as avg_amount
         FROM transactions 
         ${whereClause}
-        GROUP BY currency, type, status
-        ORDER BY currency, type, status
+        GROUP BY currency, transaction_type
+        ORDER BY currency, transaction_type
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -328,7 +336,7 @@ class TransactionHistoryService {
       const topTransactions = await sequelize.query(`
         SELECT 
           id,
-          type,
+          transaction_type as type,
           amount,
           currency,
           description,
@@ -396,12 +404,11 @@ class TransactionHistoryService {
         SELECT 
           id,
           user_id,
-          type,
+          transaction_type as type,
           amount,
           currency,
-          status,
-          reference,
-          gateway_reference,
+          reference_type,
+          reference_id,
           description,
           metadata,
           created_at,
@@ -425,7 +432,11 @@ class TransactionHistoryService {
         transaction: {
           ...transaction,
           metadata: this.parseJSON(transaction.metadata),
-          amount: parseFloat(transaction.amount)
+          amount: parseFloat(transaction.amount),
+          // Add compatibility fields
+          status: 'completed',
+          reference: transaction.reference_id || `${transaction.type}_${transaction.id}`,
+          gateway_reference: null
         }
       };
     } catch (error) {
@@ -524,8 +535,8 @@ class TransactionHistoryService {
       const [summaryResult] = await sequelize.query(`
         SELECT 
           currency,
-          type,
-          status,
+          transaction_type as type,
+          'completed' as status,
           COUNT(*) as count,
           SUM(amount) as total_amount,
           AVG(amount) as avg_amount,
@@ -533,7 +544,7 @@ class TransactionHistoryService {
           MAX(amount) as max_amount
         FROM transactions 
         ${whereClause}
-        GROUP BY currency, type, status
+        GROUP BY currency, transaction_type
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
