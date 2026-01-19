@@ -1,6 +1,30 @@
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
+const jwt = require('jsonwebtoken');
+
+/**
+ * Helper function to extract user from token (optional authentication)
+ */
+const extractUserFromToken = (req) => {
+  try {
+    // Try header first
+    let token = req.header('Authorization')?.replace('Bearer ', '');
+    // If not in header, try cookie
+    if (!token && req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+};
 
 /**
  * Middleware to check if user has access to content
@@ -8,8 +32,12 @@ const LiveClass = require('../models/liveClass');
  */
 exports.checkContentAccess = async (req, res, next) => {
   try {
-    const userId = req.user ? req.user.id : null;
+    // Extract user from token (optional authentication)
+    const user = req.user || extractUserFromToken(req);
+    const userId = user ? user.id : null;
     const { id } = req.params;
+
+    console.log(`[Purchase Middleware] Checking access for content ${id}, user: ${userId}`);
 
     // Determine content type from the route
     let contentType, contentId, content;
@@ -53,7 +81,7 @@ exports.checkContentAccess = async (req, res, next) => {
         message: 'Authentication required to access paid content',
         requiresPayment: true,
         price: content.price,
-        currency: 'NGN',
+        currency: content.currency || 'NGN',
         contentType,
         contentId
       });
@@ -76,11 +104,14 @@ exports.checkContentAccess = async (req, res, next) => {
       }
     });
 
+    console.log(`[Purchase Middleware] Purchase lookup for user ${userId}, content ${contentId}:`, purchase ? 'FOUND' : 'NOT FOUND');
+
     if (purchase) {
       // User has purchased - allow access
       req.hasAccess = true;
       req.accessReason = 'purchased';
       req.purchaseDate = purchase.createdAt;
+      console.log(`[Purchase Middleware] Access GRANTED for user ${userId}`);
       return next();
     }
 
@@ -90,7 +121,7 @@ exports.checkContentAccess = async (req, res, next) => {
       message: 'Payment required to access this content',
       requiresPayment: true,
       price: content.price,
-      currency: 'NGN',
+      currency: content.currency || 'NGN',
       contentType,
       contentId,
       title: content.title,
@@ -169,7 +200,7 @@ exports.checkPurchaseStatus = async (req, res, next) => {
       checked: true,
       requiresPayment: true,
       price: content.price,
-      currency: 'NGN'
+      currency: content.currency || 'NGN'
     };
     return next();
   } catch (error) {

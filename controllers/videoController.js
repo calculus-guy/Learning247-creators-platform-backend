@@ -1,6 +1,30 @@
 const { uploadVideoService } = require('../services/videoService');
 const Video = require('../models/Video');
 const { recordView } = require('../services/videoAnalyticsService');
+const jwt = require('jsonwebtoken');
+
+/**
+ * Helper function to extract user from token (optional authentication)
+ */
+const extractUserFromToken = (req) => {
+  try {
+    // Try header first
+    let token = req.header('Authorization')?.replace('Bearer ', '');
+    // If not in header, try cookie
+    if (!token && req.cookies && req.cookies.token) {
+      token = req.cookies.token;
+    }
+
+    if (!token) {
+      return null;
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    return decoded;
+  } catch (error) {
+    return null;
+  }
+};
 
 exports.uploadVideo = async (req, res) => {
   try {
@@ -117,7 +141,8 @@ exports.getVideoById = async (req, res) => {
       : null;
 
     // Record analytics
-    const userId = req.user ? req.user.id : null;
+    const user = req.user || extractUserFromToken(req);
+    const userId = user ? user.id : null;
     const ipAddress = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     recordView({ videoId: id, userId, ipAddress });
 
