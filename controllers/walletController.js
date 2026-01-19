@@ -120,7 +120,8 @@ exports.initiateWithdrawal = async (req, res) => {
     const userId = req.user.id;
     const { 
       amount, 
-      bankName, 
+      bankName,     // For USD/international banks
+      bankCode,     // For NGN/Nigerian banks  
       accountNumber, 
       accountName, 
       gateway = 'paystack',
@@ -157,11 +158,23 @@ exports.initiateWithdrawal = async (req, res) => {
       });
     }
 
-    if (!bankName || !accountNumber || !accountName) {
-      return res.status(400).json({
-        success: false,
-        message: 'Bank details are required'
-      });
+    // Validate bank details based on currency
+    if (currency === 'NGN') {
+      // For NGN, we need bankCode and account details
+      if (!bankCode || !accountNumber || !accountName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank code, account number, and account name are required for NGN withdrawals'
+        });
+      }
+    } else if (currency === 'USD') {
+      // For USD, we need bankName and account details
+      if (!bankName || !accountNumber || !accountName) {
+        return res.status(400).json({
+          success: false,
+          message: 'Bank name, account number, and account name are required for USD withdrawals'
+        });
+      }
     }
 
     // Check available balance for specific currency
@@ -180,12 +193,17 @@ exports.initiateWithdrawal = async (req, res) => {
     // Calculate fees
     const fees = calculatePayoutFees(amount, gateway);
 
+    // Prepare bank details based on currency
+    const bankDetails = currency === 'NGN' 
+      ? { bankCode, accountNumber, accountName }
+      : { bankName, accountNumber, accountName };
+
     // Initiate withdrawal with currency
     const payout = await initiateWithdrawal({
       userId,
       amount,
       currency,
-      bankDetails: { bankName, accountNumber, accountName },
+      bankDetails,
       gateway
     });
 
