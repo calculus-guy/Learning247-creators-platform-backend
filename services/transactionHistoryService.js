@@ -160,7 +160,7 @@ class TransactionHistoryService {
         SELECT COUNT(*) as total
         FROM financial_transactions ft
         JOIN wallet_accounts wa ON ft.wallet_id = wa.id
-        ${whereClause.replace(/user_id/g, 'wa.user_id')}
+        ${whereClause}
       `, {
         replacements,
         type: sequelize.QueryTypes.SELECT
@@ -185,7 +185,7 @@ class TransactionHistoryService {
           ft.completed_at as updated_at
         FROM financial_transactions ft
         JOIN wallet_accounts wa ON ft.wallet_id = wa.id
-        ${whereClause.replace(/user_id/g, 'wa.user_id')}
+        ${whereClause}
         ORDER BY ft.${safeSortBy} ${safeSortOrder}
         LIMIT :limit OFFSET :offset
       `, {
