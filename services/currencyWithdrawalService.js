@@ -24,7 +24,6 @@ class CurrencyWithdrawalService {
       
       // Paystack configuration for NGN
       paystack: {
-      paystack: {
         baseURL: 'https://api.paystack.co',
         secretKey: process.env.PAYSTACK_SECRET_KEY,
         publicKey: process.env.PAYSTACK_PUBLIC_KEY,
