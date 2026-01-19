@@ -243,8 +243,8 @@ class CurrencyWithdrawalService {
       // Calculate net amount (amount - fees)
       const netAmount = amount - fees.totalFee;
 
-      // Create payout
-      const payoutData = new URLSearchParams({
+      // Create transfer to connected account
+      const transferData = new URLSearchParams({
         amount: Math.round(netAmount * 100), // Stripe uses cents
         currency: 'usd',
         destination: externalAccount.accountId,
@@ -253,28 +253,32 @@ class CurrencyWithdrawalService {
           userId: userId,
           reference: reference,
           originalAmount: amount,
-          fees: fees.totalFee
+          fees: fees.totalFee,
+          bankAccountId: externalAccount.bankAccountId
         })
       });
 
-      const response = await this.stripeClient.post('/payouts', payoutData);
+      const response = await this.stripeClient.post('/transfers', transferData);
 
       if (response.data && response.data.id) {
         return {
           success: true,
           message: 'USD withdrawal initiated successfully',
           gatewayResponse: response.data,
-          payoutId: response.data.id,
+          transferId: response.data.id,
           accountId: externalAccount.accountId,
+          bankAccountId: externalAccount.bankAccountId,
           fees: fees,
           netAmount: netAmount,
-          currency: 'USD'
+          currency: 'USD',
+          estimatedArrival: '1-3 business days',
+          accountDetails: externalAccount.accountDetails
         };
       } else {
         return {
           success: false,
-          message: 'Stripe payout failed',
-          error: 'stripe_payout_failed',
+          message: 'Stripe transfer failed',
+          error: 'stripe_transfer_failed',
           gatewayResponse: response.data
         };
       }
@@ -488,36 +492,95 @@ class CurrencyWithdrawalService {
   }
 
   /**
-   * Create Stripe external account
+   * Create Stripe external account (bank account for payouts)
    * @param {Object} bankAccount - Bank account details
    * @param {number} userId - User ID
    * @returns {Promise<Object>} External account creation result
    */
   async createStripeExternalAccount(bankAccount, userId) {
     try {
-      // Note: In production, you'd typically create a Stripe Connect account
-      // For now, we'll simulate the external account creation
-      const accountData = new URLSearchParams({
-        object: 'bank_account',
-        country: bankAccount.country || 'US',
-        currency: 'usd',
-        account_number: bankAccount.accountNumber,
-        routing_number: bankAccount.routingNumber,
-        account_holder_type: 'individual'
-      });
+      console.log(`[Stripe External Account] Creating account for user ${userId}`);
 
-      // This is a simplified implementation
-      // In production, you'd use Stripe Connect accounts
-      return {
-        success: true,
-        accountId: `ba_${Date.now()}_${userId}`, // Simulated account ID
-        message: 'External account created successfully'
-      };
+      // Determine account type based on provided fields
+      let accountData;
+      
+      if (bankAccount.routingNumber && bankAccount.accountNumber) {
+        // US Bank Account
+        accountData = {
+          object: 'bank_account',
+          country: 'US',
+          currency: 'usd',
+          account_number: bankAccount.accountNumber,
+          routing_number: bankAccount.routingNumber,
+          account_holder_name: bankAccount.accountHolderName || 'Account Holder',
+          account_holder_type: bankAccount.accountType || 'individual'
+        };
+      } else if (bankAccount.iban) {
+        // International Bank Account (IBAN)
+        accountData = {
+          object: 'bank_account',
+          country: bankAccount.country || 'GB',
+          currency: 'usd',
+          account_number: bankAccount.iban,
+          account_holder_name: bankAccount.accountHolderName || 'Account Holder',
+          account_holder_type: 'individual'
+        };
+      } else {
+        throw new Error('Invalid bank account details. Provide either US routing/account number or IBAN.');
+      }
+
+      // For production, you would create this through Stripe Connect
+      // For now, we'll create a direct external account
+      const response = await this.stripeClient.post('/accounts', new URLSearchParams({
+        type: 'express',
+        country: accountData.country,
+        email: `user${userId}@example.com`, // In production, use real user email
+        capabilities: JSON.stringify({
+          transfers: { requested: true }
+        })
+      }));
+
+      if (response.data && response.data.id) {
+        // Add bank account to the created account
+        const bankResponse = await this.stripeClient.post(
+          `/accounts/${response.data.id}/external_accounts`,
+          new URLSearchParams(accountData)
+        );
+
+        if (bankResponse.data && bankResponse.data.id) {
+          return {
+            success: true,
+            accountId: response.data.id,
+            bankAccountId: bankResponse.data.id,
+            message: 'External account created successfully',
+            accountDetails: {
+              country: accountData.country,
+              currency: accountData.currency,
+              last4: bankResponse.data.last4 || 'XXXX'
+            }
+          };
+        }
+      }
+
+      throw new Error('Failed to create Stripe external account');
+
     } catch (error) {
       console.error('[Stripe External Account] Creation error:', error);
+      
+      // Handle specific Stripe errors
+      if (error.response?.data?.error) {
+        const stripeError = error.response.data.error;
+        return {
+          success: false,
+          message: stripeError.message || 'Failed to create bank account',
+          error: 'stripe_account_error',
+          code: stripeError.code
+        };
+      }
+
       return {
         success: false,
-        message: this.parseStripeError(error),
+        message: error.message || 'Failed to create external account',
         error: 'stripe_account_error'
       };
     }
@@ -541,13 +604,32 @@ class CurrencyWithdrawalService {
           }));
         }
       } else if (currency === 'USD') {
-        // Return common international banks/countries
-        return [
-          { name: 'United States', code: 'US', currency: 'USD' },
-          { name: 'United Kingdom', code: 'GB', currency: 'USD' },
-          { name: 'Canada', code: 'CA', currency: 'USD' },
-          { name: 'Australia', code: 'AU', currency: 'USD' }
-        ];
+        // Stripe doesn't have a "banks list" - it uses direct bank account details
+        return {
+          message: 'USD withdrawals use direct bank account information',
+          supportedMethods: [
+            {
+              type: 'us_bank_account',
+              name: 'US Bank Account',
+              description: 'Direct deposit to US bank accounts',
+              requiredFields: ['routing_number', 'account_number', 'account_holder_name', 'account_type']
+            },
+            {
+              type: 'international_bank',
+              name: 'International Bank Transfer',
+              description: 'SWIFT wire transfer to international banks',
+              requiredFields: ['iban_or_account_number', 'swift_code', 'account_holder_name', 'bank_name', 'bank_address']
+            },
+            {
+              type: 'debit_card',
+              name: 'Instant Payout to Debit Card',
+              description: 'Instant transfer to Visa/Mastercard debit cards',
+              requiredFields: ['card_number', 'exp_month', 'exp_year', 'cardholder_name'],
+              note: 'Available in select countries, instant but with fees'
+            }
+          ],
+          note: 'Choose the method that matches your bank location and preferences'
+        };
       }
 
       return [];
@@ -584,6 +666,30 @@ class CurrencyWithdrawalService {
    * @returns {string} User-friendly error message
    */
   parseStripeError(error) {
+    if (error.response?.data?.error) {
+      const stripeError = error.response.data.error;
+      
+      // Handle specific Stripe error codes
+      switch (stripeError.code) {
+        case 'account_invalid':
+          return 'Invalid bank account details provided';
+        case 'bank_account_declined':
+          return 'Bank account was declined by your bank';
+        case 'insufficient_funds':
+          return 'Insufficient funds in your account';
+        case 'invalid_request_error':
+          return 'Invalid withdrawal request';
+        case 'authentication_required':
+          return 'Additional authentication required';
+        case 'card_declined':
+          return 'Card was declined';
+        case 'processing_error':
+          return 'Processing error occurred, please try again';
+        default:
+          return stripeError.message || 'Stripe processing error';
+      }
+    }
+    
     if (error.response?.data?.error?.message) {
       return error.response.data.error.message;
     }
@@ -596,7 +702,11 @@ class CurrencyWithdrawalService {
       return 'Invalid request to Stripe';
     }
     
-    return 'Stripe service error';
+    if (error.response?.status === 402) {
+      return 'Payment required or account has insufficient funds';
+    }
+    
+    return error.message || 'Stripe service error';
   }
 
   /**
