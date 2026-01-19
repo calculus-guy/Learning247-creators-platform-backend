@@ -71,6 +71,12 @@ router.get('/2fa-config',
   withdrawal2FAController.get2FAConfig
 );
 
+// Debug endpoint for checking stored OTPs (development only)
+router.get('/debug-otps', 
+  authMiddleware,
+  withdrawal2FAController.debugStoredOTPs
+);
+
 // Currency-specific endpoints
 router.get('/currency-config', currencyWithdrawalController.getCurrencyConfig);
 router.get('/withdrawal-limits/:currency', currencyWithdrawalController.getWithdrawalLimits);

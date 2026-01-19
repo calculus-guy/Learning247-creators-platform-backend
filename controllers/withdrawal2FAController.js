@@ -129,7 +129,7 @@ exports.cancelWithdrawal = async (req, res) => {
 
     console.log(`[Withdrawal 2FA Controller] Cancelling withdrawal ${withdrawalId}`);
 
-    const result = withdrawal2FAService.cancelWithdrawal(withdrawalId, userId);
+    const result = await withdrawal2FAService.cancelWithdrawal(withdrawalId, userId);
 
     return res.status(result.success ? 200 : 400).json(result);
 
@@ -165,7 +165,7 @@ exports.getWithdrawalStatus = async (req, res) => {
       });
     }
 
-    const status = withdrawal2FAService.getWithdrawalStatus(withdrawalId, userId);
+    const status = await withdrawal2FAService.getWithdrawalStatus(withdrawalId, userId);
 
     if (!status) {
       return res.status(404).json({
@@ -204,7 +204,7 @@ exports.get2FAConfig = async (req, res) => {
       });
     }
 
-    const stats = withdrawal2FAService.getStatistics();
+    const stats = await withdrawal2FAService.getStatistics();
     const config = stats.config;
 
     // Calculate thresholds for user's tier
@@ -232,6 +232,46 @@ exports.get2FAConfig = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to get 2FA configuration'
+    });
+  }
+};
+
+/**
+ * Debug endpoint to check stored OTPs (for development/debugging)
+ * GET /api/wallet/debug-otps
+ */
+exports.debugStoredOTPs = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required'
+      });
+    }
+
+    // Only allow in development or for specific admin users
+    if (process.env.NODE_ENV === 'production' && !req.user.isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Debug endpoint not available in production'
+      });
+    }
+
+    const debugInfo = await withdrawal2FAService.getDebugInfo(userId);
+
+    return res.status(200).json({
+      success: true,
+      debug: debugInfo,
+      timestamp: new Date().toISOString()
+    });
+
+  } catch (error) {
+    console.error('[Withdrawal 2FA Controller] Debug error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get debug information'
     });
   }
 };
