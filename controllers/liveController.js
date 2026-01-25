@@ -174,15 +174,8 @@ exports.getLiveClassById = async (req, res) => {
     const live = await LiveClass.findByPk(id);
     if (!live) return res.status(404).json({ message: 'Live class not found.' });
     
-    // Access control check (handled by middleware)
-    if (!req.hasAccess) {
-      return res.status(402).json({
-        success: false,
-        message: 'Payment required to access this live class',
-        requiresPayment: true,
-        price: live.price
-      });
-    }
+    // Access control is handled by middleware - if we reach here, user has access
+    // The middleware sets req.hasAccess = true and req.accessReason
 
     // ✅ Add streaming provider info for frontend
     const response = {
@@ -208,15 +201,7 @@ exports.getPlayback = async (req, res) => {
     
     if (!live) return res.status(404).json({ message: 'Live class not found.' });
     
-    // Access control check (handled by middleware)
-    if (!req.hasAccess) {
-      return res.status(402).json({
-        success: false,
-        message: 'Payment required to access this live class',
-        requiresPayment: true,
-        price: live.price
-      });
-    }
+    // Access control is handled by middleware - if we reach here, user has access
 
     // ✅ ONLY check playback ID for Mux streams
     if (live.streaming_provider === 'mux') {
