@@ -44,7 +44,7 @@ router.get('/google/callback',
 
     // Set the token as a cookie (not httpOnly since frontend needs access; secure for HTTPS; lax for most flows)
     res.cookie('token', token, { httpOnly: false, secure: true, sameSite: 'lax' });
-    res.redirect('https://www.aahbibi.com/dashboard');
+    res.redirect('https://www.hallos.net/dashboard');
   }
 );
 
