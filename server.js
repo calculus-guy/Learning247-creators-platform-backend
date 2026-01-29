@@ -30,7 +30,9 @@ const allowedOrigins = [
   'https://aahbibi.com',
   'http://localhost:3000',
   'http://localhost:3001',
-  'https://aistudio.google.com'
+  'https://aistudio.google.com',
+  'https://www.hallos.net',
+  'https://hallos.net'
 ];
 
 const corsOptions = {
