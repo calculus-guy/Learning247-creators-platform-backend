@@ -14,16 +14,3 @@
 https://prod-api.aahbibi.com
 
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
-
-
-### Requirement 12: Two-Factor Authentication for Withdrawals
-
-**User Story:** As a security-conscious user, I want two-factor authentication required for withdrawals, so that my funds are protected even if my password is compromised.
-
-#### Acceptance Criteria
-
-1. THE Wallet_System SHALL require valid 2FA verification for all withdrawal requests above minimum thresholds
-2. WHEN 2FA verification fails, THE Wallet_System SHALL reject the withdrawal and log the security event
-3. THE Wallet_System SHALL support TOTP-based 2FA using standard authenticator applications
-4. THE Wallet_System SHALL allow administrators to configure 2FA requirements per user and amount threshold
-5. WHEN 2FA is not configured, THE Wallet_System SHALL require setup before allowing withdrawals
