@@ -31,7 +31,8 @@ const allowedOrigins = [
   'http://localhost:3001',
   'https://aistudio.google.com',
   'https://www.hallos.net',
-  'https://hallos.net'
+  'https://hallos.net',
+  'https://www.quiz.hallos.net'
 ];
 
 const corsOptions = {
