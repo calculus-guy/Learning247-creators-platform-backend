@@ -99,12 +99,23 @@ async function setupCourseMarketplace() {
 
     // Step 5: Add unique constraint for user-course enrollment
     console.log('5️⃣ Adding unique constraints...');
-    await sequelize.query(`
-      ALTER TABLE course_enrollments 
-      ADD CONSTRAINT IF NOT EXISTS unique_user_course_enrollment 
-      UNIQUE (user_id, course_id);
-    `);
-    console.log('✅ Unique constraints added\n');
+    try {
+      await sequelize.query(`
+        ALTER TABLE course_enrollments 
+        ADD CONSTRAINT unique_user_course_enrollment 
+        UNIQUE (user_id, course_id);
+      `);
+      console.log('✅ Unique constraints added\n');
+    } catch (error) {
+      if (error.original && error.original.code === '42P07') {
+        // Constraint already exists (error code 42P07)
+        console.log('✅ Unique constraints already exist\n');
+      } else {
+        console.log('⚠️  Constraint creation failed, but continuing...');
+        console.log('   This might be due to PostgreSQL version compatibility');
+        console.log('   You can add the constraint manually later if needed\n');
+      }
+    }
 
     // Step 6: Update purchases table to support course content type
     console.log('6️⃣ Updating purchases table for course support...');
