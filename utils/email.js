@@ -386,3 +386,63 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
     html,
   });
 };
+/**
+ * COURSE ENROLLMENT CONFIRMATION EMAIL
+ */
+exports.sendCourseEnrollmentConfirmationEmail = async (to, firstname, courseTitle, amount, currency, departmentName) => {
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+  const formattedAmount = currency === 'USD' ? amount.toFixed(2) : amount.toLocaleString();
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Course Enrollment Confirmed! 🎓</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        Thank you for your enrollment! Your payment has been successfully processed for:
+      </p>
+
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+        <h3 style="color: #333; margin-top: 0;">${courseTitle}</h3>
+        <p style="margin: 5px 0;"><strong>Department:</strong> ${departmentName}</p>
+        <p style="margin: 5px 0;"><strong>Amount Paid:</strong> ${currencySymbol}${formattedAmount}</p>
+        <p style="margin: 5px 0;"><strong>Payment Date:</strong> ${new Date().toLocaleDateString()}</p>
+      </div>
+
+      <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <p style="margin: 0;"><strong>✅ What's Next?</strong></p>
+        <p style="margin: 10px 0 0 0;">Your course login credentials will be sent to this email address within the next few hours. Please keep an eye on your inbox!</p>
+      </div>
+
+      <p><strong>Important Information:</strong></p>
+      <ul>
+        <li>Your enrollment has been confirmed and processed</li>
+        <li>Course access credentials will be sent shortly</li>
+        <li>Check your spam/junk folder if you don't see the credentials email</li>
+        <li>Contact support if you don't receive credentials within 24 hours</li>
+      </ul>
+
+      <p>
+        We're excited to have you join this learning journey! The course will provide you with 
+        valuable skills and knowledge to advance your career and personal development.
+      </p>
+
+      <p>
+        If you have any questions about your enrollment, please don't hesitate to contact our support team.
+      </p>
+
+      <p><strong>The Hallos Team</strong></p>
+
+      <hr/>
+      <em>Empowering Learners. Transforming Futures.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Hallos Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Course Enrollment Confirmed - ${courseTitle}`,
+    html,
+  });
+};

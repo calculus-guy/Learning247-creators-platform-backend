@@ -76,6 +76,30 @@ exports.handlePaystackWebhook = async (req, res) => {
         reference
       });
 
+      // Create course enrollment if this is a course purchase
+      if (contentType === 'course') {
+        const CourseEnrollmentService = require('../services/courseEnrollmentService');
+        const courseEnrollmentService = new CourseEnrollmentService();
+        
+        // Extract student details from metadata or customer data
+        const studentName = customer.first_name && customer.last_name 
+          ? `${customer.first_name} ${customer.last_name}` 
+          : metadata.studentName || 'N/A';
+        const studentEmail = customer.email || metadata.studentEmail || 'N/A';
+        const studentPhone = metadata.studentPhone || 'N/A';
+        
+        await courseEnrollmentService.createEnrollment({
+          userId,
+          courseId: contentId,
+          purchaseId: result.purchase.id,
+          studentName,
+          studentEmail,
+          studentPhone
+        });
+        
+        console.log(`[Paystack Webhook] Course enrollment created for user ${userId}, course ${contentId}`);
+      }
+
       // Log transaction
       await Transaction.create({
         userId,
@@ -96,16 +120,39 @@ exports.handlePaystackWebhook = async (req, res) => {
           content = await Video.findByPk(contentId);
         } else if (contentType === 'live_class') {
           content = await LiveClass.findByPk(contentId);
+        } else if (contentType === 'course') {
+          const Course = require('../models/Course');
+          const Department = require('../models/Department');
+          content = await Course.findByPk(contentId, {
+            include: [{
+              model: Department,
+              as: 'department',
+              attributes: ['name']
+            }]
+          });
         }
 
         if (user && content) {
-          // Send confirmation to student
-          await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, amount / 100);
-          
-          // Send notification to creator
-          const creator = await User.findByPk(content.userId);
-          if (creator) {
-            await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, amount / 100);
+          if (contentType === 'course') {
+            // Send course enrollment confirmation email
+            const { sendCourseEnrollmentConfirmationEmail } = require('../utils/email');
+            await sendCourseEnrollmentConfirmationEmail(
+              user.email,
+              user.firstname,
+              content.name,
+              amount / 100,
+              currency.toUpperCase(),
+              content.department?.name || 'General'
+            );
+          } else {
+            // Send regular purchase confirmation to student
+            await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, amount / 100);
+            
+            // Send notification to creator
+            const creator = await User.findByPk(content.userId);
+            if (creator) {
+              await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, amount / 100);
+            }
           }
         }
       } catch (emailError) {
@@ -380,6 +427,28 @@ exports.handleStripeWebhook = async (req, res) => {
         reference: session.id
       });
 
+      // Create course enrollment if this is a course purchase
+      if (contentType === 'course') {
+        const CourseEnrollmentService = require('../services/courseEnrollmentService');
+        const courseEnrollmentService = new CourseEnrollmentService();
+        
+        // Extract student details from metadata
+        const studentName = session.metadata.studentName || 'N/A';
+        const studentEmail = session.metadata.studentEmail || email || 'N/A';
+        const studentPhone = session.metadata.studentPhone || 'N/A';
+        
+        await courseEnrollmentService.createEnrollment({
+          userId,
+          courseId: contentId,
+          purchaseId: result.purchase.id,
+          studentName,
+          studentEmail,
+          studentPhone
+        });
+        
+        console.log(`[Stripe Webhook] Course enrollment created for user ${userId}, course ${contentId}`);
+      }
+
       // Log transaction
       await Transaction.create({
         userId,
@@ -400,16 +469,39 @@ exports.handleStripeWebhook = async (req, res) => {
           content = await Video.findByPk(contentId);
         } else if (contentType === 'live_class') {
           content = await LiveClass.findByPk(contentId);
+        } else if (contentType === 'course') {
+          const Course = require('../models/Course');
+          const Department = require('../models/Department');
+          content = await Course.findByPk(contentId, {
+            include: [{
+              model: Department,
+              as: 'department',
+              attributes: ['name']
+            }]
+          });
         }
 
         if (user && content) {
-          // Send confirmation to student
-          await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, session.amount_total / 100);
-          
-          // Send notification to creator
-          const creator = await User.findByPk(content.userId);
-          if (creator) {
-            await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, session.amount_total / 100);
+          if (contentType === 'course') {
+            // Send course enrollment confirmation email
+            const { sendCourseEnrollmentConfirmationEmail } = require('../utils/email');
+            await sendCourseEnrollmentConfirmationEmail(
+              user.email,
+              user.firstname,
+              content.name,
+              session.amount_total / 100,
+              session.currency.toUpperCase(),
+              content.department?.name || 'General'
+            );
+          } else {
+            // Send regular purchase confirmation to student
+            await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, session.amount_total / 100);
+            
+            // Send notification to creator
+            const creator = await User.findByPk(content.userId);
+            if (creator) {
+              await sendSaleNotificationEmail(creator.email, creator.firstname, content.title, user.firstname, session.amount_total / 100);
+            }
           }
         }
       } catch (emailError) {

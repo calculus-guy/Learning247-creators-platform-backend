@@ -44,7 +44,8 @@ class PaymentRoutingService {
     // Content currency mapping (determines which gateway to use)
     this.contentCurrencyMapping = {
       'video': this.getContentCurrency.bind(this),
-      'live_class': this.getContentCurrency.bind(this)
+      'live_class': this.getContentCurrency.bind(this),
+      'course': this.getContentCurrency.bind(this)
     };
   }
 
@@ -52,7 +53,7 @@ class PaymentRoutingService {
    * Initialize payment with automatic gateway routing
    * @param {Object} params - Payment parameters
    * @param {number} params.userId - User ID
-   * @param {string} params.contentType - Content type (video/live_class)
+   * @param {string} params.contentType - Content type (video/live_class/course)
    * @param {string} params.contentId - Content ID
    * @param {string} params.userEmail - User email
    * @param {string} params.idempotencyKey - Idempotency key
@@ -83,15 +84,33 @@ class PaymentRoutingService {
         throw new Error(`${contentType} not found`);
       }
 
-      // Determine currency (content currency or forced currency)
-      const currency = forceCurrency || contentDetails.currency || this.getDefaultCurrencyForContent(contentDetails);
+      // Determine currency and price for courses
+      let currency, amount;
+      if (contentType === 'course') {
+        // For courses, use forced currency or default to NGN
+        currency = forceCurrency || 'NGN';
+        this.walletService.validateCurrency(currency);
+        
+        // Set price based on selected currency
+        if (currency === 'USD') {
+          amount = parseFloat(contentDetails.priceUsd);
+        } else if (currency === 'NGN') {
+          amount = parseFloat(contentDetails.priceNgn);
+        } else {
+          throw new Error(`Unsupported currency for courses: ${currency}`);
+        }
+      } else {
+        // For videos and live classes, use existing logic
+        currency = forceCurrency || contentDetails.currency || this.getDefaultCurrencyForContent(contentDetails);
+        amount = parseFloat(contentDetails.price);
+      }
       
       // Validate currency and get required gateway
       this.walletService.validateCurrency(currency);
       const requiredGateway = this.walletService.getRequiredGateway(currency);
 
       // Check if content is free
-      if (parseFloat(contentDetails.price) === 0) {
+      if (amount === 0) {
         throw new Error('This content is free. No payment required.');
       }
 
@@ -111,10 +130,10 @@ class PaymentRoutingService {
         userId,
         contentType,
         contentId,
-        amount: parseFloat(contentDetails.price),
+        amount,
         currency,
         email: userEmail,
-        contentTitle: contentDetails.title || `${contentType} purchase`
+        contentTitle: contentDetails.title || contentDetails.name || `${contentType} purchase`
       });
 
       // Cache successful result
@@ -461,27 +480,31 @@ class PaymentRoutingService {
         paymentStatus: 'completed'
       }, { transaction });
 
-      // Get content creator and credit their multi-currency wallet
-      const creatorId = await this.getContentCreatorId(contentType, contentId);
-      
-      if (creatorId) {
-        // Credit creator's wallet in the appropriate currency
-        await this.walletService.creditWallet({
-          userId: creatorId,
-          currency,
-          amount,
-          reference,
-          description: `Earnings from ${contentType} purchase`,
-          metadata: {
-            purchaseId: purchase.id,
-            buyerUserId: userId,
-            contentType,
-            contentId,
-            gateway
-          }
-        });
+      // Get content creator and credit their multi-currency wallet (skip for courses)
+      if (contentType !== 'course') {
+        const creatorId = await this.getContentCreatorId(contentType, contentId);
+        
+        if (creatorId) {
+          // Credit creator's wallet in the appropriate currency
+          await this.walletService.creditWallet({
+            userId: creatorId,
+            currency,
+            amount,
+            reference,
+            description: `Earnings from ${contentType} purchase`,
+            metadata: {
+              purchaseId: purchase.id,
+              buyerUserId: userId,
+              contentType,
+              contentId,
+              gateway
+            }
+          });
 
-        console.log(`[Payment Routing] Credited ${amount} ${currency} to creator ${creatorId}'s wallet`);
+          console.log(`[Payment Routing] Credited ${amount} ${currency} to creator ${creatorId}'s wallet`);
+        }
+      } else {
+        console.log(`[Payment Routing] Course purchase - no individual creator to credit`);
       }
 
       await transaction.commit();
@@ -514,6 +537,26 @@ class PaymentRoutingService {
         return await LiveClass.findByPk(contentId, {
           attributes: ['id', 'title', 'price', 'currency', 'userId']
         });
+      } else if (contentType === 'course') {
+        const Course = require('../models/Course');
+        const course = await Course.findByPk(contentId, {
+          attributes: ['id', 'name', 'priceUsd', 'priceNgn']
+        });
+        
+        if (course) {
+          // For courses, we need to determine currency based on user preference or default
+          // Since courses have both USD and NGN prices, we'll return both and let the routing decide
+          return {
+            id: course.id,
+            title: course.name,
+            priceUsd: course.priceUsd,
+            priceNgn: course.priceNgn,
+            // Default to NGN, but this will be overridden by currency selection
+            price: course.priceNgn,
+            currency: 'NGN',
+            userId: null // Courses don't have individual creators
+          };
+        }
       }
       return null;
     } catch (error) {

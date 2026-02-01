@@ -13,7 +13,7 @@ const Purchase = sequelize.define('Purchase', {
     field: 'user_id'
   },
   contentType: {
-    type: DataTypes.ENUM('video', 'live_class'),
+    type: DataTypes.ENUM('video', 'live_class', 'course'),
     allowNull: false,
     field: 'content_type'
   },
@@ -51,5 +51,57 @@ const Purchase = sequelize.define('Purchase', {
   timestamps: true,
   underscored: true
 });
+
+// Instance methods
+Purchase.prototype.isCourse = function() {
+  return this.contentType === 'course';
+};
+
+Purchase.prototype.isVideo = function() {
+  return this.contentType === 'video';
+};
+
+Purchase.prototype.isLiveClass = function() {
+  return this.contentType === 'live_class';
+};
+
+Purchase.prototype.getFormattedAmount = function() {
+  return parseFloat(this.amount);
+};
+
+// Class methods
+Purchase.findCoursesPurchases = function(options = {}) {
+  return this.findAll({
+    where: { 
+      contentType: 'course',
+      paymentStatus: 'completed'
+    },
+    order: [['createdAt', 'DESC']],
+    ...options
+  });
+};
+
+Purchase.findByUser = function(userId, contentType = null, options = {}) {
+  const whereClause = { 
+    userId,
+    paymentStatus: 'completed'
+  };
+  
+  if (contentType) {
+    whereClause.contentType = contentType;
+  }
+  
+  return this.findAll({
+    where: whereClause,
+    order: [['createdAt', 'DESC']],
+    ...options
+  });
+};
+
+Purchase.findByReference = function(paymentReference) {
+  return this.findOne({
+    where: { paymentReference }
+  });
+};
 
 module.exports = Purchase;

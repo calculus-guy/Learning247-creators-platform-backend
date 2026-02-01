@@ -185,3 +185,25 @@ router.get('/transactions/summary', (req, res, next) => {
 });
 
 module.exports = router;
+/**
+ * Course Enrollment Management (Admin)
+ */
+const courseEnrollmentController = require('../controllers/courseEnrollmentController');
+
+// Get course enrollments for admin dashboard
+router.get('/course-enrollments', courseEnrollmentController.getEnrollments);
+
+// Get specific enrollment details
+router.get('/course-enrollments/:id', courseEnrollmentController.getEnrollmentById);
+
+// Toggle credentials sent status
+router.patch('/course-enrollments/:id/mark-sent', courseEnrollmentController.markCredentialsSent);
+
+// Batch update credentials sent status
+router.patch('/course-enrollments/batch-mark-sent', courseEnrollmentController.batchMarkCredentialsSent);
+
+// Get enrollment statistics
+router.get('/course-enrollments/stats', courseEnrollmentController.getEnrollmentStats);
+
+// Export enrollments
+router.get('/course-enrollments/export', courseEnrollmentController.exportEnrollments);
