@@ -251,8 +251,7 @@ exports.getMyEnrollments = async (req, res) => {
 
     console.log(`[Course Controller] Getting enrollments for user ${userId}`);
 
-    const result = await courseEnrollmentService.getEnrollmentsByUser({
-      userId,
+    const result = await courseEnrollmentService.getEnrollmentsByUser(userId, {
       limit: parseInt(limit),
       offset: parseInt(offset)
     });
