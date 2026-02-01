@@ -1,5 +1,6 @@
 const sequelize = require('./config/db');
 
+
 async function setupCourseMarketplace() {
   try {
     console.log('🚀 Starting Course Marketplace setup for production...\n');
