@@ -1,5 +1,4 @@
 const sequelize = require('./config/db');
-jh
 
 async function setupCourseMarketplace() {
   try {
