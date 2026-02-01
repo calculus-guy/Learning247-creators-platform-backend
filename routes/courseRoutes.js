@@ -23,19 +23,18 @@ router.get('/departments/:id/courses', courseController.getCoursesByDepartment);
 // Search courses (must be before /:id route)
 router.get('/search', courseController.searchCourses);
 
-// Get course details
-router.get('/:id', courseController.getCourseById);
-
 /**
  * Authenticated Course Routes
  * All routes below require authentication
  */
-router.use(authMiddleware);
+
+// Get user's course enrollments (must be before /:id route)
+router.get('/my-enrollments', authMiddleware, courseController.getMyEnrollments);
+
+// Get course details (must be after specific routes)
+router.get('/:id', courseController.getCourseById);
 
 // Purchase course (requires student details)
-router.post('/:id/purchase', courseController.purchaseCourse);
-
-// Get user's course enrollments
-router.get('/my-enrollments', courseController.getMyEnrollments);
+router.post('/:id/purchase', authMiddleware, courseController.purchaseCourse);
 
 module.exports = router;
