@@ -194,7 +194,7 @@ exports.purchaseCourse = async (req, res) => {
     }
 
     // Check if user already enrolled
-    const existingEnrollment = await courseEnrollmentService.getUserEnrollmentForCourse(userId, courseId);
+    const existingEnrollment = await courseEnrollmentService.checkUserEnrollment(userId, courseId);
     if (existingEnrollment) {
       return res.status(409).json({
         success: false,
