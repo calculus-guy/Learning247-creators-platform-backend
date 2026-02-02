@@ -17,4 +17,4 @@ https://prod-api.aahbibi.com
 
  
 
-In the live routes i have to create an endpoint that returns the scheduled classes
+In the live routes i have to create an endpoint that returns the scheduled classes 
