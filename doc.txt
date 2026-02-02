@@ -11,7 +11,7 @@
   "password": "123456" 
 }
 
-https://prod-api.aahbibi.com 
+https://prod-api.aahbibi.com  
  
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
 
