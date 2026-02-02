@@ -408,7 +408,7 @@ exports.endZegoCloudSession = async (req, res) => {
 
 exports.getAllLiveClasses = async (req, res) => {
   try {
-    const { status, privacy, category } = req.query;
+    const { status, privacy, category, showAll } = req.query;
     
     const filters = {};
     
@@ -419,8 +419,15 @@ exports.getAllLiveClasses = async (req, res) => {
       filters.privacy = 'public'; // Only show public classes by default
     }
     
-    // Filter by status if provided
-    if (status) filters.status = status;
+    // 🎯 KEY CHANGE: Default to only show active classes for better UX
+    if (status) {
+      // If specific status requested, use it
+      filters.status = status;
+    } else if (!showAll || showAll !== 'true') {
+      // Default: Only show scheduled and live classes (hide ended/recorded)
+      filters.status = ['scheduled', 'live'];
+    }
+    // If showAll=true is passed, show everything (for admin/creator views)
     
     // Filter by category if provided
     if (category) filters.category = category;
@@ -447,6 +454,10 @@ exports.getAllLiveClasses = async (req, res) => {
     // - "scheduled" = created but not started yet
     // - "live" = ZegoCloud room is active
     // - "ended" = ZegoCloud session ended
+
+    // 📊 UX Enhancement: By default, only 'scheduled' and 'live' classes are shown
+    // This keeps the frontend clean and focused on actionable content
+    // Use ?showAll=true to see ended/recorded classes (for creators/admins)
 
     return res.json({
       count: liveClasses.length,
