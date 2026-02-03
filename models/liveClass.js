@@ -25,7 +25,7 @@ const LiveClass = sequelize.define('LiveClass', {
   endTime: { type: DataTypes.DATE, allowNull: true },
 
   privacy: { type: DataTypes.ENUM('public', 'private'), defaultValue: 'public' },
-  status: { type: DataTypes.ENUM('scheduled','live','ended','recorded'), defaultValue: 'scheduled' },
+  status: { type: DataTypes.ENUM('scheduled','live','ended','recorded','archived'), defaultValue: 'scheduled' },
 
   // Mux live fields
   mux_stream_id: { type: DataTypes.STRING, allowNull: true },

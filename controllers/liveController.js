@@ -425,7 +425,9 @@ exports.getAllLiveClasses = async (req, res) => {
       filters.status = status;
     } else if (!showAll || showAll !== 'true') {
       // Default: Only show scheduled and live classes (hide ended/recorded)
-      filters.status = ['scheduled', 'live'];
+      // Use Sequelize Op.in for array filtering
+      const { Op } = require('sequelize');
+      filters.status = { [Op.in]: ['scheduled', 'live'] };
     }
     // If showAll=true is passed, show everything (for admin/creator views)
     
