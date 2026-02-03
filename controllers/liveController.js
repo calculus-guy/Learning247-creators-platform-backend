@@ -469,3 +469,53 @@ exports.getAllLiveClasses = async (req, res) => {
     return handleError(res, error);
   }
 };
+
+/**
+ * Get user's own live classes
+ * GET /live/my-classes
+ */
+exports.getMyLiveClasses = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { status, showAll } = req.query;
+    
+    console.log(`[Live Controller] Getting live classes for user ${userId}`);
+    
+    const filters = { userId };
+    
+    // Filter by status if provided
+    if (status) {
+      filters.status = status;
+    } else if (!showAll || showAll !== 'true') {
+      // Default: Only show scheduled and live classes (hide ended)
+      const { Op } = require('sequelize');
+      filters.status = { [Op.in]: ['scheduled', 'live'] };
+    }
+    
+    const liveClasses = await LiveClass.findAll({
+      where: filters,
+      order: [['createdAt', 'DESC']], // Most recent first for user's own classes
+      include: [
+        {
+          model: LiveHost,
+          as: 'hosts',
+          include: [{ model: User, attributes: ['id', 'firstname', 'lastname', 'email'] }]
+        }
+      ]
+    });
+
+    return res.json({ 
+      success: true,
+      count: liveClasses.length,
+      liveClasses,
+      filters: {
+        userId,
+        status,
+        showAll
+      }
+    });
+  } catch (error) {
+    console.error('[Live Controller] Get my live classes error:', error);
+    return handleError(res, error);
+  }
+};
