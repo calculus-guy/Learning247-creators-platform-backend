@@ -17,7 +17,7 @@ class LiveClassCleanupService {
   constructor() {
     this.config = {
       // Auto-end classes that have been "live" for more than X hours
-      staleThresholdHours: 3,
+      staleThresholdHours: 6,
       
       // Archive classes that ended more than X days ago
       archiveThresholdDays: 30,
