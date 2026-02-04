@@ -51,7 +51,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-     
+      
 app.use(
   "/api/webhooks", webhookRoutes
 );
