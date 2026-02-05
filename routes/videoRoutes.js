@@ -14,7 +14,11 @@ const router = express.Router();
 router.post(
   '/upload',
   authMiddleware,
-  upload.fields([{ name: 'thumbnail', maxCount: 1 }]),
+  upload.fields([
+    { name: 'thumbnail', maxCount: 1 },
+    { name: 'image', maxCount: 1 },
+    { name: 'file', maxCount: 1 }
+  ]),
   uploadVideo
 );
 
