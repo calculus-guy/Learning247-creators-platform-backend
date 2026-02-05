@@ -42,8 +42,8 @@ exports.uploadVideo = async (req, res) => {
     } = req.body;
 
     const userId = req.user.id; // from auth middleware
-    // Check multiple possible field names (thumbnail, image, file)
-    const thumbnailFile = req.files?.thumbnail?.[0] || req.files?.image?.[0] || req.files?.file?.[0];
+    // Check multiple possible field names (thumbnail, thumbnailUrl, image, file)
+    const thumbnailFile = req.files?.thumbnail?.[0] || req.files?.thumbnailUrl?.[0] || req.files?.image?.[0] || req.files?.file?.[0];
 
     const result = await uploadVideoService({
       userId,

@@ -50,8 +50,8 @@ exports.createLiveClass = async (req, res) => {
     const userId = req.user.id;
     
     // Handle thumbnail - either from file upload or URL string
-    // Check multiple possible field names (thumbnail, image, file)
-    const thumbnailFile = req.files?.thumbnail?.[0] || req.files?.image?.[0] || req.files?.file?.[0];
+    // Check multiple possible field names (thumbnail, thumbnailUrl, image, file)
+    const thumbnailFile = req.files?.thumbnail?.[0] || req.files?.thumbnailUrl?.[0] || req.files?.image?.[0] || req.files?.file?.[0];
     // S3 uploads have 'location' property, local uploads have 'filename'
     const finalThumbnailUrl = thumbnailFile 
       ? (thumbnailFile.location || `/upload/${thumbnailFile.filename}`)

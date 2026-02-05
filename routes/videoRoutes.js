@@ -16,6 +16,7 @@ router.post(
   authMiddleware,
   upload.fields([
     { name: 'thumbnail', maxCount: 1 },
+    { name: 'thumbnailUrl', maxCount: 1 },
     { name: 'image', maxCount: 1 },
     { name: 'file', maxCount: 1 }
   ]),
