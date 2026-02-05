@@ -33,6 +33,7 @@
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "multer-s3": "^3.0.1",
     "node-cron": "^3.0.3",
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",

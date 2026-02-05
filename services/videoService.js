@@ -40,7 +40,9 @@ exports.uploadVideoService = async ({
       tags: (typeof tags === 'string' && tags.length > 0) ? tags.split(',').map(tag => tag.trim()) : (Array.isArray(tags) ? tags : []),
       privacy,
       ageRestriction: ageRestriction === 'true',
-      thumbnailUrl: thumbnailFile ? `/uploads/${thumbnailFile.filename}` : null,
+      thumbnailUrl: thumbnailFile 
+        ? (thumbnailFile.location || `/upload/${thumbnailFile.filename}`) 
+        : null,
       muxUploadId: upload.id,
       status: 'uploading',
     });

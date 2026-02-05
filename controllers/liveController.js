@@ -51,7 +51,10 @@ exports.createLiveClass = async (req, res) => {
     
     // Handle thumbnail - either from file upload or URL string
     const thumbnailFile = req.files?.thumbnail?.[0];
-    const finalThumbnailUrl = thumbnailFile ? `/uploads/${thumbnailFile.filename}` : thumbnailUrl || null; 
+    // S3 uploads have 'location' property, local uploads have 'filename'
+    const finalThumbnailUrl = thumbnailFile 
+      ? (thumbnailFile.location || `/upload/${thumbnailFile.filename}`)
+      : thumbnailUrl || null; 
 
     // Basic check before calling services
     if (!title) return res.status(400).json({ success: false, message: "Title is required" });
