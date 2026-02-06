@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 const financialRateLimiterController = require('../controllers/financialRateLimiterController');
 const fraudDetectionController = require('../controllers/fraudDetectionController');
 const withdrawalLimitController = require('../controllers/withdrawalLimitController');
@@ -17,8 +18,8 @@ const transactionHistoryController = require('../controllers/transactionHistoryC
 // Apply authentication middleware to all routes
 router.use(authMiddleware);
 
-// TODO: Add admin role check middleware
-// router.use(adminRoleMiddleware);
+// Apply admin role check middleware to all routes
+router.use(adminMiddleware);
 
 /**
  * Financial Rate Limiter Management
