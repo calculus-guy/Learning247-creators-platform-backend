@@ -56,7 +56,8 @@ exports.checkZegoCloudAccess = async (req, res, next) => {
         message: 'Authentication required to access paid live class',
         requiresPayment: true,
         price: liveClass.price,
-        currency: 'NGN',
+        amount: liveClass.price,
+        currency: liveClass.currency || 'NGN',
         contentType: 'live_class',
         contentId: liveClassId
       });
@@ -94,7 +95,8 @@ exports.checkZegoCloudAccess = async (req, res, next) => {
       code: 'PAYMENT_REQUIRED',
       requiresPayment: true,
       price: liveClass.price,
-      currency: 'NGN',
+      amount: liveClass.price,
+      currency: liveClass.currency || 'NGN',
       contentType: 'live_class',
       contentId: liveClassId,
       title: liveClass.title,
@@ -163,7 +165,8 @@ exports.checkZegoCloudAccessByParam = async (req, res, next) => {
         message: 'Authentication required to access paid live class',
         requiresPayment: true,
         price: liveClass.price,
-        currency: 'NGN',
+        amount: liveClass.price,
+        currency: liveClass.currency || 'NGN',
         contentType: 'live_class',
         contentId: liveClassId
       });
@@ -201,7 +204,8 @@ exports.checkZegoCloudAccessByParam = async (req, res, next) => {
       code: 'PAYMENT_REQUIRED',
       requiresPayment: true,
       price: liveClass.price,
-      currency: 'NGN',
+      amount: liveClass.price,
+      currency: liveClass.currency || 'NGN',
       contentType: 'live_class',
       contentId: liveClassId,
       title: liveClass.title,
