@@ -70,7 +70,6 @@ res.cookie('token', token, {
 
 
 Live class recording
-Payment before live class entering
 Oauth final cleanup
 
 
