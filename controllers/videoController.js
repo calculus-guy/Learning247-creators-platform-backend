@@ -45,6 +45,20 @@ exports.uploadVideo = async (req, res) => {
     // Check multiple possible field names (thumbnail, thumbnailUrl, image, file)
     const thumbnailFile = req.files?.thumbnail?.[0] || req.files?.thumbnailUrl?.[0] || req.files?.image?.[0] || req.files?.file?.[0];
 
+    // 🔍 Debug logging
+    console.log('📸 Video Upload - Thumbnail Debug:', {
+      hasFiles: !!req.files,
+      fileKeys: req.files ? Object.keys(req.files) : [],
+      thumbnailFile: thumbnailFile ? {
+        fieldname: thumbnailFile.fieldname,
+        originalname: thumbnailFile.originalname,
+        mimetype: thumbnailFile.mimetype,
+        size: thumbnailFile.size,
+        location: thumbnailFile.location, // S3 URL
+        filename: thumbnailFile.filename  // Local filename
+      } : null
+    });
+
     const result = await uploadVideoService({
       userId,
       title,
@@ -67,6 +81,7 @@ exports.uploadVideo = async (req, res) => {
       video: result.video,
     });
   } catch (err) {
+    console.error('❌ Video upload error:', err);
     res.status(500).json({
       success: false,
       message: err.message,

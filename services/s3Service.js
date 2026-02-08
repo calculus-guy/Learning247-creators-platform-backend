@@ -34,7 +34,6 @@ const uploadToS3 = multer({
       const randomString = Math.random().toString(36).substring(2, 15);
       const extension = path.extname(file.originalname);
       
-      // All thumbnails go to uploads/photos/ folder
       const filename = `upload/photos/${timestamp}-${randomString}${extension}`;
       cb(null, filename);
     }
@@ -64,7 +63,7 @@ const uploadFileToS3 = async (fileBuffer, fileName, contentType) => {
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
     const extension = path.extname(fileName);
-    const key = `uploads/photos/${timestamp}-${randomString}${extension}`;
+    const key = `upload/photos/${timestamp}-${randomString}${extension}`;
     
     const params = {
       Bucket: process.env.AWS_S3_BUCKET,

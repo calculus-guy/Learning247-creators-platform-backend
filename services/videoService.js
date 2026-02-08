@@ -29,6 +29,18 @@ exports.uploadVideoService = async ({
       ? currency.toUpperCase() 
       : 'NGN';
 
+    // 🔍 Process thumbnail URL
+    const thumbnailUrl = thumbnailFile 
+      ? (thumbnailFile.location || `/upload/${thumbnailFile.filename}`) 
+      : null;
+
+    console.log('📸 Video Service - Thumbnail Processing:', {
+      hasThumbnailFile: !!thumbnailFile,
+      s3Location: thumbnailFile?.location,
+      localFilename: thumbnailFile?.filename,
+      finalThumbnailUrl: thumbnailUrl
+    });
+
     const video = await VideoModel.create({
       userId,
       title,
@@ -40,22 +52,23 @@ exports.uploadVideoService = async ({
       tags: (typeof tags === 'string' && tags.length > 0) ? tags.split(',').map(tag => tag.trim()) : (Array.isArray(tags) ? tags : []),
       privacy,
       ageRestriction: ageRestriction === 'true',
-      thumbnailUrl: thumbnailFile 
-        ? (thumbnailFile.location || `/upload/${thumbnailFile.filename}`) 
-        : null,
+      thumbnailUrl: thumbnailUrl,
       muxUploadId: upload.id,
       status: 'uploading',
     });
 
-    // Note: Thumbnail file is kept in /uploads folder for serving
-    // Do NOT delete it - it's needed for the thumbnailUrl to work
+    console.log('✅ Video created with thumbnail:', {
+      videoId: video.id,
+      thumbnailUrl: video.thumbnailUrl
+    });
+
 
     return {
       success: true,
       message: 'Mux upload created successfully',
       uploadUrl: upload.url,
       uploadId: upload.id,
-      videoId: video.id,
+      video: video, // Return full video object with thumbnailUrl
     };
   } catch (err) {
     console.error('Error uploading video:', err);
