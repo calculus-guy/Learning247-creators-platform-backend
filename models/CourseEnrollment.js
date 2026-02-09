@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 const sequelize = require('../config/db');
 
 const CourseEnrollment = sequelize.define('CourseEnrollment', {
@@ -124,7 +124,7 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
       where: {
         accessType: ['monthly', 'yearly'],
         expiresAt: {
-          [sequelize.Op.lt]: new Date()
+          [Op.lt]: new Date()
         }
       }
     },
@@ -133,7 +133,7 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
       where: {
         accessType: ['monthly', 'yearly'],
         expiresAt: {
-          [sequelize.Op.gt]: new Date()
+          [Op.gt]: new Date()
         }
       }
     },
@@ -142,7 +142,7 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
       where: {
         accessType: ['monthly', 'yearly'],
         expiresAt: {
-          [sequelize.Op.between]: [
+          [Op.between]: [
             new Date(),
             new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           ]
