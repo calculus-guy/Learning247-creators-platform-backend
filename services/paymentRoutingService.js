@@ -87,18 +87,16 @@ class PaymentRoutingService {
       // Determine currency and price for courses
       let currency, amount;
       if (contentType === 'course') {
-        // For courses, use forced currency or default to NGN
+        // ✅ For courses, use forced currency and price from metadata
+        // Pricing is now managed by CoursePricingService via .env
         currency = forceCurrency || 'NGN';
         this.walletService.validateCurrency(currency);
         
-        // Set price based on selected currency
-        if (currency === 'USD') {
-          amount = parseFloat(contentDetails.priceUsd);
-        } else if (currency === 'NGN') {
-          amount = parseFloat(contentDetails.priceNgn);
-        } else {
-          throw new Error(`Unsupported currency for courses: ${currency}`);
+        // ✅ Get price from metadata.finalPrice (set by course controller)
+        if (!metadata || !metadata.finalPrice) {
+          throw new Error('Course price must be provided in metadata.finalPrice');
         }
+        amount = parseFloat(metadata.finalPrice);
       } else {
         // For videos and live classes, use existing logic
         currency = forceCurrency || contentDetails.currency || this.getDefaultCurrencyForContent(contentDetails);
@@ -540,20 +538,19 @@ class PaymentRoutingService {
       } else if (contentType === 'course') {
         const Course = require('../models/Course');
         const course = await Course.findByPk(contentId, {
-          attributes: ['id', 'name', 'priceUsd', 'priceNgn']
+          attributes: ['id', 'name']  // ✅ REMOVED: priceUsd, priceNgn (now in .env)
         });
         
         if (course) {
-          // For courses, we need to determine currency based on user preference or default
-          // Since courses have both USD and NGN prices, we'll return both and let the routing decide
+          // ✅ For courses, pricing is now managed by CoursePricingService
+          // The price will be passed in metadata.finalPrice by the course controller
           return {
             id: course.id,
             title: course.name,
-            priceUsd: course.priceUsd,
-            priceNgn: course.priceNgn,
-            // Default to NGN, but this will be overridden by currency selection
-            price: course.priceNgn,
-            currency: 'NGN',
+            // ✅ REMOVED: priceUsd, priceNgn fields
+            // Price is now passed via metadata.finalPrice
+            price: null,  // Will be set from metadata
+            currency: null,  // Will be set from forceCurrency
             userId: null // Courses don't have individual creators
           };
         }
