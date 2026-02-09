@@ -21,7 +21,7 @@ exports.sendEventRegistrationEmail = async (to, firstname) => {
       <p>Dear ${firstname},</p>
 
       <p>Welcome aboard! You've successfully registered for the 
-      <strong>Aahbibi Creators’ Summit – Enugu Edition</strong>.</p>
+      <strong>Hallos Creators’ Summit – Enugu Edition</strong>.</p>
 
       <p>This summit isn’t just another event — it’s a movement.</p>
 
@@ -36,37 +36,37 @@ exports.sendEventRegistrationEmail = async (to, firstname) => {
       <h3>Spread the Word</h3>
 
       <p>
-      “Just signed up for the #AahbibiCreatorsSummit in Enugu!  
+      “Just signed up for the #hallosCreatorsSummit in Enugu!  
       Can’t wait to connect and learn with amazing creators across Africa.  
-      Join me at www.aahbibi.com  
-      #Aahbibi #CreatorsSummit #Enugu2025 #LearnCreateEarn”
+      Join me at www.hallos.com  
+      #hallos #CreatorsSummit #Enugu2025 #LearnCreateEarn”
       </p>
 
-      <p>Forward this message to your creative friends and invite them to register now at <a href="https://www.aahbibi.com">www.aahbibi.com</a>.</p>
+      <p>Forward this message to your creative friends and invite them to register now at <a href="https://www.hallos.com">www.hallos.com</a>.</p>
     </div>
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Creators Summit" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Creators Summit" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "You're In! Aahbibi Creators’ Summit – Enugu",
+    subject: "You're In! hallos Creators’ Summit – Enugu",
     html,
   });
 };
 
 
 /**
- * AAHBIBI PLATFORM WELCOME EMAIL
+ * hallos PLATFORM WELCOME EMAIL
  */
-exports.sendAahbibiWelcomeEmail = async (to, firstname) => {
+exports.sendhallosWelcomeEmail = async (to, firstname) => {
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>Welcome to Aahbibi — Empowering Creators!</h2>
+      <h2>Welcome to hallos — Empowering Creators!</h2>
 
       <p>Dear ${firstname},</p>
 
       <p>
-        Welcome to <a href="https://www.aahbibi.com">www.Aahbibi.com</a>, the creators’ marketplace for 
+        Welcome to <a href="https://www.hallos.com">www.hallos.com</a>, the creators’ marketplace for 
         skill acquisition, knowledge sharing, and revenue generation.
       </p>
 
@@ -76,7 +76,7 @@ exports.sendAahbibiWelcomeEmail = async (to, firstname) => {
       </p>
 
       <p>
-        At Aahbibi, we believe knowledge is power — but shared knowledge is impact.
+        At hallos, we believe knowledge is power — but shared knowledge is impact.
       </p>
 
       <p>
@@ -88,7 +88,7 @@ exports.sendAahbibiWelcomeEmail = async (to, firstname) => {
         Thank you for trusting us to be part of your journey.
       </p>
 
-      <p><strong>With appreciation,<br/>Alexander Oseji<br/>Co-Founder, Aahbibi.com</strong></p>
+      <p><strong>With appreciation,<br/>Alexander Oseji<br/>Co-Founder, hallos.com</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -96,9 +96,9 @@ exports.sendAahbibiWelcomeEmail = async (to, firstname) => {
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "Welcome to Aahbibi — The Creators' Marketplace",
+    subject: "Welcome to hallos — The Creators' Marketplace",
     html,
   });
 };
@@ -125,14 +125,14 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
 
       <p>
         You can access your purchased content anytime from your dashboard at 
-        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
       </p>
 
       <p>
         Happy learning!
       </p>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -140,7 +140,7 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
     subject: `Purchase Confirmed - ${contentTitle}`,
     html,
@@ -169,14 +169,14 @@ exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studen
 
       <p>
         This amount has been added to your wallet. You can view your earnings and withdraw funds 
-        from your creator dashboard at <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+        from your creator dashboard at <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
       </p>
 
       <p>
         Keep creating amazing content!
       </p>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -184,7 +184,7 @@ exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studen
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
     subject: `New Sale - ${contentTitle}`,
     html,
@@ -221,10 +221,10 @@ exports.sendWithdrawalConfirmationEmail = async (to, firstname, amount, netAmoun
 
       <p>
         You can view your transaction history in your creator dashboard at 
-        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
       </p>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -232,7 +232,7 @@ exports.sendWithdrawalConfirmationEmail = async (to, firstname, amount, netAmoun
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
     subject: 'Withdrawal Successful',
     html,
@@ -263,10 +263,10 @@ exports.sendWithdrawalFailureEmail = async (to, firstname, amount, reason) => {
 
       <p>
         You can retry the withdrawal from your creator dashboard at 
-        <a href="https://www.aahbibi.com/dashboard">www.aahbibi.com/dashboard</a>.
+        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
       </p>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -274,7 +274,7 @@ exports.sendWithdrawalFailureEmail = async (to, firstname, amount, reason) => {
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
     subject: 'Withdrawal Failed - Action Required',
     html,
@@ -292,7 +292,7 @@ exports.sendPasswordResetOTP = async (to, firstname, otp) => {
       <p>Dear ${firstname},</p>
 
       <p>
-        You requested to reset your password for your Aahbibi account. 
+        You requested to reset your password for your hallos account. 
         Use the verification code below to proceed:
       </p>
 
@@ -313,7 +313,7 @@ exports.sendPasswordResetOTP = async (to, firstname, otp) => {
         Enter this code on the password reset page to create your new password.
       </p>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Empowering Creators. Elevating Knowledge Sharing.</em>
@@ -321,9 +321,9 @@ exports.sendPasswordResetOTP = async (to, firstname, otp) => {
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Team" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
-    subject: 'Password Reset Code - Aahbibi',
+    subject: 'Password Reset Code - hallos',
     html,
   });
 };
@@ -339,7 +339,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
       <p>Dear ${firstname},</p>
 
       <p>
-        You requested to withdraw <strong>${currency} ${amount.toLocaleString()}</strong> from your Aahbibi wallet.
+        You requested to withdraw <strong>${currency} ${amount.toLocaleString()}</strong> from your hallos wallet.
         For your security, please confirm this withdrawal with the verification code below:
       </p>
 
@@ -361,7 +361,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
         <li>This code expires in <strong>10 minutes</strong></li>
         <li>Never share this code with anyone</li>
         <li>If you didn't request this withdrawal, contact support immediately</li>
-        <li>Only enter this code on the official Aahbibi website</li>
+        <li>Only enter this code on the official hallos website</li>
       </ul>
 
       <p>
@@ -372,7 +372,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
         <p style="margin: 0;"><strong>⚠️ Security Tip:</strong> Always verify withdrawal details carefully before confirming.</p>
       </div>
 
-      <p><strong>The Aahbibi Team</strong></p>
+      <p><strong>The hallos Team</strong></p>
 
       <hr/>
       <em>Secure. Trusted. Reliable.</em>
@@ -380,7 +380,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
   `;
 
   await transporter.sendMail({
-    from: `"Aahbibi Security" <${process.env.EMAIL_USER}>`,
+    from: `"hallos Security" <${process.env.EMAIL_USER}>`,
     to,
     subject: `Withdrawal Confirmation - ${currency} ${amount.toLocaleString()}`,
     html,
