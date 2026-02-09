@@ -56,28 +56,8 @@ const Course = sequelize.define('Course', {
       }
     }
   },
-  priceUsd: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,  // ✅ Changed to nullable
-    defaultValue: null,  // ✅ No default value
-    field: 'price_usd',
-    validate: {
-      min: 0,
-      isDecimal: true
-    },
-    comment: 'Deprecated: Pricing now handled by CoursePricingService'
-  },
-  priceNgn: {
-    type: DataTypes.DECIMAL(10, 2),
-    allowNull: true,  // ✅ Changed to nullable
-    defaultValue: null,  // ✅ No default value
-    field: 'price_ngn',
-    validate: {
-      min: 0,
-      isDecimal: true
-    },
-    comment: 'Deprecated: Pricing now handled by CoursePricingService'
-  },
+  // ✅ REMOVED: priceUsd and priceNgn fields
+  // Pricing is now managed by CoursePricingService via .env configuration
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
@@ -102,11 +82,7 @@ const Course = sequelize.define('Course', {
 });
 
 // Instance methods
-// ✅ DEPRECATED: getPrice() - Use CoursePricingService instead
-Course.prototype.getPrice = function(currency = 'NGN') {
-  console.warn('⚠️ Course.getPrice() is deprecated. Use CoursePricingService instead.');
-  return currency.toUpperCase() === 'USD' ? this.priceUsd : this.priceNgn;
-};
+// ✅ REMOVED: getPrice() method - Use CoursePricingService instead
 
 Course.prototype.getEnrollmentCount = async function() {
   const CourseEnrollment = require('./CourseEnrollment');
@@ -117,11 +93,7 @@ Course.prototype.getEnrollmentCount = async function() {
 
 Course.prototype.toJSON = function() {
   const values = Object.assign({}, this.get());
-  
-  // Convert prices to numbers for JSON response (if they exist)
-  if (values.priceUsd) values.priceUsd = parseFloat(values.priceUsd);
-  if (values.priceNgn) values.priceNgn = parseFloat(values.priceNgn);
-  
+  // No price conversion needed - prices removed from model
   return values;
 };
 
