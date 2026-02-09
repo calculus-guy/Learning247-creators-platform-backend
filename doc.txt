@@ -14,8 +14,3 @@
 https://prod-api.aahbibi.com  
  
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
-
-Live class recording
-
-
-Alright I have another request from my PM actually. He was talking about the fact that the live classes have to be recorded and stored in our S3 bucket actually. U will need to guide me on how to do that
