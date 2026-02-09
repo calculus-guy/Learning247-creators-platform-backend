@@ -58,9 +58,10 @@ class PaymentRoutingService {
    * @param {string} params.userEmail - User email
    * @param {string} params.idempotencyKey - Idempotency key
    * @param {string} params.forceCurrency - Optional currency override
+   * @param {Object} params.metadata - Optional metadata (required for courses)
    * @returns {Promise<Object>} Payment initialization result
    */
-  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null }) {
+  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null, metadata = {} }) {
     try {
       // Validate idempotency
       const idempotencyResult = await this.idempotencyService.checkAndStore(
