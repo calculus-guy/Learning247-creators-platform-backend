@@ -79,7 +79,9 @@ exports.handlePaystackWebhook = async (req, res) => {
       // Create course enrollment if this is a course purchase
       if (contentType === 'course') {
         const CourseEnrollmentService = require('../services/courseEnrollmentService');
+        const CoursePricingService = require('../services/coursePricingService');
         const courseEnrollmentService = new CourseEnrollmentService();
+        const coursePricingService = new CoursePricingService();
         
         // Extract student details from metadata or customer data
         const studentName = customer.first_name && customer.last_name 
@@ -88,16 +90,25 @@ exports.handlePaystackWebhook = async (req, res) => {
         const studentEmail = customer.email || metadata.studentEmail || 'N/A';
         const studentPhone = metadata.studentPhone || 'N/A';
         
+        // ✅ NEW: Extract access type and expiry from metadata
+        const accessType = metadata.accessType || 'individual';
+        const expiresAt = metadata.expiresAt ? new Date(metadata.expiresAt) : null;
+        
+        // ✅ NEW: For monthly/yearly, contentId is null
+        const courseId = accessType === 'individual' ? contentId : null;
+        
         await courseEnrollmentService.createEnrollment({
           userId,
-          courseId: contentId,
+          courseId,  // ✅ null for monthly/yearly
           purchaseId: result.purchase.id,
           studentName,
           studentEmail,
-          studentPhone
+          studentPhone,
+          accessType,  // ✅ NEW
+          expiresAt    // ✅ NEW
         });
         
-        console.log(`[Paystack Webhook] Course enrollment created for user ${userId}, course ${contentId}`);
+        console.log(`[Paystack Webhook] Course enrollment created - User: ${userId}, Access: ${accessType}, Expires: ${expiresAt || 'Never'}`);
       }
 
       // Log transaction
@@ -430,23 +441,34 @@ exports.handleStripeWebhook = async (req, res) => {
       // Create course enrollment if this is a course purchase
       if (contentType === 'course') {
         const CourseEnrollmentService = require('../services/courseEnrollmentService');
+        const CoursePricingService = require('../services/coursePricingService');
         const courseEnrollmentService = new CourseEnrollmentService();
+        const coursePricingService = new CoursePricingService();
         
         // Extract student details from metadata
         const studentName = session.metadata.studentName || 'N/A';
         const studentEmail = session.metadata.studentEmail || email || 'N/A';
         const studentPhone = session.metadata.studentPhone || 'N/A';
         
+        // ✅ NEW: Extract access type and expiry from metadata
+        const accessType = session.metadata.accessType || 'individual';
+        const expiresAt = session.metadata.expiresAt ? new Date(session.metadata.expiresAt) : null;
+        
+        // ✅ NEW: For monthly/yearly, contentId is null
+        const courseId = accessType === 'individual' ? contentId : null;
+        
         await courseEnrollmentService.createEnrollment({
           userId,
-          courseId: contentId,
+          courseId,  // ✅ null for monthly/yearly
           purchaseId: result.purchase.id,
           studentName,
           studentEmail,
-          studentPhone
+          studentPhone,
+          accessType,  // ✅ NEW
+          expiresAt    // ✅ NEW
         });
         
-        console.log(`[Stripe Webhook] Course enrollment created for user ${userId}, course ${contentId}`);
+        console.log(`[Stripe Webhook] Course enrollment created - User: ${userId}, Access: ${accessType}, Expires: ${expiresAt || 'Never'}`);
       }
 
       // Log transaction

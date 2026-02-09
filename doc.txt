@@ -14,3 +14,5 @@
 https://prod-api.aahbibi.com  
  
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
+
+  Ensure paystack collect money from everyone in africa

@@ -1,12 +1,14 @@
 const CourseService = require('../services/courseService');
 const PaymentRoutingService = require('../services/paymentRoutingService');
 const CourseEnrollmentService = require('../services/courseEnrollmentService');
+const CoursePricingService = require('../services/coursePricingService');  // ✅ NEW
 const User = require('../models/User');
 
 // Initialize services
 const courseService = new CourseService();
 const paymentRoutingService = new PaymentRoutingService();
 const courseEnrollmentService = new CourseEnrollmentService();
+const coursePricingService = new CoursePricingService();  // ✅ NEW
 
 /**
  * Course Controller
@@ -134,40 +136,20 @@ exports.getCourseById = async (req, res) => {
 };
 
 /**
- * Purchase course
- * POST /api/courses/:id/purchase
+ * Purchase course or access pass
+ * POST /api/courses/purchase
+ * 
+ * ✅ UPDATED: Now supports individual, monthly, and yearly access types
  */
 exports.purchaseCourse = async (req, res) => {
   try {
-    const { id: courseId } = req.params;
-    const { currency, studentName, studentEmail, studentPhone } = req.body;
+    const { accessType, courseId, currency, couponCode, studentName, studentEmail, studentPhone } = req.body;
     const userId = req.user.id;
     const idempotencyKey = req.headers['idempotency-key'];
 
-    console.log(`[Course Controller] Processing course purchase for user ${userId}, course ${courseId}`);
+    console.log(`[Course Controller] Processing purchase - User: ${userId}, Access Type: ${accessType}`);
 
-    // Validate required fields
-    if (!courseId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Course ID is required'
-      });
-    }
-
-    if (!currency || !['USD', 'NGN'].includes(currency.toUpperCase())) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid currency (USD or NGN) is required'
-      });
-    }
-
-    if (!studentName || !studentEmail || !studentPhone) {
-      return res.status(400).json({
-        success: false,
-        message: 'Student details (name, email, phone) are required'
-      });
-    }
-
+    // Validate idempotency key
     if (!idempotencyKey) {
       return res.status(400).json({
         success: false,
@@ -175,7 +157,31 @@ exports.purchaseCourse = async (req, res) => {
       });
     }
 
-    // Get user email
+    // Validate student details
+    if (!studentName || !studentEmail || !studentPhone) {
+      return res.status(400).json({
+        success: false,
+        message: 'Student details (name, email, phone) are required'
+      });
+    }
+
+    // Validate purchase request using pricing service
+    const validation = coursePricingService.validatePurchaseRequest({
+      accessType,
+      courseId,
+      currency,
+      couponCode
+    });
+
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validation.errors
+      });
+    }
+
+    // Get user details
     const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({
@@ -184,55 +190,104 @@ exports.purchaseCourse = async (req, res) => {
       });
     }
 
-    // Check if course exists
-    const course = await courseService.getCourseById(courseId);
-    if (!course) {
-      return res.status(404).json({
-        success: false,
-        message: 'Course not found'
-      });
+    // For individual purchases, verify course exists
+    let course = null;
+    if (accessType === 'individual') {
+      course = await courseService.getCourseById(courseId);
+      if (!course) {
+        return res.status(404).json({
+          success: false,
+          message: 'Course not found'
+        });
+      }
+
+      // Check if user already enrolled in this specific course
+      const existingEnrollment = await courseEnrollmentService.checkUserEnrollment(userId, courseId);
+      if (existingEnrollment) {
+        return res.status(409).json({
+          success: false,
+          message: 'You are already enrolled in this course'
+        });
+      }
     }
 
-    // Check if user already enrolled
-    const existingEnrollment = await courseEnrollmentService.checkUserEnrollment(userId, courseId);
-    if (existingEnrollment) {
-      return res.status(409).json({
-        success: false,
-        message: 'You are already enrolled in this course'
-      });
-    }
+    // Calculate pricing with discount
+    const pricingDetails = coursePricingService.calculateDiscount(
+      accessType,
+      currency,
+      couponCode
+    );
 
-    // Initialize payment with student details in metadata
+    // Calculate expiry date
+    const expiresAt = coursePricingService.calculateExpiryDate(accessType);
+
+    // Initialize payment with enhanced metadata
     const result = await paymentRoutingService.initializePayment({
       userId,
       contentType: 'course',
-      contentId: courseId,
+      contentId: courseId || null,  // null for monthly/yearly
       userEmail: user.email,
       idempotencyKey,
       forceCurrency: currency.toUpperCase(),
       metadata: {
+        // Student details
         studentName,
         studentEmail,
-        studentPhone
+        studentPhone,
+        // Access details
+        accessType,
+        expiresAt: expiresAt ? expiresAt.toISOString() : null,
+        // Pricing details
+        couponCode: pricingDetails.couponApplied ? couponCode : null,
+        regularPrice: pricingDetails.regularPrice,
+        discount: pricingDetails.savings,
+        finalPrice: pricingDetails.finalPrice
       }
     });
 
-    return res.status(200).json({
+    // Build response
+    const response = {
       success: true,
       message: result.cached ? 'Payment already initialized (cached)' : 'Payment initialized successfully',
-      currency: result.currency,
-      gateway: result.gateway,
-      requiredGateway: result.requiredGateway,
-      cached: result.cached || false,
-      data: result.data,
-      course: {
+      
+      // Access details
+      accessType,
+      accessDescription: coursePricingService.getAccessTypeDescription(accessType),
+      expiresAt: expiresAt ? expiresAt.toISOString() : null,
+      
+      // Pricing details
+      pricing: {
+        currency: pricingDetails.currency,
+        regularPrice: pricingDetails.regularPrice,
+        finalPrice: pricingDetails.finalPrice,
+        discount: pricingDetails.savings,
+        discountPercentage: pricingDetails.discountPercentage,
+        couponApplied: pricingDetails.couponApplied
+      },
+      
+      // Payment details
+      payment: {
+        gateway: result.gateway,
+        requiredGateway: result.requiredGateway,
+        cached: result.cached || false,
+        paymentUrl: result.data.paymentUrl || result.data.authorization_url,
+        reference: result.data.reference || result.data.sessionId
+      }
+    };
+
+    // Add course details for individual purchases
+    if (accessType === 'individual' && course) {
+      response.course = {
         id: course.id,
         name: course.name,
         department: course.department?.name
-      }
-    });
+      };
+    }
+
+    return res.status(200).json(response);
+
   } catch (error) {
-    console.error('[Course Controller] Purchase course error:', error);
+    console.error('[Course Controller] Purchase error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to initialize course purchase'

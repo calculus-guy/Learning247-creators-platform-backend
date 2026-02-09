@@ -18,10 +18,10 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
   },
   courseId: {
     type: DataTypes.UUID,
-    allowNull: false,
+    allowNull: true,  // ✅ Changed to nullable for monthly/yearly access
     field: 'course_id',
     validate: {
-      notEmpty: true
+      isUUID: 4
     }
   },
   purchaseId: {
@@ -59,6 +59,23 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
       notEmpty: true,
       len: [1, 50]
     }
+  },
+  // ✅ NEW: Access type field
+  accessType: {
+    type: DataTypes.ENUM('individual', 'monthly', 'yearly'),
+    allowNull: false,
+    defaultValue: 'individual',
+    field: 'access_type',
+    validate: {
+      isIn: [['individual', 'monthly', 'yearly']]
+    }
+  },
+  // ✅ NEW: Expiry date field
+  expiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'expires_at',
+    comment: 'Expiry date for monthly/yearly access. NULL for individual courses'
   },
   credentialsSent: {
     type: DataTypes.BOOLEAN,
@@ -102,11 +119,42 @@ const CourseEnrollment = sequelize.define('CourseEnrollment', {
     completed: {
       where: { credentialsSent: true }
     },
+    // ✅ NEW: Scope for expired enrollments
+    expired: {
+      where: {
+        accessType: ['monthly', 'yearly'],
+        expiresAt: {
+          [sequelize.Op.lt]: new Date()
+        }
+      }
+    },
+    // ✅ NEW: Scope for active subscriptions
+    activeSubscriptions: {
+      where: {
+        accessType: ['monthly', 'yearly'],
+        expiresAt: {
+          [sequelize.Op.gt]: new Date()
+        }
+      }
+    },
+    // ✅ NEW: Scope for expiring soon (within 7 days)
+    expiringSoon: {
+      where: {
+        accessType: ['monthly', 'yearly'],
+        expiresAt: {
+          [sequelize.Op.between]: [
+            new Date(),
+            new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+          ]
+        }
+      }
+    },
     withDetails: {
       include: [
         {
           model: sequelize.models.Course,
           as: 'course',
+          required: false,  // ✅ Changed to false for monthly/yearly (no course)
           include: [{
             model: sequelize.models.Department,
             as: 'department'
@@ -150,11 +198,40 @@ CourseEnrollment.prototype.getStudentDetails = function() {
   };
 };
 
+// ✅ NEW: Check if enrollment is expired
+CourseEnrollment.prototype.isExpired = function() {
+  if (!this.expiresAt) return false; // Individual courses never expire
+  return new Date() > new Date(this.expiresAt);
+};
+
+// ✅ NEW: Get days until expiry
+CourseEnrollment.prototype.getDaysUntilExpiry = function() {
+  if (!this.expiresAt) return null; // Individual courses never expire
+  const now = new Date();
+  const expiry = new Date(this.expiresAt);
+  const diffTime = expiry - now;
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+};
+
+// ✅ NEW: Get access description
+CourseEnrollment.prototype.getAccessDescription = function() {
+  const descriptions = {
+    individual: 'Individual Course',
+    monthly: 'Monthly All-Access',
+    yearly: 'Yearly All-Access'
+  };
+  return descriptions[this.accessType] || this.accessType;
+};
+
 CourseEnrollment.prototype.toJSON = function() {
   const values = Object.assign({}, this.get());
   
   // Add computed fields
   values.studentDetails = this.getStudentDetails();
+  values.isExpired = this.isExpired();
+  values.daysUntilExpiry = this.getDaysUntilExpiry();
+  values.accessDescription = this.getAccessDescription();
   
   return values;
 };

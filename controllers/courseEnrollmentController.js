@@ -15,6 +15,8 @@ const courseEnrollmentService = new CourseEnrollmentService();
 /**
  * Get course enrollments for admin dashboard
  * GET /api/admin/course-enrollments
+ * 
+ * ✅ UPDATED: Now supports filtering by accessType and expiry status
  */
 exports.getEnrollments = async (req, res) => {
   try {
@@ -25,7 +27,9 @@ exports.getEnrollments = async (req, res) => {
       search,
       courseId,
       departmentId,
-      credentialsSent
+      credentialsSent,
+      accessType,  // ✅ NEW: Filter by access type
+      expiryStatus  // ✅ NEW: Filter by expiry (active, expired, expiring_soon)
     } = req.query;
 
     console.log('[Course Enrollment Controller] Getting enrollments for admin dashboard');
@@ -42,6 +46,16 @@ exports.getEnrollments = async (req, res) => {
     if (credentialsSent !== undefined) {
       filters.credentialsSent = credentialsSent === 'true';
     }
+    
+    // ✅ NEW: Access type filter
+    if (accessType && ['individual', 'monthly', 'yearly'].includes(accessType)) {
+      filters.accessType = accessType;
+    }
+    
+    // ✅ NEW: Expiry status filter
+    if (expiryStatus && ['active', 'expired', 'expiring_soon'].includes(expiryStatus)) {
+      filters.expiryStatus = expiryStatus;
+    }
 
     const result = await courseEnrollmentService.getEnrollmentsForAdmin(filters);
 
@@ -50,17 +64,19 @@ exports.getEnrollments = async (req, res) => {
       enrollments: result.enrollments,
       summary: result.summary,
       pagination: {
-        total: result.total,
+        total: result.pagination.total,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        pages: Math.ceil(result.total / parseInt(limit))
+        pages: result.pagination.pages
       },
       filters: {
         status,
         search,
         courseId,
         departmentId,
-        credentialsSent
+        credentialsSent,
+        accessType,  // ✅ NEW
+        expiryStatus  // ✅ NEW
       }
     });
   } catch (error) {
@@ -215,6 +231,8 @@ exports.batchMarkCredentialsSent = async (req, res) => {
 /**
  * Get enrollment statistics for admin dashboard
  * GET /api/admin/course-enrollments/stats
+ * 
+ * ✅ UPDATED: Now includes access type breakdown and expiry stats
  */
 exports.getEnrollmentStats = async (req, res) => {
   try {
@@ -242,6 +260,36 @@ exports.getEnrollmentStats = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to fetch enrollment statistics'
+    });
+  }
+};
+
+/**
+ * ✅ NEW: Get enrollments expiring soon (within 7 days)
+ * GET /api/admin/course-enrollments/expiring-soon
+ */
+exports.getExpiringSoon = async (req, res) => {
+  try {
+    const { days = 7, limit = 50 } = req.query;
+
+    console.log(`[Course Enrollment Controller] Getting enrollments expiring within ${days} days`);
+
+    const result = await courseEnrollmentService.getExpiringSoon({
+      days: parseInt(days),
+      limit: parseInt(limit)
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: result.count,
+      enrollments: result.enrollments,
+      daysThreshold: parseInt(days)
+    });
+  } catch (error) {
+    console.error('[Course Enrollment Controller] Get expiring soon error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch expiring enrollments'
     });
   }
 };

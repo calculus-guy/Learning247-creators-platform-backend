@@ -58,23 +58,25 @@ const Course = sequelize.define('Course', {
   },
   priceUsd: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 35.00,
+    allowNull: true,  // ✅ Changed to nullable
+    defaultValue: null,  // ✅ No default value
     field: 'price_usd',
     validate: {
       min: 0,
       isDecimal: true
-    }
+    },
+    comment: 'Deprecated: Pricing now handled by CoursePricingService'
   },
   priceNgn: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: false,
-    defaultValue: 50000.00,
+    allowNull: true,  // ✅ Changed to nullable
+    defaultValue: null,  // ✅ No default value
     field: 'price_ngn',
     validate: {
       min: 0,
       isDecimal: true
-    }
+    },
+    comment: 'Deprecated: Pricing now handled by CoursePricingService'
   },
   isActive: {
     type: DataTypes.BOOLEAN,
@@ -85,20 +87,7 @@ const Course = sequelize.define('Course', {
   tableName: 'courses',
   timestamps: true,
   underscored: true,
-  hooks: {
-    beforeCreate: (course) => {
-      // Ensure fixed pricing
-      course.priceUsd = 35.00;
-      course.priceNgn = 50000.00;
-    },
-    beforeUpdate: (course) => {
-      // Prevent price changes
-      if (course.changed('priceUsd') || course.changed('priceNgn')) {
-        course.priceUsd = 35.00;
-        course.priceNgn = 50000.00;
-      }
-    }
-  },
+  // ✅ REMOVED: Price enforcement hooks (pricing now in service layer)
   scopes: {
     active: {
       where: { isActive: true }
@@ -113,7 +102,9 @@ const Course = sequelize.define('Course', {
 });
 
 // Instance methods
+// ✅ DEPRECATED: getPrice() - Use CoursePricingService instead
 Course.prototype.getPrice = function(currency = 'NGN') {
+  console.warn('⚠️ Course.getPrice() is deprecated. Use CoursePricingService instead.');
   return currency.toUpperCase() === 'USD' ? this.priceUsd : this.priceNgn;
 };
 
@@ -127,7 +118,7 @@ Course.prototype.getEnrollmentCount = async function() {
 Course.prototype.toJSON = function() {
   const values = Object.assign({}, this.get());
   
-  // Convert prices to numbers for JSON response
+  // Convert prices to numbers for JSON response (if they exist)
   if (values.priceUsd) values.priceUsd = parseFloat(values.priceUsd);
   if (values.priceNgn) values.priceNgn = parseFloat(values.priceNgn);
   

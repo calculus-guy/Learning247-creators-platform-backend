@@ -34,7 +34,7 @@ router.get('/my-enrollments', authMiddleware, courseController.getMyEnrollments)
 // Get course details (must be after specific routes)
 router.get('/:id', courseController.getCourseById);
 
-// Purchase course (requires student details)
-router.post('/:id/purchase', authMiddleware, courseController.purchaseCourse);
+// ✅ UPDATED: Purchase course or access pass (no :id param, accessType in body)
+router.post('/purchase', authMiddleware, courseController.purchaseCourse);
 
 module.exports = router;

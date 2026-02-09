@@ -191,8 +191,17 @@ module.exports = router;
  */
 const courseEnrollmentController = require('../controllers/courseEnrollmentController');
 
-// Get course enrollments for admin dashboard
+// Get course enrollments for admin dashboard (✅ UPDATED: supports accessType and expiryStatus filters)
 router.get('/course-enrollments', courseEnrollmentController.getEnrollments);
+
+// ✅ NEW: Get enrollments expiring soon (must be before /:id route)
+router.get('/course-enrollments/expiring-soon', courseEnrollmentController.getExpiringSoon);
+
+// Get enrollment statistics (✅ UPDATED: includes access type and expiry breakdown)
+router.get('/course-enrollments/stats', courseEnrollmentController.getEnrollmentStats);
+
+// Export enrollments
+router.get('/course-enrollments/export', courseEnrollmentController.exportEnrollments);
 
 // Get specific enrollment details
 router.get('/course-enrollments/:id', courseEnrollmentController.getEnrollmentById);
@@ -202,9 +211,3 @@ router.patch('/course-enrollments/:id/mark-sent', courseEnrollmentController.mar
 
 // Batch update credentials sent status
 router.patch('/course-enrollments/batch-mark-sent', courseEnrollmentController.batchMarkCredentialsSent);
-
-// Get enrollment statistics
-router.get('/course-enrollments/stats', courseEnrollmentController.getEnrollmentStats);
-
-// Export enrollments
-router.get('/course-enrollments/export', courseEnrollmentController.exportEnrollments);
