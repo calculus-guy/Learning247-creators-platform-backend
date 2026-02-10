@@ -39,7 +39,7 @@ async function initializePaystackPayment({ userId, contentType, contentId, amoun
         contentId: contentId || null,  // Keep null in metadata for webhook
         custom_fields: customFields
       },
-      callback_url: `${process.env.CLIENT_URL}/payment/verify`
+      callback_url: `${process.env.CLIENT_URL}/dashboard?payment=success`
     });
 
     return {
