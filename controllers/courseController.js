@@ -271,7 +271,7 @@ exports.purchaseCourse = async (req, res) => {
         requiredGateway: result.requiredGateway,
         cached: result.cached || false,
         // Handle different payment URL field names from different gateways
-        paymentUrl: result.data?.authorizationUrl || result.data?.authorization_url || result.data?.paymentUrl || result.data?.url,
+        paymentUrl: result.data?.authorizationUrl || result.data?.authorization_url || result.data?.checkoutUrl || result.data?.paymentUrl || result.data?.url,
         reference: result.data?.reference || result.data?.sessionId
       }
     };
