@@ -288,6 +288,29 @@ class PaymentRoutingService {
    */
   async processPaystackPayment({ userId, contentType, contentId, amount, currency, email, contentTitle }) {
     try {
+      // Build custom fields, excluding null contentId
+      const customFields = [
+        {
+          display_name: 'Content Type',
+          variable_name: 'content_type',
+          value: contentType
+        },
+        {
+          display_name: 'Content Title',
+          variable_name: 'content_title',
+          value: contentTitle
+        }
+      ];
+      
+      // Only add Content ID field if not null
+      if (contentId) {
+        customFields.push({
+          display_name: 'Content ID',
+          variable_name: 'content_id',
+          value: contentId.toString()
+        });
+      }
+      
       const response = await paystackClient.post('/transaction/initialize', {
         email,
         amount: Math.round(amount * 100), // Convert to kobo
@@ -295,24 +318,8 @@ class PaymentRoutingService {
         metadata: {
           userId: userId.toString(),
           contentType,
-          contentId: contentId.toString(),
-          custom_fields: [
-            {
-              display_name: 'Content Type',
-              variable_name: 'content_type',
-              value: contentType
-            },
-            {
-              display_name: 'Content ID',
-              variable_name: 'content_id',
-              value: contentId.toString()
-            },
-            {
-              display_name: 'Content Title',
-              variable_name: 'content_title',
-              value: contentTitle
-            }
-          ]
+          contentId: contentId ? contentId.toString() : null,  // Handle null
+          custom_fields: customFields
         },
         callback_url: `${process.env.CLIENT_URL}/payment/verify`
       });
@@ -358,7 +365,7 @@ class PaymentRoutingService {
         metadata: {
           userId: userId.toString(),
           contentType,
-          contentId: contentId.toString(),
+          contentId: contentId ? contentId.toString() : 'null',  // Handle null, Stripe doesn't accept null
           email,
           contentTitle
         }
