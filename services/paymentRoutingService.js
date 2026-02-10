@@ -321,7 +321,7 @@ class PaymentRoutingService {
           contentId: contentId ? contentId.toString() : null,  // Handle null
           custom_fields: customFields
         },
-        callback_url: `${process.env.CLIENT_URL}/courses/my-enrollments?payment=success`
+        callback_url: `${process.env.CLIENT_URL}/payments/verify`
       });
 
       return {
@@ -359,8 +359,8 @@ class PaymentRoutingService {
           }
         ],
         mode: 'payment',
-        success_url: `${process.env.CLIENT_URL}/courses/my-enrollments?payment=success`,
-        cancel_url: `${process.env.CLIENT_URL}/courses/my-enrollments?payment=cancelled`,
+        success_url: `${process.env.CLIENT_URL}/payments/verify?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_URL}/payments/verify?cancelled=true`,
         client_reference_id: userId.toString(),
         metadata: {
           userId: userId.toString(),
