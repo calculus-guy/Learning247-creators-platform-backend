@@ -27,7 +27,7 @@ dist-ssr
 
 autoware.pem
 
-# *.md
+*.md
 *.txt
 
 seed-admin.js

@@ -537,6 +537,19 @@ class PaymentRoutingService {
           attributes: ['id', 'title', 'price', 'currency', 'userId']
         });
       } else if (contentType === 'course') {
+        // ✅ For monthly/yearly access, contentId is null (all courses)
+        if (!contentId) {
+          // Monthly or yearly all-access pass
+          return {
+            id: null,
+            title: 'All-Access Pass',
+            price: null,  // Will be set from metadata.finalPrice
+            currency: null,  // Will be set from forceCurrency
+            userId: null
+          };
+        }
+        
+        // For individual course purchases
         const Course = require('../models/Course');
         const course = await Course.findByPk(contentId, {
           attributes: ['id', 'name']  // ✅ REMOVED: priceUsd, priceNgn (now in .env)
