@@ -417,7 +417,7 @@ exports.handleStripeWebhook = async (req, res) => {
       // Extract metadata
       const userId = parseInt(session.metadata.userId);
       const contentType = session.metadata.contentType;
-      const contentId = session.metadata.contentId;
+      const contentId = session.metadata.contentId === 'null' ? null : session.metadata.contentId;  // Handle string 'null'
       const email = session.metadata.email;
 
       // Check if already processed

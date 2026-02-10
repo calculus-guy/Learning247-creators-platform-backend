@@ -11,6 +11,24 @@ const sequelize = require('../config/db');
  */
 async function initializePaystackPayment({ userId, contentType, contentId, amount, currency, email }) {
   try {
+    // Build custom fields array, excluding null contentId
+    const customFields = [
+      {
+        display_name: 'Content Type',
+        variable_name: 'content_type',
+        value: contentType
+      }
+    ];
+    
+    // Only add Content ID field if contentId is not null
+    if (contentId) {
+      customFields.push({
+        display_name: 'Content ID',
+        variable_name: 'content_id',
+        value: contentId
+      });
+    }
+    
     const response = await paystackClient.post('/transaction/initialize', {
       email,
       amount: Math.round(amount * 100), // Paystack expects amount in kobo (smallest currency unit)
@@ -18,19 +36,8 @@ async function initializePaystackPayment({ userId, contentType, contentId, amoun
       metadata: {
         userId,
         contentType,
-        contentId,
-        custom_fields: [
-          {
-            display_name: 'Content Type',
-            variable_name: 'content_type',
-            value: contentType
-          },
-          {
-            display_name: 'Content ID',
-            variable_name: 'content_id',
-            value: contentId
-          }
-        ]
+        contentId: contentId || null,  // Keep null in metadata for webhook
+        custom_fields: customFields
       },
       callback_url: `${process.env.CLIENT_URL}/payment/verify`
     });
@@ -84,7 +91,7 @@ async function initializeStripePayment({ userId, contentType, contentId, amount,
       metadata: {
         userId: userId.toString(),
         contentType,
-        contentId,
+        contentId: contentId || 'null',  // Stripe metadata doesn't accept null, use string
         email
       }
     });
