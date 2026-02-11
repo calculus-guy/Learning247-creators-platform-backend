@@ -12,7 +12,7 @@ exports.recordView = async ({ videoId, userId, ipAddress }) => {
           { userId: userId || null },
           { ipAddress: ipAddress || null },
         ],
-        created_at: { [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // within 24 hours, so each view only counts once per day
+        createdAt: { [Op.gte]: new Date(Date.now() - 24 * 60 * 60 * 1000) }, // within 24 hours, so each view only counts once per day
       },
     });
 
