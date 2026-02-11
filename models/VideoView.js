@@ -12,7 +12,7 @@ const VideoView = sequelize.define('VideoView', {
     allowNull: false,
   },
   userId: {
-    type: DataTypes.UUID,
+    type: DataTypes.INTEGER,
     allowNull: true, // null for guests
   },
   ipAddress: {
