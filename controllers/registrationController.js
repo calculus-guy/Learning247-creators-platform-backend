@@ -2,7 +2,7 @@ const { validationResult } = require('express-validator');
 const Registration = require('../models/registrationModel');
 const { 
   sendEventRegistrationEmail, 
-  sendAahbibiWelcomeEmail 
+  sendhallosWelcomeEmail 
 } = require('../utils/email');
 
 exports.register = async (req, res) => {
@@ -38,7 +38,7 @@ exports.register = async (req, res) => {
     });
 
     await sendEventRegistrationEmail(email, firstname);
-    await sendAahbibiWelcomeEmail(email, firstname);
+    await sendhallosWelcomeEmail(email, firstname);
 
     res.status(201).json({
       message: 'Registration successful. Emails sent.',
