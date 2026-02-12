@@ -106,7 +106,10 @@ exports.sendhallosWelcomeEmail = async (to, firstname) => {
 /**
  * PURCHASE CONFIRMATION EMAIL (to student)
  */
-exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amount) => {
+exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amount, currency = 'NGN') => {
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+  const formattedAmount = currency === 'USD' ? amount.toFixed(2) : amount.toLocaleString();
+
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
       <h2>Purchase Confirmed! 🎉</h2>
@@ -121,7 +124,7 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
         ${contentTitle}
       </p>
 
-      <p><strong>Amount Paid:</strong> ₦${amount.toFixed(2)}</p>
+      <p><strong>Amount Paid:</strong> ${currencySymbol}${formattedAmount}</p>
 
       <p>
         You can access your purchased content anytime from your dashboard at 
@@ -150,7 +153,10 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
 /**
  * SALE NOTIFICATION EMAIL (to creator)
  */
-exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studentName, amount) => {
+exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studentName, amount, currency = 'NGN') => {
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+  const formattedAmount = currency === 'USD' ? amount.toFixed(2) : amount.toLocaleString();
+
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
       <h2>You Made a Sale! 💰</h2>
@@ -165,7 +171,7 @@ exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studen
         ${contentTitle}
       </p>
 
-      <p><strong>Amount:</strong> ₦${amount.toFixed(2)}</p>
+      <p><strong>Amount:</strong> ${currencySymbol}${formattedAmount}</p>
 
       <p>
         This amount has been added to your wallet. You can view your earnings and withdraw funds 
