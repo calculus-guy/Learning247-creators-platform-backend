@@ -12,6 +12,9 @@ LiveClass.hasMany(LiveAttendee, { foreignKey: 'liveClassId', as: 'attendees' });
 LiveAttendee.belongsTo(LiveClass, { foreignKey: 'liveClassId' });
 LiveAttendee.belongsTo(User, { foreignKey: 'userId' });
 
+// ✅ Add creator association
+LiveClass.belongsTo(User, { foreignKey: 'userId', as: 'creator' });
+
 module.exports = {
   LiveClass,
   LiveHost,

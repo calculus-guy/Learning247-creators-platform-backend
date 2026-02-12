@@ -175,33 +175,143 @@ exports.addAttendee = async (req, res) => {
 exports.getLiveClassById = async (req, res) => {
   try {
     const { id } = req.params;
-    const live = await LiveClass.findByPk(id);
-    if (!live) return res.status(404).json({ message: 'Live class not found.' });
     
-    // Access control check (handled by middleware)
-    if (!req.hasAccess) {
-      return res.status(402).json({
+    // Get live class with creator info
+    const User = require('../models/User');
+    const live = await LiveClass.findByPk(id, {
+      include: [{
+        model: User,
+        as: 'creator',
+        attributes: ['id', 'firstname', 'lastname', 'email']
+      }]
+    });
+    
+    if (!live) {
+      return res.status(404).json({ 
         success: false,
-        message: 'Payment required to access this live class',
-        requiresPayment: true,
-        price: live.price
+        message: 'Live class not found.' 
       });
     }
 
-    // ✅ Add streaming provider info for frontend
-    const response = {
-      ...live.dataValues,
-      accessGranted: true,
-      accessReason: req.accessReason,
-      purchaseDate: req.purchaseDate || null,
-      // ✅ Helper flags for frontend
-      isZegoCloud: live.streaming_provider === 'zegocloud',
-      isMux: live.streaming_provider === 'mux'
+    // Extract user from token (optional authentication)
+    const extractUserFromToken = (req) => {
+      try {
+        const jwt = require('jsonwebtoken');
+        let token = req.header('Authorization')?.replace('Bearer ', '');
+        if (!token && req.cookies && req.cookies.token) {
+          token = req.cookies.token;
+        }
+        if (!token) return null;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
+        return decoded;
+      } catch (error) {
+        return null;
+      }
     };
 
-    return res.json(response);
+    const user = req.user || extractUserFromToken(req);
+    const userId = user ? user.id : null;
+
+    // Check access (free content, creator, or purchased)
+    let hasAccess = false;
+    let accessReason = null;
+    let purchaseDate = null;
+
+    const price = parseFloat(live.price);
+    
+    // Check if free
+    if (price === 0) {
+      hasAccess = true;
+      accessReason = 'free_content';
+    }
+    
+    // Check if creator
+    if (userId && live.userId && live.userId === userId) {
+      hasAccess = true;
+      accessReason = 'creator';
+    }
+    
+    // Check if purchased
+    if (userId && !hasAccess) {
+      const Purchase = require('../models/Purchase');
+      const purchase = await Purchase.findOne({
+        where: {
+          userId,
+          contentType: 'live_class',
+          contentId: id,
+          paymentStatus: 'completed'
+        }
+      });
+      
+      if (purchase) {
+        hasAccess = true;
+        accessReason = 'purchased';
+        purchaseDate = purchase.createdAt;
+      }
+    }
+
+    // Build public response (always returned)
+    const publicInfo = {
+      id: live.id,
+      title: live.title,
+      description: live.description,
+      price: live.price,
+      currency: live.currency || 'NGN',
+      category: live.category,
+      thumbnailUrl: live.thumbnailUrl,
+      startTime: live.startTime,
+      endTime: live.endTime,
+      status: live.status,
+      privacy: live.privacy,
+      streaming_provider: live.streaming_provider,
+      max_participants: live.max_participants,
+      createdAt: live.createdAt,
+      updatedAt: live.updatedAt,
+      // Instructor info
+      instructor: live.creator ? {
+        id: live.creator.id,
+        name: `${live.creator.firstname} ${live.creator.lastname}`.trim(),
+        firstname: live.creator.firstname,
+        lastname: live.creator.lastname
+      } : null,
+      // Access flags
+      hasAccess,
+      requiresPayment: !hasAccess && price > 0,
+      accessReason
+    };
+
+    // If user has access, add private streaming info
+    if (hasAccess) {
+      publicInfo.accessGranted = true;
+      publicInfo.purchaseDate = purchaseDate;
+      publicInfo.userId = live.userId;
+      
+      // Add streaming details only if user has access
+      if (live.streaming_provider === 'zegocloud') {
+        publicInfo.zego_room_id = live.zego_room_id;
+        publicInfo.zego_app_id = live.zego_app_id;
+        publicInfo.isZegoCloud = true;
+        publicInfo.isMux = false;
+      } else if (live.streaming_provider === 'mux') {
+        publicInfo.mux_stream_id = live.mux_stream_id;
+        publicInfo.mux_playback_id = live.mux_playback_id;
+        publicInfo.mux_rtmp_url = live.mux_rtmp_url;
+        publicInfo.recording_asset_id = live.recording_asset_id;
+        publicInfo.isZegoCloud = false;
+        publicInfo.isMux = true;
+      }
+    }
+
+    return res.json({
+      success: true,
+      ...publicInfo
+    });
   } catch (error) {
-    return handleError(res, error);
+    console.error('[Live Controller] Get live class error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to fetch live class details'
+    });
   }
 };
 
