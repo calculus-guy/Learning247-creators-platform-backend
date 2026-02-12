@@ -150,11 +150,17 @@ async function getMultiCurrencyBalances(userId) {
 
     const balances = {};
     for (const account of walletAccounts) {
+      // Convert from kobo/cents to naira/dollars
+      const availableBalance = parseInt(account.balance_available) || 0;
+      const pendingBalance = parseInt(account.balance_pending) || 0;
+      const totalEarnings = availableBalance + pendingBalance;
+      
+      // Divide by 100 to convert kobo → naira or cents → dollars
       balances[account.currency] = {
-        totalEarnings: account.balance_available + account.balance_pending,
-        withdrawnAmount: 0, // Would need calculation from transaction history
-        pendingAmount: account.balance_pending,
-        availableBalance: account.balance_available,
+        totalEarnings: (totalEarnings / 100).toFixed(2),
+        withdrawnAmount: "0.00", // Would need calculation from transaction history
+        pendingAmount: (pendingBalance / 100).toFixed(2),
+        availableBalance: (availableBalance / 100).toFixed(2),
         currency: account.currency
       };
     }
@@ -189,11 +195,16 @@ async function getAvailableBalance(userId, currency = 'NGN') {
       });
 
       if (walletAccount) {
+        // Convert from kobo/cents to naira/dollars
+        const availableBalance = parseInt(walletAccount.balance_available) || 0;
+        const pendingBalance = parseInt(walletAccount.balance_pending) || 0;
+        const totalEarnings = availableBalance + pendingBalance;
+        
         return {
-          totalEarnings: walletAccount.balance_available + walletAccount.balance_pending,
-          withdrawnAmount: 0, // Would need to be calculated from transaction history
-          pendingAmount: walletAccount.balance_pending,
-          availableBalance: walletAccount.balance_available,
+          totalEarnings: (totalEarnings / 100).toFixed(2),
+          withdrawnAmount: "0.00", // Would need to be calculated from transaction history
+          pendingAmount: (pendingBalance / 100).toFixed(2),
+          availableBalance: (availableBalance / 100).toFixed(2),
           currency: walletAccount.currency
         };
       }
@@ -207,10 +218,10 @@ async function getAvailableBalance(userId, currency = 'NGN') {
                             parseFloat(wallet.pendingAmount);
 
     return {
-      totalEarnings: parseFloat(wallet.totalEarnings),
-      withdrawnAmount: parseFloat(wallet.withdrawnAmount),
-      pendingAmount: parseFloat(wallet.pendingAmount),
-      availableBalance: availableBalance,
+      totalEarnings: parseFloat(wallet.totalEarnings).toFixed(2),
+      withdrawnAmount: parseFloat(wallet.withdrawnAmount).toFixed(2),
+      pendingAmount: parseFloat(wallet.pendingAmount).toFixed(2),
+      availableBalance: availableBalance.toFixed(2),
       currency: wallet.currency
     };
   } catch (error) {
