@@ -32,6 +32,27 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,
   },
+}, {
+  hooks: {
+    afterCreate: async (user, options) => {
+      try {
+        console.log(`[User Hook] Creating wallets for new user ${user.id} (${user.email})`);
+        
+        // Import wallet service
+        const { getOrCreateWallet } = require('../services/walletService');
+        
+        // Create NGN and USD wallets for the new user
+        await getOrCreateWallet(user.id, 'NGN');
+        await getOrCreateWallet(user.id, 'USD');
+        
+        console.log(`[User Hook] ✅ Wallets created successfully for user ${user.id}`);
+      } catch (error) {
+        console.error(`[User Hook] ❌ Failed to create wallets for user ${user.id}:`, error.message);
+        // Don't throw error - user creation should succeed even if wallet creation fails
+        // Wallets can be created later via the initialize endpoint
+      }
+    }
+  }
 });
 
 module.exports = User;

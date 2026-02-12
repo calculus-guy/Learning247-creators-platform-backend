@@ -487,27 +487,66 @@ class PaymentRoutingService {
       }, { transaction });
 
       // Get content creator and credit their multi-currency wallet (skip for courses)
-      if (contentType !== 'course') {
+      if (contentType !== 'special_course') {
         const creatorId = await this.getContentCreatorId(contentType, contentId);
         
         if (creatorId) {
-          // Credit creator's wallet in the appropriate currency
-          await this.walletService.creditWallet({
-            userId: creatorId,
-            currency,
-            amount,
-            reference,
-            description: `Earnings from ${contentType} purchase`,
-            metadata: {
-              purchaseId: purchase.id,
-              buyerUserId: userId,
-              contentType,
-              contentId,
-              gateway
-            }
-          });
+          try {
+            // Credit creator's wallet in the appropriate currency
+            await this.walletService.creditWallet({
+              userId: creatorId,
+              currency,
+              amount,
+              reference,
+              description: `Earnings from ${contentType} purchase`,
+              metadata: {
+                purchaseId: purchase.id,
+                buyerUserId: userId,
+                contentType,
+                contentId,
+                gateway
+              }
+            });
 
-          console.log(`[Payment Routing] Credited ${amount} ${currency} to creator ${creatorId}'s wallet`);
+            console.log(`[Payment Routing] Credited ${amount} ${currency} to creator ${creatorId}'s wallet`);
+          } catch (walletError) {
+            console.error(`[Payment Routing] Failed to credit wallet for creator ${creatorId}:`, walletError.message);
+            
+            // If wallet doesn't exist, try to create it and retry
+            if (walletError.message && walletError.message.includes('Wallet not found')) {
+              console.log(`[Payment Routing] Attempting to create wallet for creator ${creatorId}...`);
+              
+              try {
+                const { getOrCreateWallet } = require('./walletService');
+                await getOrCreateWallet(creatorId, currency);
+                
+                // Retry crediting wallet
+                await this.walletService.creditWallet({
+                  userId: creatorId,
+                  currency,
+                  amount,
+                  reference,
+                  description: `Earnings from ${contentType} purchase`,
+                  metadata: {
+                    purchaseId: purchase.id,
+                    buyerUserId: userId,
+                    contentType,
+                    contentId,
+                    gateway
+                  }
+                });
+                
+                console.log(`[Payment Routing] ✅ Wallet created and credited ${amount} ${currency} to creator ${creatorId}`);
+              } catch (retryError) {
+                console.error(`[Payment Routing] ❌ Failed to create wallet and credit creator ${creatorId}:`, retryError.message);
+                // Don't throw - purchase should succeed even if wallet credit fails
+                // Creator can be manually credited later
+              }
+            } else {
+              // Other wallet errors - log but don't fail the purchase
+              console.error(`[Payment Routing] ❌ Wallet credit error (non-critical):`, walletError);
+            }
+          }
         }
       } else {
         console.log(`[Payment Routing] Course purchase - no individual creator to credit`);
