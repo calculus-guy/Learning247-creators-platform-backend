@@ -86,7 +86,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes); 
-  
+   
   
 const PORT = process.env.PORT || 8080; 
      
