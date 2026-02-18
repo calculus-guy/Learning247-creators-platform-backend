@@ -373,15 +373,30 @@ exports.handleStripeWebhook = async (req, res) => {
   try {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const signature = req.headers['stripe-signature'];
-    const payload = req.body;
     
-    // Enhanced security validation
+    // req.body is a Buffer from express.raw(), convert to string for Stripe
+    const payload = req.body.toString('utf8');
+    
+    // Parse event using Stripe's method first for signature validation
+    let event;
+    try {
+      event = stripeClient.webhooks.constructEvent(
+        payload,
+        signature,
+        STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error('[Stripe Webhook] Signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    // Enhanced security validation (after Stripe verification)
     const validationResult = await webhookSecurityService.validateWebhook({
       provider: 'stripe',
       payload,
       signature,
       secret: STRIPE_WEBHOOK_SECRET,
-      eventId: req.body.id || `stripe_${Date.now()}`,
+      eventId: event.id || `stripe_${Date.now()}`,
       clientIP
     });
 
@@ -393,19 +408,6 @@ exports.handleStripeWebhook = async (req, res) => {
     if (validationResult.duplicate) {
       console.log('[Stripe Webhook] Duplicate event, returning success');
       return res.status(200).json({ received: true });
-    }
-
-    // Parse event using Stripe's method for additional validation
-    let event;
-    try {
-      event = stripeClient.webhooks.constructEvent(
-        payload,
-        signature,
-        STRIPE_WEBHOOK_SECRET
-      );
-    } catch (err) {
-      console.error('[Stripe Webhook] Event construction failed:', err.message);
-      return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
     console.log('[Stripe Webhook] Processing event type:', event.type);
