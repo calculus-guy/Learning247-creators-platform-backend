@@ -198,17 +198,24 @@ exports.initiateWithdrawal = async (req, res) => {
       ? { bankCode, accountNumber, accountName }
       : { bankName, accountNumber, accountName };
 
-    // Initiate withdrawal with currency
-    const payout = await initiateWithdrawal({
-      userId,
-      amount,
-      currency,
-      bankDetails,
-      gateway
-    });
+    // Track whether funds were locked
+    let fundsLocked = false;
+    let payout = null;
 
-    // Process payout based on gateway
     try {
+      // Initiate withdrawal with currency (this locks the funds)
+      payout = await initiateWithdrawal({
+        userId,
+        amount,
+        currency,
+        bankDetails,
+        gateway
+      });
+
+      // If we reach here, funds are locked
+      fundsLocked = true;
+
+      // Process payout based on gateway
       let result;
       if (gateway === 'paystack') {
         result = await processPaystackPayout(payout.id);
@@ -224,8 +231,16 @@ exports.initiateWithdrawal = async (req, res) => {
         currency
       });
     } catch (processingError) {
-      // If processing fails, release the locked amount
-      await releaseLockedAmount(userId, amount, currency);
+      // Only release funds if they were actually locked
+      if (fundsLocked) {
+        try {
+          await releaseLockedAmount(userId, amount, currency);
+          console.log(`[Withdrawal] Released locked funds for user ${userId}: ${amount} ${currency}`);
+        } catch (releaseError) {
+          console.error('[Withdrawal] Failed to release locked funds:', releaseError);
+          // Log but don't throw - the main error is more important
+        }
+      }
       
       return res.status(500).json({
         success: false,
@@ -236,14 +251,6 @@ exports.initiateWithdrawal = async (req, res) => {
     }
   } catch (error) {
     console.error('Initiate withdrawal error:', error);
-    
-    // Try to release locked amount if it was locked
-    try {
-      const { currency = 'NGN' } = req.body;
-      await releaseLockedAmount(req.user.id, req.body.amount, currency);
-    } catch (releaseError) {
-      console.error('Failed to release locked amount:', releaseError);
-    }
 
     return res.status(500).json({
       success: false,
