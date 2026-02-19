@@ -46,13 +46,17 @@ function calculatePayoutFees(amount, gateway = 'paystack') {
  * @param {object} params - Withdrawal parameters
  * @returns {object} - Payout record
  */
-async function initiateWithdrawal({ userId, amount, bankDetails, gateway = 'paystack' }) {
+async function initiateWithdrawal({ userId, amount, currency = 'NGN', bankDetails, gateway = 'paystack' }) {
   try {
-    const { bankName, accountNumber, accountName } = bankDetails;
+    const { bankName, bankCode, accountNumber, accountName } = bankDetails;
 
-    // Validate bank details
-    if (!bankName || !accountNumber || !accountName) {
-      throw new Error('Bank details are incomplete');
+    // Validate bank details - accept either bankCode (for NGN) or bankName (for USD)
+    if (!accountNumber || !accountName) {
+      throw new Error('Account number and account name are required');
+    }
+
+    if (!bankCode && !bankName) {
+      throw new Error('Either bank code or bank name is required');
     }
 
     // Calculate fees
@@ -62,8 +66,24 @@ async function initiateWithdrawal({ userId, amount, bankDetails, gateway = 'pays
       throw new Error('Amount too small after fees');
     }
 
-    // Lock amount in wallet
-    await lockAmountForWithdrawal(userId, amount);
+    // Lock amount in wallet with currency
+    await lockAmountForWithdrawal(userId, amount, currency);
+
+    // Determine final bankName for storage
+    let finalBankName = bankName;
+    let finalBankCode = bankCode;
+    
+    // If we have bankCode but no bankName (NGN case), try to get bank name
+    if (bankCode && !bankName) {
+      try {
+        const banks = await getNigerianBanks();
+        const bank = banks.find(b => b.code === bankCode);
+        finalBankName = bank ? bank.name : `Bank Code: ${bankCode}`;
+      } catch (error) {
+        console.warn('Could not fetch bank name, using bank code:', error.message);
+        finalBankName = `Bank Code: ${bankCode}`;
+      }
+    }
 
     // Create payout record
     const payout = await Payout.create({
@@ -72,13 +92,16 @@ async function initiateWithdrawal({ userId, amount, bankDetails, gateway = 'pays
       platformFee: fees.platformFee,
       gatewayFee: fees.gatewayFee,
       netAmount: fees.netAmount,
-      currency: 'NGN',
+      currency: currency.toUpperCase(),
       paymentGateway: gateway,
-      bankName,
+      bankName: finalBankName,
       accountNumber,
       accountName,
       status: 'pending'
     });
+
+    // Store bankCode as a property for later use (not persisted to DB)
+    payout.bankCode = finalBankCode;
 
     return payout;
   } catch (error) {
@@ -104,12 +127,20 @@ async function processPaystackPayout(payoutId) {
       throw new Error('Payout already processed');
     }
 
+    // Get bankCode - either from the payout object (if just created) or derive from bankName
+    let bankCode = payout.bankCode;
+    
+    if (!bankCode) {
+      // Fallback: try to get bank code from bank name
+      bankCode = await getBankCode(payout.bankName);
+    }
+
     // Step 1: Create transfer recipient
     const recipientResponse = await paystackClient.post('/transferrecipient', {
       type: 'nuban',
       name: payout.accountName,
       account_number: payout.accountNumber,
-      bank_code: await getBankCode(payout.bankName), // Helper function to get bank code
+      bank_code: bankCode,
       currency: 'NGN'
     });
 
@@ -208,62 +239,105 @@ async function processStripePayout(payoutId) {
 }
 
 /**
- * Helper function to get Paystack bank code from bank name
- * In production, you should fetch this from Paystack's bank list API
+ * Cache for Nigerian banks list to avoid repeated API calls
  */
-async function getBankCode(bankName) {
-  // Common Nigerian banks - you should fetch this dynamically from Paystack API
-  const bankCodes = {
-    'Access Bank': '044',
-    'Citibank': '023',
-    'Diamond Bank': '063',
-    'Ecobank Nigeria': '050',
-    'Fidelity Bank': '070',
-    'First Bank of Nigeria': '011',
-    'First City Monument Bank': '214',
-    'Guaranty Trust Bank': '058',
-    'Heritage Bank': '030',
-    'Keystone Bank': '082',
-    'Polaris Bank': '076',
-    'Providus Bank': '101',
-    'Stanbic IBTC Bank': '221',
-    'Standard Chartered Bank': '068',
-    'Sterling Bank': '232',
-    'Union Bank of Nigeria': '032',
-    'United Bank for Africa': '033',
-    'Unity Bank': '215',
-    'Wema Bank': '035',
-    'Zenith Bank': '057'
-  };
-
-  const code = bankCodes[bankName];
-  
-  if (!code) {
-    // If bank not found, try to fetch from Paystack API
-    try {
-      const response = await paystackClient.get('/bank');
-      const banks = response.data.data;
-      const bank = banks.find(b => b.name.toLowerCase().includes(bankName.toLowerCase()));
-      return bank ? bank.code : '011'; // Default to First Bank if not found
-    } catch (error) {
-      console.error('Error fetching bank codes:', error);
-      return '011'; // Default to First Bank
-    }
-  }
-
-  return code;
-}
+let banksCache = null;
+let banksCacheTimestamp = null;
+const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 /**
- * Get list of Nigerian banks from Paystack
+ * Get list of Nigerian banks from Paystack (with caching)
  */
 async function getNigerianBanks() {
   try {
+    // Check if cache is valid
+    const now = Date.now();
+    if (banksCache && banksCacheTimestamp && (now - banksCacheTimestamp < CACHE_DURATION)) {
+      console.log('[Paystack] Using cached banks list');
+      return banksCache;
+    }
+
+    // Fetch fresh data from Paystack
+    console.log('[Paystack] Fetching banks list from API');
     const response = await paystackClient.get('/bank?currency=NGN');
-    return response.data.data;
+    banksCache = response.data.data;
+    banksCacheTimestamp = now;
+    
+    return banksCache;
   } catch (error) {
     console.error('Error fetching banks:', error);
+    
+    // If we have stale cache, return it as fallback
+    if (banksCache) {
+      console.warn('[Paystack] API failed, using stale cache');
+      return banksCache;
+    }
+    
     throw new Error('Failed to fetch bank list');
+  }
+}
+
+/**
+ * Helper function to get Paystack bank code from bank name
+ * Fetches dynamically from Paystack API with caching
+ */
+async function getBankCode(bankName) {
+  try {
+    // Fetch banks list (uses cache if available)
+    const banks = await getNigerianBanks();
+    
+    // Try exact match first
+    let bank = banks.find(b => b.name.toLowerCase() === bankName.toLowerCase());
+    
+    // If no exact match, try partial match
+    if (!bank) {
+      bank = banks.find(b => b.name.toLowerCase().includes(bankName.toLowerCase()));
+    }
+    
+    // If still no match, try reverse (bankName includes bank.name)
+    if (!bank) {
+      bank = banks.find(b => bankName.toLowerCase().includes(b.name.toLowerCase()));
+    }
+    
+    if (bank) {
+      console.log(`[Paystack] Found bank code ${bank.code} for "${bankName}"`);
+      return bank.code;
+    }
+    
+    // No match found
+    console.warn(`[Paystack] No bank found matching "${bankName}"`);
+    throw new Error(`Bank not found: ${bankName}`);
+    
+  } catch (error) {
+    console.error('[Paystack] Error getting bank code:', error.message);
+    
+    // Emergency fallback: hardcoded common banks (only if API completely fails)
+    const emergencyFallback = {
+      'access bank': '044',
+      'gtbank': '058',
+      'guaranty trust bank': '058',
+      'first bank': '011',
+      'first bank of nigeria': '011',
+      'zenith bank': '057',
+      'uba': '033',
+      'united bank for africa': '033',
+      'fidelity bank': '070',
+      'union bank': '032',
+      'sterling bank': '232',
+      'stanbic ibtc': '221',
+      'polaris bank': '076',
+      'wema bank': '035',
+      'ecobank': '050'
+    };
+    
+    const fallbackCode = emergencyFallback[bankName.toLowerCase()];
+    if (fallbackCode) {
+      console.warn(`[Paystack] Using emergency fallback code ${fallbackCode} for "${bankName}"`);
+      return fallbackCode;
+    }
+    
+    // If all else fails, throw error
+    throw new Error(`Could not resolve bank code for: ${bankName}`);
   }
 }
 
