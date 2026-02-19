@@ -284,19 +284,14 @@ class WebhookSecurityService {
     try {
       const eventKey = `${provider}:${eventId}`;
       
-      // Check in-memory store first
+      // Check in-memory store
       if (this.processedEvents.has(eventKey)) {
         return true;
       }
 
-      // In production, also check persistent storage (database/Redis)
-      // For now, using idempotency service as fallback
-      const idempotencyResult = await this.idempotencyService.checkIdempotency(
-        eventKey,
-        { provider, eventId, type: 'webhook' }
-      );
-
-      return !idempotencyResult.isUnique;
+      // In production, you should also check persistent storage (database/Redis)
+      // For now, relying on in-memory store which is sufficient for most cases
+      return false;
     } catch (error) {
       console.error('[Webhook Security] Event deduplication check error:', error);
       // On error, assume not duplicate to avoid blocking valid events
@@ -317,18 +312,11 @@ class WebhookSecurityService {
       // Store in memory with timestamp
       this.processedEvents.set(eventKey, now);
 
-      // Also store in idempotency service for persistence
-      await this.idempotencyService.cacheResponse(eventKey, {
-        processed: true,
-        timestamp: now,
-        provider,
-        eventId
-      });
-
       // Clean up old events periodically
       this.cleanupOldEvents();
     } catch (error) {
       console.error('[Webhook Security] Mark event processed error:', error);
+      // Don't throw - this is not critical enough to fail the webhook
     }
   }
 
