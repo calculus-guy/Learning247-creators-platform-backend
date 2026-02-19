@@ -135,7 +135,10 @@ async function processPaystackPayout(payoutId) {
       bankCode = await getBankCode(payout.bankName);
     }
 
+    console.log(`[Paystack Payout] Processing withdrawal for user ${payout.userId}: ${payout.netAmount} NGN`);
+
     // Step 1: Create transfer recipient
+    console.log(`[Paystack Payout] Creating transfer recipient for account ${payout.accountNumber}`);
     const recipientResponse = await paystackClient.post('/transferrecipient', {
       type: 'nuban',
       name: payout.accountName,
@@ -144,9 +147,15 @@ async function processPaystackPayout(payoutId) {
       currency: 'NGN'
     });
 
+    if (!recipientResponse.data.status) {
+      throw new Error(recipientResponse.data.message || 'Failed to create transfer recipient');
+    }
+
     const recipientCode = recipientResponse.data.data.recipient_code;
+    console.log(`[Paystack Payout] Recipient created: ${recipientCode}`);
 
     // Step 2: Initiate transfer
+    console.log(`[Paystack Payout] Initiating transfer of ${payout.netAmount} NGN`);
     const transferResponse = await paystackClient.post('/transfer', {
       source: 'balance',
       amount: Math.round(payout.netAmount * 100), // Convert to kobo
@@ -155,12 +164,30 @@ async function processPaystackPayout(payoutId) {
       reference: `payout_${payout.id}_${Date.now()}`
     });
 
+    console.log('[Paystack Payout] Transfer response:', JSON.stringify(transferResponse.data, null, 2));
+
+    if (!transferResponse.data.status) {
+      throw new Error(transferResponse.data.message || 'Transfer request failed');
+    }
+
     const transferData = transferResponse.data.data;
+
+    // Check transfer status
+    if (transferData.status === 'failed') {
+      throw new Error(`Transfer failed: ${transferData.message || 'Unknown reason'}`);
+    }
+
+    // Log important transfer details
+    console.log(`[Paystack Payout] Transfer status: ${transferData.status}`);
+    console.log(`[Paystack Payout] Transfer code: ${transferData.transfer_code}`);
+    console.log(`[Paystack Payout] Transfer reference: ${transferData.reference}`);
 
     // Update payout with transfer reference
     payout.transferReference = transferData.transfer_code || transferData.reference;
     payout.status = 'processing';
     await payout.save();
+
+    console.log(`[Paystack Payout] Payout ${payout.id} updated to processing status`);
 
     return {
       success: true,
@@ -168,7 +195,11 @@ async function processPaystackPayout(payoutId) {
       transferData
     };
   } catch (error) {
-    console.error('Paystack payout error:', error.response?.data || error.message);
+    console.error('[Paystack Payout] Error details:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status
+    });
     
     // Update payout status to failed
     const payout = await Payout.findByPk(payoutId);
@@ -176,9 +207,11 @@ async function processPaystackPayout(payoutId) {
       payout.status = 'failed';
       payout.failureReason = error.response?.data?.message || error.message;
       await payout.save();
+      
+      console.error(`[Paystack Payout] Payout ${payout.id} marked as failed: ${payout.failureReason}`);
     }
 
-    throw new Error(error.response?.data?.message || 'Failed to process Paystack payout');
+    throw new Error(error.response?.data?.message || error.message || 'Failed to process Paystack payout');
   }
 }
 
