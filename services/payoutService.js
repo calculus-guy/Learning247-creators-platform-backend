@@ -232,13 +232,11 @@ async function processStripePayout(payoutId) {
       throw new Error('Payout already processed');
     }
 
-    // Note: Stripe payouts typically require Stripe Connect setup
-    // This is a simplified version - you may need to adjust based on your Stripe setup
-    
+
     const transfer = await stripeClient.transfers.create({
-      amount: Math.round(payout.netAmount * 100), // Convert to cents
-      currency: 'usd', // Adjust based on your needs
-      destination: 'connected_account_id', // You'll need to set this up
+      amount: Math.round(payout.netAmount * 100), // I Converted to cents
+      currency: 'usd', 
+      destination: 'connected_account_id', 
       description: `Withdrawal for user ${payout.userId}`,
       metadata: {
         payoutId: payout.id,
