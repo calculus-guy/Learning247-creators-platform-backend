@@ -65,6 +65,10 @@ Purchase.prototype.isLiveClass = function() {
   return this.contentType === 'live_class';
 };
 
+Purchase.prototype.isLiveSeries = function() {
+  return this.contentType === 'live_series';
+};
+
 Purchase.prototype.getFormattedAmount = function() {
   return parseFloat(this.amount);
 };

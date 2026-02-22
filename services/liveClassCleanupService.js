@@ -95,6 +95,71 @@ class LiveClassCleanupService {
   }
 
   /**
+   * Auto-end sessions that have been "live" for too long
+   * Separate from one-time classes for safety
+   */
+  async autoEndStaleSessions() {
+    try {
+      const { LiveSession } = require('../models/liveSeriesIndex');
+      const cutoffTime = new Date(Date.now() - (this.config.staleThresholdHours * 60 * 60 * 1000));
+      
+      console.log(`🧹 [Cleanup] Checking for live sessions older than ${this.config.staleThresholdHours} hours...`);
+
+      // Find sessions that have been "live" for too long
+      const staleSessions = await LiveSession.findAll({
+        where: {
+          status: 'live',
+          updatedAt: { [Op.lt]: cutoffTime }
+        },
+        limit: this.config.batchSize,
+        attributes: ['id', 'sessionNumber', 'seriesId', 'updatedAt']
+      });
+
+      if (staleSessions.length === 0) {
+        console.log('✅ [Cleanup] No stale live sessions found');
+        return { endedCount: 0, errors: [] };
+      }
+
+      console.log(`🔄 [Cleanup] Found ${staleSessions.length} stale live sessions, ending them...`);
+
+      let endedCount = 0;
+      const errors = [];
+
+      // Auto-end each stale session
+      for (const session of staleSessions) {
+        try {
+          await session.update({ 
+            status: 'ended',
+            actualEndTime: new Date()
+          });
+
+          console.log(`✅ [Cleanup] Auto-ended session ${session.sessionNumber} in series ${session.seriesId}`);
+          endedCount++;
+        } catch (error) {
+          console.error(`❌ [Cleanup] Failed to end session ${session.id}:`, error.message);
+          errors.push({
+            sessionId: session.id,
+            seriesId: session.seriesId,
+            error: error.message
+          });
+        }
+      }
+
+      console.log(`🎉 [Cleanup] Auto-ended ${endedCount} stale live sessions`);
+      
+      return {
+        endedCount,
+        errors,
+        processedAt: new Date()
+      };
+
+    } catch (error) {
+      console.error('❌ [Cleanup] Auto-end stale sessions failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Archive old ended classes to improve performance
    * Options: Delete, move to archive table, or mark as archived
    */

@@ -14,6 +14,7 @@ const registrationRoutes = require('./routes/registrationRoutes');
 const videoRoutes = require('./routes/videoRoutes');
 const liveRoutes = require('./routes/liveRoutes');
 const zegoCloudRoutes = require('./routes/zegoCloudRoutes');
+const liveSeriesRoutes = require('./routes/liveSeries');
 const userRoutes = require('./routes/userRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const walletRoutes = require('./routes/walletRoutes');
@@ -25,6 +26,7 @@ const LiveClassCleanupService = require('./services/liveClassCleanupService');
 
 require('./models/walletIndex');
 require('./models/courseIndex');
+require('./models/liveSeriesIndex');
 
 const app = express();
 
@@ -77,6 +79,7 @@ app.use('/register', rateLimiter);
 app.use('/event', registrationRoutes);
 app.use('/live', liveRoutes);
 app.use('/api/live/zegocloud', zegoCloudRoutes);
+app.use('/api/live/series', liveSeriesRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
@@ -105,18 +108,25 @@ sequelize.sync({ force: false })
 function setupLiveClassCleanup() {
   const cleanupService = new LiveClassCleanupService();
   
-  // 🕐 Every hour: Auto-end stale live classes
+  // 🕐 Every hour: Auto-end stale live classes AND sessions
   cron.schedule('0 * * * *', async () => {
     try {
       console.log('🧹 [Cron] Running hourly live class cleanup...');
-      const result = await cleanupService.autoEndStaleLiveClasses();
       
-      if (result.endedCount > 0) {
-        console.log(`✅ [Cron] Auto-ended ${result.endedCount} stale live classes`);
+      // Clean up one-time classes
+      const classResult = await cleanupService.autoEndStaleLiveClasses();
+      if (classResult.endedCount > 0) {
+        console.log(`✅ [Cron] Auto-ended ${classResult.endedCount} stale live classes`);
       }
       
-      if (result.errors.length > 0) {
-        console.error(`⚠️ [Cron] ${result.errors.length} cleanup errors occurred`);
+      // Clean up series sessions
+      const sessionResult = await cleanupService.autoEndStaleSessions();
+      if (sessionResult.endedCount > 0) {
+        console.log(`✅ [Cron] Auto-ended ${sessionResult.endedCount} stale live sessions`);
+      }
+      
+      if (classResult.errors.length > 0 || sessionResult.errors.length > 0) {
+        console.error(`⚠️ [Cron] ${classResult.errors.length + sessionResult.errors.length} cleanup errors occurred`);
       }
     } catch (error) {
       console.error('❌ [Cron] Hourly cleanup failed:', error.message);
@@ -138,7 +148,7 @@ function setupLiveClassCleanup() {
   });
   
   console.log('⏰ Live class cleanup cron jobs scheduled:');
-  console.log('   - Hourly: Auto-end stale live classes');
+  console.log('   - Hourly: Auto-end stale live classes and sessions');
   console.log('   - Weekly: Archive old ended classes');
 }
   
