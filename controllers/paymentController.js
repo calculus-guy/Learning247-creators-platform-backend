@@ -26,10 +26,10 @@ exports.initializeCheckout = async (req, res) => {
       });
     }
 
-    if (!['video', 'live_class'].includes(contentType)) {
+    if (!['video', 'live_class', 'live_series'].includes(contentType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid content type. Must be "video" or "live_class"'
+        message: 'Invalid content type. Must be "video", "live_class", or "live_series"'
       });
     }
 
@@ -141,7 +141,7 @@ exports.getMyPurchases = async (req, res) => {
       paymentStatus: 'completed'
     };
 
-    if (contentType && ['video', 'live_class'].includes(contentType)) {
+    if (contentType && ['video', 'live_class', 'live_series'].includes(contentType)) {
       whereClause.contentType = contentType;
     }
 
@@ -165,6 +165,12 @@ exports.getMyPurchases = async (req, res) => {
             attributes: ['id', 'title', 'thumbnailUrl', 'startTime', 'endTime', 'status']
           });
           purchaseData.content = liveClass;
+        } else if (purchase.contentType === 'live_series') {
+          const { LiveSeries } = require('../models/liveSeriesIndex');
+          const liveSeries = await LiveSeries.findByPk(purchase.contentId, {
+            attributes: ['id', 'title', 'thumbnailUrl', 'startDate', 'endDate', 'status', 'recurrencePattern']
+          });
+          purchaseData.content = liveSeries;
         }
         
         return purchaseData;
@@ -207,6 +213,9 @@ exports.checkOwnership = async (req, res) => {
       content = await Video.findByPk(contentId);
     } else if (contentType === 'live_class') {
       content = await LiveClass.findByPk(contentId);
+    } else if (contentType === 'live_series') {
+      const { LiveSeries } = require('../models/liveSeriesIndex');
+      content = await LiveSeries.findByPk(contentId);
     }
 
     if (!content) {

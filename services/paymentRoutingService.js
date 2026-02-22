@@ -582,6 +582,11 @@ class PaymentRoutingService {
         return await LiveClass.findByPk(contentId, {
           attributes: ['id', 'title', 'price', 'currency', 'userId']
         });
+      } else if (contentType === 'live_series') {
+        const { LiveSeries } = require('../models/liveSeriesIndex');
+        return await LiveSeries.findByPk(contentId, {
+          attributes: ['id', 'title', 'price', 'currency', 'userId']
+        });
       } else if (contentType === 'course') {
         // ✅ For monthly/yearly access, contentId is null (all courses)
         if (!contentId) {

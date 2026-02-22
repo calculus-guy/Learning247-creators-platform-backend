@@ -302,9 +302,11 @@ async function getEarningsBreakdown(userId) {
         totalsByCurrency[currency] = {
           totalFromVideos: 0,
           totalFromLiveClasses: 0,
+          totalFromLiveSeries: 0,
           totalSales: 0,
           videoSales: 0,
-          liveClassSales: 0
+          liveClassSales: 0,
+          liveSeriesSales: 0
         };
       }
 
@@ -314,9 +316,12 @@ async function getEarningsBreakdown(userId) {
       if (purchase.contentType === 'video') {
         totalsByCurrency[currency].totalFromVideos += amount;
         totalsByCurrency[currency].videoSales++;
-      } else {
+      } else if (purchase.contentType === 'live_class') {
         totalsByCurrency[currency].totalFromLiveClasses += amount;
         totalsByCurrency[currency].liveClassSales++;
+      } else if (purchase.contentType === 'live_series') {
+        totalsByCurrency[currency].totalFromLiveSeries += amount;
+        totalsByCurrency[currency].liveSeriesSales++;
       }
     });
 
@@ -367,7 +372,7 @@ async function getCreatorPurchases(userId, { limit = 50, offset = 0, contentType
     };
 
     // Filter by content type if specified
-    if (contentType && ['video', 'live_class'].includes(contentType)) {
+    if (contentType && ['video', 'live_class', 'live_series'].includes(contentType)) {
       if (contentType === 'video') {
         whereClause[Op.or] = [{ contentType: 'video', contentId: { [Op.in]: videoIds } }];
       } else {
@@ -401,6 +406,12 @@ async function getCreatorPurchases(userId, { limit = 50, offset = 0, contentType
         } else if (purchase.contentType === 'live_class') {
           const liveClass = liveClasses.find(lc => lc.id === purchase.contentId);
           purchaseData.content = liveClass ? liveClass.toJSON() : null;
+        } else if (purchase.contentType === 'live_series') {
+          const { LiveSeries } = require('../models/liveSeriesIndex');
+          const liveSeries = await LiveSeries.findByPk(purchase.contentId, {
+            attributes: ['id', 'title', 'thumbnailUrl', 'startDate', 'endDate', 'status']
+          });
+          purchaseData.content = liveSeries ? liveSeries.toJSON() : null;
         }
         
         return purchaseData;

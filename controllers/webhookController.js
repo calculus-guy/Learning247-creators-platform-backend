@@ -131,6 +131,18 @@ exports.handlePaystackWebhook = async (req, res) => {
           content = await Video.findByPk(contentId);
         } else if (contentType === 'live_class') {
           content = await LiveClass.findByPk(contentId);
+        } else if (contentType === 'live_series') {
+          const { LiveSeries } = require('../models/liveSeriesIndex');
+          const { LiveSession } = require('../models/liveSeriesIndex');
+          content = await LiveSeries.findByPk(contentId);
+          
+          // Get total sessions count for the series
+          if (content) {
+            const sessionsCount = await LiveSession.count({
+              where: { seriesId: content.id }
+            });
+            content.totalSessions = sessionsCount;
+          }
         } else if (contentType === 'course') {
           const Course = require('../models/Course');
           const Department = require('../models/Department');
@@ -155,6 +167,31 @@ exports.handlePaystackWebhook = async (req, res) => {
               currency.toUpperCase(),
               content.department?.name || 'General'
             );
+          } else if (contentType === 'live_series') {
+            // Send live series purchase confirmation email
+            const { sendLiveSeriesPurchaseEmail } = require('../utils/email');
+            await sendLiveSeriesPurchaseEmail(
+              user.email,
+              user.firstname,
+              content.title,
+              content.totalSessions || 0,
+              amount / 100,
+              currency.toUpperCase(),
+              content.startDate
+            );
+            
+            // Send notification to creator
+            const creator = await User.findByPk(content.userId);
+            if (creator) {
+              await sendSaleNotificationEmail(
+                creator.email, 
+                creator.firstname, 
+                content.title, 
+                user.firstname, 
+                amount / 100,
+                currency.toUpperCase()
+              );
+            }
           } else {
             // Send regular purchase confirmation to student
             await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, amount / 100);
@@ -493,6 +530,18 @@ exports.handleStripeWebhook = async (req, res) => {
           content = await Video.findByPk(contentId);
         } else if (contentType === 'live_class') {
           content = await LiveClass.findByPk(contentId);
+        } else if (contentType === 'live_series') {
+          const { LiveSeries } = require('../models/liveSeriesIndex');
+          const { LiveSession } = require('../models/liveSeriesIndex');
+          content = await LiveSeries.findByPk(contentId);
+          
+          // Get total sessions count for the series
+          if (content) {
+            const sessionsCount = await LiveSession.count({
+              where: { seriesId: content.id }
+            });
+            content.totalSessions = sessionsCount;
+          }
         } else if (contentType === 'course') {
           const Course = require('../models/Course');
           const Department = require('../models/Department');
@@ -517,6 +566,31 @@ exports.handleStripeWebhook = async (req, res) => {
               session.currency.toUpperCase(),
               content.department?.name || 'General'
             );
+          } else if (contentType === 'live_series') {
+            // Send live series purchase confirmation email
+            const { sendLiveSeriesPurchaseEmail } = require('../utils/email');
+            await sendLiveSeriesPurchaseEmail(
+              user.email,
+              user.firstname,
+              content.title,
+              content.totalSessions || 0,
+              session.amount_total / 100,
+              session.currency.toUpperCase(),
+              content.startDate
+            );
+            
+            // Send notification to creator
+            const creator = await User.findByPk(content.userId);
+            if (creator) {
+              await sendSaleNotificationEmail(
+                creator.email, 
+                creator.firstname, 
+                content.title, 
+                user.firstname, 
+                session.amount_total / 100,
+                session.currency.toUpperCase()
+              );
+            }
           } else {
             // Send regular purchase confirmation to student
             await sendPurchaseConfirmationEmail(user.email, user.firstname, content.title, session.amount_total / 100);

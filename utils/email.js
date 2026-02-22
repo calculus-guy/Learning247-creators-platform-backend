@@ -452,3 +452,77 @@ exports.sendCourseEnrollmentConfirmationEmail = async (to, firstname, courseTitl
     html,
   });
 };
+
+/**
+ * LIVE SERIES PURCHASE CONFIRMATION EMAIL
+ */
+exports.sendLiveSeriesPurchaseEmail = async (to, firstname, seriesTitle, totalSessions, amount, currency, startDate) => {
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+  const formattedAmount = currency === 'USD' ? amount.toFixed(2) : amount.toLocaleString();
+  const formattedStartDate = new Date(startDate).toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Live Series Access Confirmed! 🎉</h2>
+
+      <p>Dear ${firstname},</p>
+
+      <p>
+        Congratulations! You now have full access to all sessions in:
+      </p>
+
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+        <h3 style="color: #333; margin-top: 0;">${seriesTitle}</h3>
+        <p style="margin: 5px 0;"><strong>Total Sessions:</strong> ${totalSessions} live sessions</p>
+        <p style="margin: 5px 0;"><strong>Series Starts:</strong> ${formattedStartDate}</p>
+        <p style="margin: 5px 0;"><strong>Amount Paid:</strong> ${currencySymbol}${formattedAmount}</p>
+        <p style="margin: 5px 0;"><strong>Payment Date:</strong> ${new Date().toLocaleDateString()}</p>
+      </div>
+
+      <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <p style="margin: 0;"><strong>✅ You're All Set!</strong></p>
+        <p style="margin: 10px 0 0 0;">You can now join any live session in this series. View your upcoming sessions and join links from your dashboard.</p>
+      </div>
+
+      <p><strong>What You Get:</strong></p>
+      <ul>
+        <li>Access to all ${totalSessions} live sessions in the series</li>
+        <li>Real-time interaction with the instructor</li>
+        <li>Q&A opportunities during each session</li>
+        <li>Join from any device with internet connection</li>
+      </ul>
+
+      <p><strong>How to Join Sessions:</strong></p>
+      <ol>
+        <li>Log in to your dashboard at <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a></li>
+        <li>Go to "My Live Series" or "Upcoming Sessions"</li>
+        <li>Click "Join Session" when the session is live</li>
+      </ol>
+
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0;"><strong>💡 Pro Tip:</strong> Sessions are only available when the instructor starts them. Make sure to check your schedule and join on time!</p>
+      </div>
+
+      <p>
+        We're excited to have you in this series! Get ready for an amazing learning experience.
+      </p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Live Series Access Confirmed - ${seriesTitle}`,
+    html,
+  });
+};
