@@ -18,6 +18,14 @@ class LiveSeriesService {
     const sessions = [];
     const { days, startTime, duration } = series.recurrencePattern;
     
+    console.log('[Live Series Service] Generating sessions with:', {
+      days,
+      startTime,
+      duration,
+      startDate: series.startDate,
+      endDate: series.endDate
+    });
+    
     // Map day names to day numbers (0 = Sunday, 1 = Monday, etc.)
     const dayMap = {
       'sunday': 0,
@@ -30,6 +38,7 @@ class LiveSeriesService {
     };
     
     const dayNumbers = days.map(day => dayMap[day.toLowerCase()]);
+    console.log('[Live Series Service] Looking for day numbers:', dayNumbers);
     
     // Parse start time (format: "19:00")
     const [hours, minutes] = startTime.split(':').map(Number);
@@ -38,6 +47,11 @@ class LiveSeriesService {
     const currentDate = new Date(series.startDate);
     const endDate = new Date(series.endDate);
     let sessionNumber = 1;
+    
+    console.log('[Live Series Service] Date range:', {
+      start: currentDate.toISOString(),
+      end: endDate.toISOString()
+    });
     
     while (currentDate <= endDate) {
       const dayOfWeek = currentDate.getDay();
@@ -64,6 +78,8 @@ class LiveSeriesService {
       // Move to next day
       currentDate.setDate(currentDate.getDate() + 1);
     }
+    
+    console.log('[Live Series Service] Generated sessions count:', sessions.length);
     
     return sessions;
   }
