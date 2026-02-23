@@ -9,7 +9,7 @@ const { Op } = require('sequelize');
  */
 exports.createSeries = async (req, res) => {
   try {
-    const {
+    let {
       title,
       description,
       price,
@@ -24,6 +24,18 @@ exports.createSeries = async (req, res) => {
     } = req.body;
     
     const userId = req.user.id;
+    
+    // Parse recurrencePattern if it's a string (from FormData)
+    if (typeof recurrencePattern === 'string') {
+      try {
+        recurrencePattern = JSON.parse(recurrencePattern);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid recurrence pattern JSON format. Must be valid JSON.'
+        });
+      }
+    }
     
     // Validate required fields
     if (!title || !startDate || !endDate || !recurrencePattern) {
