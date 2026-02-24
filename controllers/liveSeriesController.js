@@ -276,8 +276,26 @@ exports.getSeriesById = async (req, res) => {
     
     // Check if user has access (optional authentication)
     let hasAccess = false;
-    if (req.user) {
+    let accessReason = null;
+    const price = parseFloat(series.price);
+    
+    // Check if free
+    if (price === 0) {
+      hasAccess = true;
+      accessReason = 'free_content';
+    }
+    
+    // Check if user is authenticated and has access
+    if (req.user && !hasAccess) {
       hasAccess = await liveSeriesService.checkSeriesAccess(req.user.id, series.id);
+      if (hasAccess) {
+        // Determine access reason
+        if (series.userId === req.user.id) {
+          accessReason = 'creator';
+        } else {
+          accessReason = 'purchased';
+        }
+      }
     }
     
     return res.json({
@@ -286,7 +304,8 @@ exports.getSeriesById = async (req, res) => {
         ...series.dataValues,
         stats,
         hasAccess,
-        requiresPayment: !hasAccess && parseFloat(series.price) > 0
+        accessReason,
+        requiresPayment: !hasAccess && price > 0
       }
     });
     

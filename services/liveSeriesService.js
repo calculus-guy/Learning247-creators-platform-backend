@@ -126,6 +126,12 @@ class LiveSeriesService {
         return true;
       }
       
+      // Check if series is free (price = 0)
+      const price = parseFloat(series.price);
+      if (price === 0) {
+        return true;
+      }
+      
       // Check if user purchased the series
       const purchase = await Purchase.findOne({
         where: {
