@@ -72,7 +72,7 @@ app.use(session({
 
 app.use(passport.initialize());
 app.use(passport.session());
-
+ 
 app.use('/auth', authRoutes);
 app.use('/auth', passwordResetRoutes); //  Password reset routes
 app.use('/register', rateLimiter);
