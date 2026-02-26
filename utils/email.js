@@ -526,3 +526,167 @@ exports.sendLiveSeriesPurchaseEmail = async (to, firstname, seriesTitle, totalSe
     html,
   });
 };
+
+/**
+ * SESSION REMINDER EMAIL (1 hour before)
+ */
+exports.sendSessionReminderEmail = async (to, firstname, sessionData) => {
+  const { sessionId, sessionNumber, seriesTitle, scheduledStartTime, thumbnailUrl } = sessionData;
+  
+  const startTime = new Date(scheduledStartTime);
+  const formattedDate = startTime.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  const formattedTime = startTime.toLocaleTimeString('en-US', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZoneName: 'short'
+  });
+
+  const joinUrl = `${process.env.CLIENT_URL}/session/${sessionId}/join`;
+  const calendarUrl = `${process.env.CLIENT_URL}/session/${sessionId}/calendar`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Your Live Session Starts in 1 Hour! ⏰</h2>
+
+      <p>Hi ${firstname},</p>
+
+      <p>
+        This is a friendly reminder that your live session is starting soon!
+      </p>
+
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #007bff;">
+        <h3 style="color: #333; margin-top: 0;">${seriesTitle}</h3>
+        <p style="margin: 5px 0;"><strong>Session ${sessionNumber}</strong></p>
+        <p style="margin: 5px 0;">📅 ${formattedDate}</p>
+        <p style="margin: 5px 0;">⏰ ${formattedTime}</p>
+      </div>
+
+      ${thumbnailUrl ? `
+      <div style="text-align: center; margin: 20px 0;">
+        <img src="${thumbnailUrl}" alt="${seriesTitle}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+      ` : ''}
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${joinUrl}" style="background-color: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+          Join Session Now
+        </a>
+      </div>
+
+      <p style="text-align: center; margin: 20px 0;">
+        <a href="${calendarUrl}" style="color: #007bff; text-decoration: none;">
+          📅 Add to Calendar
+        </a>
+      </p>
+
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0;"><strong>💡 Pro Tip:</strong> Join a few minutes early to test your connection and get settled!</p>
+      </div>
+
+      <p><strong>What to Prepare:</strong></p>
+      <ul>
+        <li>Stable internet connection</li>
+        <li>Headphones or speakers</li>
+        <li>Notebook for taking notes</li>
+        <li>Any questions you want to ask</li>
+      </ul>
+
+      <p>
+        See you in the session!
+      </p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Reminders" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Starting Soon: ${seriesTitle} - Session ${sessionNumber}`,
+    html,
+  });
+};
+
+/**
+ * NEW CONTENT NEWSLETTER EMAIL
+ */
+exports.sendNewContentEmail = async (to, firstname, contentData) => {
+  const { id, title, description, thumbnailUrl, contentType, pricing, creatorName } = contentData;
+  
+  const contentTypeLabel = {
+    'video': 'New Video',
+    'live_class': 'New Live Class',
+    'live_series': 'New Live Series'
+  }[contentType] || 'New Content';
+
+  const viewUrl = `${process.env.CLIENT_URL}/${contentType}/${id}`;
+  const unsubscribeUrl = `${process.env.CLIENT_URL}/profile/notifications`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>🎉 ${contentTypeLabel} Available Now!</h2>
+
+      <p>Hi ${firstname},</p>
+
+      <p>
+        Great news! New content has just been added to hallos that you might be interested in:
+      </p>
+
+      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+        ${thumbnailUrl ? `
+        <div style="text-align: center; margin-bottom: 15px;">
+          <img src="${thumbnailUrl}" alt="${title}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+        </div>
+        ` : ''}
+        
+        <h3 style="color: #333; margin-top: 0;">${title}</h3>
+        ${creatorName ? `<p style="color: #666; margin: 5px 0;">By ${creatorName}</p>` : ''}
+        ${description ? `<p style="margin: 10px 0;">${description.substring(0, 200)}${description.length > 200 ? '...' : ''}</p>` : ''}
+        
+        ${pricing ? `
+        <div style="margin: 15px 0;">
+          <p style="margin: 5px 0;"><strong>Price:</strong></p>
+          <p style="margin: 5px 0;">₦${pricing.ngn.toLocaleString()} NGN or $${pricing.usd.toFixed(2)} USD</p>
+        </div>
+        ` : ''}
+      </div>
+
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${viewUrl}" style="background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+          View ${contentTypeLabel}
+        </a>
+      </div>
+
+      <p>
+        Don't miss out on this opportunity to learn something new!
+      </p>
+
+      <hr style="margin: 30px 0; border: none; border-top: 1px solid #ddd;"/>
+
+      <p style="font-size: 12px; color: #666;">
+        You're receiving this email because you subscribed to hallos newsletter. 
+        <a href="${unsubscribeUrl}" style="color: #007bff;">Manage your notification preferences</a>
+      </p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      <hr/>
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Newsletter" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `${contentTypeLabel}: ${title}`,
+    html,
+  });
+};

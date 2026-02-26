@@ -28,6 +28,31 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING,
     defaultValue: 'viewer',
   },
+  phoneNumber: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'phone_number'
+  },
+  country: {
+    type: DataTypes.STRING(100),
+    allowNull: true
+  },
+  bio: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  socialLinks: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    defaultValue: {},
+    field: 'social_links'
+  },
+  newsletterSubscribed: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'newsletter_subscribed'
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

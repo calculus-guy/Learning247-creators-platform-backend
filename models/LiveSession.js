@@ -56,6 +56,12 @@ const LiveSession = sequelize.define('LiveSession', {
     type: DataTypes.STRING,
     allowNull: true,
     field: 'recording_url'
+  },
+  reminderSent: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'reminder_sent'
   }
 }, {
   tableName: 'live_sessions',

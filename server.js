@@ -20,9 +20,11 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
+const emailSchedulerService = require('./services/emailSchedulerService');
 
 require('./models/walletIndex');
 require('./models/courseIndex');
@@ -85,6 +87,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
@@ -98,9 +101,21 @@ sequelize.sync({ force: false })
       console.log(`Server running on http://localhost:${PORT}`);
       
       setupLiveClassCleanup();
+      setupEmailScheduler();
     });
   })
   .catch(err => console.error('DB Connection Failed:', err));
+
+/**
+ * Setup email notification scheduler
+ */
+function setupEmailScheduler() {
+  console.log('📧 Starting email notification scheduler...');
+  emailSchedulerService.startAll();
+  
+  const status = emailSchedulerService.getStatus();
+  console.log(`✅ Email scheduler started:`, status);
+}
 
 /**
  * Setup automated live class cleanup cron jobs
