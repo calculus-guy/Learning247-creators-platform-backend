@@ -25,6 +25,19 @@ const enforcePrivacySettings = async (liveClass, userId, invitationCode, hasAcce
       return { allowed: true };
     }
 
+    // Check if user is a co-host (co-hosts don't need to pay)
+    const { LiveHost } = require('../models/liveIndex');
+    const isHost = await LiveHost.findOne({
+      where: {
+        liveClassId: liveClass.id,
+        userId: userId
+      }
+    });
+
+    if (isHost) {
+      return { allowed: true, reason: 'cohost' };
+    }
+
     // Public rooms - check payment access
     if (liveClass.privacy === 'public') {
       if (liveClass.price > 0 && !hasAccess) {
@@ -348,14 +361,22 @@ const joinRoom = async (req, res) => {
       });
     }
 
-    // Privacy and access control enforcement
-    const accessCheck = await enforcePrivacySettings(liveClass, userId, invitationCode, req.hasAccess);
-    if (!accessCheck.allowed) {
-      return res.status(accessCheck.statusCode).json({
-        success: false,
-        message: accessCheck.message,
-        code: accessCheck.code
-      });
+    // Normalize role (frontend might send 'Cohost', 'cohost', 'CoHost', etc.)
+    const normalizedRole = role.toLowerCase();
+    const isCohost = normalizedRole === 'cohost';
+    const isCreator = liveClass.userId === userId;
+
+    // Co-hosts and creators bypass payment check
+    if (!isCohost && !isCreator) {
+      // Regular participants need to pass privacy and payment checks
+      const accessCheck = await enforcePrivacySettings(liveClass, userId, invitationCode, req.hasAccess);
+      if (!accessCheck.allowed) {
+        return res.status(accessCheck.statusCode).json({
+          success: false,
+          message: accessCheck.message,
+          code: accessCheck.code
+        });
+      }
     }
 
     // Get user information for display
@@ -366,8 +387,23 @@ const joinRoom = async (req, res) => {
       email: user ? user.email : null
     };
 
-    // Determine role - creator gets host role
-    const participantRole = liveClass.userId === userId ? 'host' : role;
+    // Determine ZegoCloud role
+    // Creator and co-hosts get 'host', others get 'participant' or 'audience'
+    let participantRole = 'participant';
+    let userType = 'participant';
+    
+    if (isCreator) {
+      participantRole = 'host';
+      userType = 'creator';
+    } else if (isCohost) {
+      participantRole = 'host'; // Co-hosts get host privileges
+      userType = 'cohost';
+    } else {
+      // Regular participants - validate role
+      const validRoles = ['participant', 'audience'];
+      participantRole = validRoles.includes(normalizedRole) ? normalizedRole : 'participant';
+      userType = 'participant';
+    }
 
     // ✅ Generate official ZegoCloud token
     const token = zegoCloudService.generateToken(
@@ -375,6 +411,8 @@ const joinRoom = async (req, res) => {
       userId,
       participantRole
     );
+
+    console.log(`[ZegoCloud Controller] User ${userId} joined as ${userType} with role ${participantRole}`);
 
     // Return response with official token
     res.status(200).json({
@@ -385,6 +423,8 @@ const joinRoom = async (req, res) => {
         appId: liveClass.zego_app_id,
         token: token, // ✅ Official ZegoCloud token
         role: participantRole,
+        userType: userType, // 'creator', 'cohost', or 'participant'
+        isCohost: isCohost,
         userInfo: userInfo,
         liveClass: {
           id: liveClass.id,

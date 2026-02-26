@@ -232,6 +232,22 @@ exports.getLiveClassById = async (req, res) => {
       accessReason = 'creator';
     }
     
+    // Check if co-host
+    if (userId && !hasAccess) {
+      const { LiveHost } = require('../models/liveIndex');
+      const isHost = await LiveHost.findOne({
+        where: {
+          liveClassId: id,
+          userId: userId
+        }
+      });
+
+      if (isHost) {
+        hasAccess = true;
+        accessReason = isHost.role === 'creator' ? 'creator' : 'cohost';
+      }
+    }
+    
     // Check if purchased
     if (userId && !hasAccess) {
       const Purchase = require('../models/Purchase');

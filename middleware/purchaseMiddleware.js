@@ -94,6 +94,24 @@ exports.checkContentAccess = async (req, res, next) => {
       return next();
     }
 
+    // For live classes, check if user is a co-host
+    if (contentType === 'live_class') {
+      const { LiveHost } = require('../models/liveIndex');
+      const isHost = await LiveHost.findOne({
+        where: {
+          liveClassId: contentId,
+          userId: userId
+        }
+      });
+
+      if (isHost) {
+        req.hasAccess = true;
+        req.accessReason = isHost.role === 'creator' ? 'creator' : 'cohost';
+        console.log(`[Purchase Middleware] Access GRANTED for ${isHost.role} user ${userId}`);
+        return next();
+      }
+    }
+
     // Check if user has purchased the content
     const purchase = await Purchase.findOne({
       where: {
