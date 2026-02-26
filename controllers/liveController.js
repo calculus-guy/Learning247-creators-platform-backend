@@ -127,7 +127,8 @@ exports.createLiveClass = async (req, res) => {
         // Include helpful info for frontend
         streamingProvider: liveClass.streaming_provider,
         isZegoCloud: liveClass.streaming_provider === 'zegocloud',
-        isMux: liveClass.streaming_provider === 'mux'
+        isMux: liveClass.streaming_provider === 'mux',
+        pricing: liveClass.getDualPricing()
       }
     });
   } catch (error) {
@@ -304,7 +305,8 @@ exports.getLiveClassById = async (req, res) => {
 
     return res.json({
       success: true,
-      ...publicInfo
+      ...publicInfo,
+      pricing: live.getDualPricing()
     });
   } catch (error) {
     console.error('[Live Controller] Get live class error:', error);
@@ -575,9 +577,16 @@ exports.getAllLiveClasses = async (req, res) => {
     // This keeps the frontend clean and focused on actionable content
     // Use ?showAll=true to see ended/recorded classes (for creators/admins)
 
+    // Add dual pricing to each live class
+    const liveClassesWithPricing = liveClasses.map(liveClass => {
+      const classData = liveClass.toJSON();
+      classData.pricing = liveClass.getDualPricing();
+      return classData;
+    });
+
     return res.json({
-      count: liveClasses.length,
-      liveClasses
+      count: liveClassesWithPricing.length,
+      liveClasses: liveClassesWithPricing
     });
   } catch (error) {
     return handleError(res, error);
@@ -618,10 +627,17 @@ exports.getMyLiveClasses = async (req, res) => {
       ]
     });
 
+    // Add dual pricing to each live class
+    const liveClassesWithPricing = liveClasses.map(liveClass => {
+      const classData = liveClass.toJSON();
+      classData.pricing = liveClass.getDualPricing();
+      return classData;
+    });
+
     return res.json({ 
       success: true,
-      count: liveClasses.length,
-      liveClasses,
+      count: liveClassesWithPricing.length,
+      liveClasses: liveClassesWithPricing,
       filters: {
         userId,
         status,

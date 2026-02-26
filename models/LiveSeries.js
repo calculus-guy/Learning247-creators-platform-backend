@@ -109,4 +109,17 @@ LiveSeries.prototype.getDurationInWeeks = function() {
   return Math.ceil(diffDays / 7);
 };
 
+// Currency conversion methods
+LiveSeries.prototype.getDualPricing = function() {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.getDualPricing(this.price, this.currency);
+};
+
+LiveSeries.prototype.getPriceInCurrency = function(targetCurrency) {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.convert(this.price, this.currency, targetCurrency);
+};
+
 module.exports = LiveSeries;

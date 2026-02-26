@@ -112,7 +112,8 @@ exports.createSeries = async (req, res) => {
       message: 'Live series created successfully',
       series: {
         ...series.dataValues,
-        totalSessions: sessions.length
+        totalSessions: sessions.length,
+        pricing: series.getDualPricing()
       }
     });
     
@@ -173,7 +174,8 @@ exports.getAllSeries = async (req, res) => {
         const stats = await liveSeriesService.calculateSeriesStats(s.id);
         return {
           ...s.dataValues,
-          stats
+          stats,
+          pricing: s.getDualPricing()
         };
       })
     );
@@ -226,7 +228,8 @@ exports.getMySeries = async (req, res) => {
         const stats = await liveSeriesService.calculateSeriesStats(s.id);
         return {
           ...s.dataValues,
-          stats
+          stats,
+          pricing: s.getDualPricing()
         };
       })
     );
@@ -305,7 +308,8 @@ exports.getSeriesById = async (req, res) => {
         stats,
         hasAccess,
         accessReason,
-        requiresPayment: !hasAccess && price > 0
+        requiresPayment: !hasAccess && price > 0,
+        pricing: series.getDualPricing()
       }
     });
     
@@ -416,7 +420,10 @@ exports.updateSeries = async (req, res) => {
     return res.json({
       success: true,
       message: 'Series updated successfully',
-      series
+      series: {
+        ...series.dataValues,
+        pricing: series.getDualPricing()
+      }
     });
     
   } catch (error) {

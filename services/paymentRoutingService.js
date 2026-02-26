@@ -1,6 +1,7 @@
 const { paystackClient } = require('../config/paystack');
 const { stripeClient } = require('../config/stripe');
 const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
+const CurrencyConversionService = require('./currencyConversionService');
 const { idempotencyService } = require('./idempotencyService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
@@ -23,6 +24,7 @@ const sequelize = require('../config/db');
 class PaymentRoutingService {
   constructor() {
     this.walletService = new MultiCurrencyWalletService();
+    this.conversionService = new CurrencyConversionService();
     this.idempotencyService = idempotencyService;
     
     // Gateway routing configuration
@@ -99,9 +101,21 @@ class PaymentRoutingService {
         }
         amount = parseFloat(metadata.finalPrice);
       } else {
-        // For videos and live classes, use existing logic
-        currency = forceCurrency || contentDetails.currency || this.getDefaultCurrencyForContent(contentDetails);
-        amount = parseFloat(contentDetails.price);
+        // For videos, live classes, and live series - handle currency conversion
+        const baseCurrency = contentDetails.currency || 'NGN';
+        const baseAmount = parseFloat(contentDetails.price);
+        
+        // Determine target currency
+        currency = forceCurrency || baseCurrency;
+        this.walletService.validateCurrency(currency);
+        
+        // Convert price if user selected different currency than content's base currency
+        if (currency !== baseCurrency) {
+          amount = this.conversionService.convert(baseAmount, baseCurrency, currency);
+          console.log(`[Payment Routing] Currency conversion: ${baseAmount} ${baseCurrency} → ${amount} ${currency}`);
+        } else {
+          amount = baseAmount;
+        }
       }
       
       // Validate currency and get required gateway

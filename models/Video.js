@@ -41,4 +41,17 @@ const Video = sequelize.define('Video', {
   underscored: true
 });
 
+// Currency conversion methods
+Video.prototype.getDualPricing = function() {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.getDualPricing(this.price, this.currency);
+};
+
+Video.prototype.getPriceInCurrency = function(targetCurrency) {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.convert(this.price, this.currency, targetCurrency);
+};
+
 module.exports = Video;

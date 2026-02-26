@@ -110,4 +110,17 @@ LiveClass.prototype.canAcceptMoreParticipants = function(currentCount) {
   return !this.max_participants || currentCount < this.max_participants;
 };
 
+// Currency conversion methods
+LiveClass.prototype.getDualPricing = function() {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.getDualPricing(this.price, this.currency);
+};
+
+LiveClass.prototype.getPriceInCurrency = function(targetCurrency) {
+  const CurrencyConversionService = require('../services/currencyConversionService');
+  const conversionService = new CurrencyConversionService();
+  return conversionService.convert(this.price, this.currency, targetCurrency);
+};
+
 module.exports = LiveClass;

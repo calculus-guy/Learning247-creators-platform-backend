@@ -108,9 +108,16 @@ exports.getAllVideos = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
+    // Add dual pricing to each video
+    const videosWithPricing = videos.map(video => {
+      const videoData = video.toJSON();
+      videoData.pricing = video.getDualPricing();
+      return videoData;
+    });
+
     return res.status(200).json({
-      count: videos.length,
-      videos
+      count: videosWithPricing.length,
+      videos: videosWithPricing
     });
   } catch (error) {
     console.error('Error fetching videos:', error);
@@ -167,7 +174,8 @@ exports.getVideoById = async (req, res) => {
       playbackUrl,
       accessGranted: true,
       accessReason: req.accessReason,
-      purchaseDate: req.purchaseDate || null
+      purchaseDate: req.purchaseDate || null,
+      pricing: video.getDualPricing()
     });
   } catch (error) {
     console.error('Error fetching video by ID:', error);
@@ -193,9 +201,16 @@ exports.getUserVideos = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
+    // Add dual pricing to each video
+    const videosWithPricing = videos.map(video => {
+      const videoData = video.toJSON();
+      videoData.pricing = video.getDualPricing();
+      return videoData;
+    });
+
     return res.status(200).json({
-      count: videos.length,
-      videos
+      count: videosWithPricing.length,
+      videos: videosWithPricing
     });
   } catch (error) {
     console.error('Error fetching user videos:', error);
@@ -215,9 +230,16 @@ exports.getMyVideos = async (req, res) => {
       order: [['created_at', 'DESC']]
     });
 
+    // Add dual pricing to each video
+    const videosWithPricing = videos.map(video => {
+      const videoData = video.toJSON();
+      videoData.pricing = video.getDualPricing();
+      return videoData;
+    });
+
     return res.status(200).json({
-      count: videos.length,
-      videos
+      count: videosWithPricing.length,
+      videos: videosWithPricing
     });
   } catch (error) {
     console.error('Error fetching my videos:', error);
