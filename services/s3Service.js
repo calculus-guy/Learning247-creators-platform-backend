@@ -23,7 +23,8 @@ const s3 = new AWS.S3();
 
 /**
  * Multer configuration for S3 uploads
- * All thumbnails are stored in uploads/photos/ folder
+ * Thumbnails stored in upload/photos/
+ * Profile pictures stored in upload/profiles/
  * SVG files are automatically sanitized before upload
  */
 const uploadToS3 = multer({
@@ -37,7 +38,9 @@ const uploadToS3 = multer({
       const randomString = Math.random().toString(36).substring(2, 15);
       const extension = path.extname(file.originalname);
       
-      const filename = `upload/photos/${timestamp}-${randomString}${extension}`;
+      // Determine folder based on field name
+      const folder = file.fieldname === 'profilePicture' ? 'upload/profiles' : 'upload/photos';
+      const filename = `${folder}/${timestamp}-${randomString}${extension}`;
       cb(null, filename);
     },
     // Transform SVG files before upload (sanitization)
@@ -77,13 +80,17 @@ const uploadToS3 = multer({
  * Direct S3 upload function (alternative to multer)
  * Use this for programmatic uploads
  * Automatically sanitizes SVG files
+ * @param {Buffer} fileBuffer - File buffer
+ * @param {string} fileName - Original filename
+ * @param {string} contentType - MIME type
+ * @param {string} folder - S3 folder (default: 'photos', options: 'photos', 'profiles')
  */
-const uploadFileToS3 = async (fileBuffer, fileName, contentType) => {
+const uploadFileToS3 = async (fileBuffer, fileName, contentType, folder = 'photos') => {
   try {
     const timestamp = Date.now();
     const randomString = Math.random().toString(36).substring(2, 15);
     const extension = path.extname(fileName);
-    const key = `upload/photos/${timestamp}-${randomString}${extension}`;
+    const key = `upload/${folder}/${timestamp}-${randomString}${extension}`;
     
     let uploadBuffer = fileBuffer;
     
