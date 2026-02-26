@@ -379,7 +379,8 @@ exports.updateSeries = async (req, res) => {
       category,
       thumbnailUrl,
       privacy,
-      maxParticipants
+      maxParticipants,
+      endDate
     } = req.body;
     
     // Get series
@@ -415,22 +416,65 @@ exports.updateSeries = async (req, res) => {
     if (privacy) updates.privacy = privacy;
     if (maxParticipants) updates.maxParticipants = maxParticipants;
     
+    // Handle end date extension
+    let newSessionsGenerated = 0;
+    if (endDate) {
+      const newEndDate = new Date(endDate);
+      const currentEndDate = new Date(series.endDate);
+      
+      // Validate: new end date must be after current end date (extension only)
+      if (newEndDate <= currentEndDate) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date can only be extended (moved forward). Cannot shorten the series.'
+        });
+      }
+      
+      // Validate: new end date must be in the future
+      if (newEndDate <= new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'End date must be in the future'
+        });
+      }
+      
+      console.log(`[Live Series Controller] Extending series ${id} end date from ${currentEndDate} to ${newEndDate}`);
+      
+      // Update end date
+      updates.endDate = newEndDate;
+      
+      // Generate additional sessions for the extended period
+      const additionalSessions = await liveSeriesService.extendSeriesSessions(series, newEndDate);
+      newSessionsGenerated = additionalSessions.length;
+      
+      console.log(`[Live Series Controller] Generated ${newSessionsGenerated} additional sessions`);
+    }
+    
     await series.update(updates);
     
-    return res.json({
+    const response = {
       success: true,
       message: 'Series updated successfully',
       series: {
         ...series.dataValues,
         pricing: series.getDualPricing()
       }
-    });
+    };
+    
+    // Include info about new sessions if end date was extended
+    if (newSessionsGenerated > 0) {
+      response.message = `Series updated successfully. ${newSessionsGenerated} additional session(s) generated.`;
+      response.newSessionsCount = newSessionsGenerated;
+    }
+    
+    return res.json(response);
     
   } catch (error) {
     console.error('[Live Series Controller] Update series error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to update series'
+      message: 'Failed to update series',
+      error: error.message
     });
   }
 };

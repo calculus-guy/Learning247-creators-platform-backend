@@ -311,6 +311,91 @@ class LiveSeriesService {
   }
   
   /**
+   * Extend series by generating additional sessions for new end date
+   * @param {Object} series - LiveSeries instance
+   * @param {Date} newEndDate - New end date
+   * @returns {Promise<Array>} Array of newly created sessions
+   */
+  async extendSeriesSessions(series, newEndDate) {
+    try {
+      // Get the last session number
+      const lastSession = await LiveSession.findOne({
+        where: { seriesId: series.id },
+        order: [['sessionNumber', 'DESC']]
+      });
+      
+      const lastSessionNumber = lastSession ? lastSession.sessionNumber : 0;
+      const lastSessionDate = lastSession 
+        ? new Date(lastSession.scheduledEndTime)
+        : new Date(series.startDate);
+      
+      console.log('[Live Series Service] Extending sessions from:', {
+        lastSessionNumber,
+        lastSessionDate: lastSessionDate.toISOString(),
+        newEndDate: newEndDate.toISOString()
+      });
+      
+      // Generate sessions for the extended period
+      const { days, startTime, duration } = series.recurrencePattern;
+      
+      // Map day names to day numbers
+      const dayMap = {
+        'sunday': 0,
+        'monday': 1,
+        'tuesday': 2,
+        'wednesday': 3,
+        'thursday': 4,
+        'friday': 5,
+        'saturday': 6
+      };
+      
+      const dayNumbers = days.map(day => dayMap[day.toLowerCase()]);
+      const [hours, minutes] = startTime.split(':').map(Number);
+      
+      // Start from the day after the last session
+      const currentDate = new Date(lastSessionDate);
+      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setHours(0, 0, 0, 0);
+      
+      const sessions = [];
+      let sessionNumber = lastSessionNumber + 1;
+      
+      while (currentDate <= newEndDate) {
+        const dayOfWeek = currentDate.getDay();
+        
+        if (dayNumbers.includes(dayOfWeek)) {
+          const sessionStart = new Date(currentDate);
+          sessionStart.setHours(hours, minutes, 0, 0);
+          
+          const sessionEnd = new Date(sessionStart);
+          sessionEnd.setMinutes(sessionEnd.getMinutes() + duration);
+          
+          sessions.push({
+            seriesId: series.id,
+            sessionNumber: sessionNumber++,
+            scheduledStartTime: sessionStart,
+            scheduledEndTime: sessionEnd,
+            status: 'scheduled'
+          });
+        }
+        
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+      
+      if (sessions.length > 0) {
+        const createdSessions = await LiveSession.bulkCreate(sessions);
+        console.log(`[Live Series Service] Created ${createdSessions.length} additional sessions`);
+        return createdSessions;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('[Live Series Service] Error extending sessions:', error);
+      throw error;
+    }
+  }
+  
+  /**
    * Validate recurrence pattern
    * @param {Object} pattern - Recurrence pattern object
    * @returns {Object} { valid: boolean, errors: Array }
