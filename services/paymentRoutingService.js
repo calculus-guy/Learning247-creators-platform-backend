@@ -173,7 +173,9 @@ class PaymentRoutingService {
         } catch (error) {
           await transaction.rollback();
           console.error('[Payment Routing] Free access creation error:', error);
-          throw new Error('Failed to grant free access');
+          console.error('[Payment Routing] Error details:', error.message);
+          console.error('[Payment Routing] Error stack:', error.stack);
+          throw error; // Throw the actual error, not a generic message
         }
       }
 
