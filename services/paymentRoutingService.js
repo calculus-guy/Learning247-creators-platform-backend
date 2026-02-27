@@ -132,9 +132,49 @@ class PaymentRoutingService {
       this.walletService.validateCurrency(currency);
       const requiredGateway = this.walletService.getRequiredGateway(currency);
 
-      // Check if content is free
+      // Check if content is free (after coupon discount)
       if (amount === 0) {
-        throw new Error('This content is free. No payment required.');
+        // Create purchase record directly for free access (100% coupon discount)
+        const transaction = await sequelize.transaction();
+        
+        try {
+          const purchase = await Purchase.create({
+            userId,
+            contentType,
+            contentId,
+            amount: 0,
+            currency,
+            paymentGateway: 'coupon',
+            paymentReference: `COUPON-${couponCode || 'FREE'}-${Date.now()}`,
+            paymentStatus: 'completed'
+          }, { transaction });
+
+          await transaction.commit();
+
+          console.log(`[Payment Routing] Free access granted via coupon ${couponCode} for user ${userId}`);
+
+          const result = {
+            success: true,
+            freeAccess: true,
+            couponApplied: true,
+            couponCode: couponCode || null,
+            purchase,
+            message: couponCode 
+              ? `Coupon ${couponCode} applied! You now have full access.`
+              : 'This content is free. Access granted.',
+            currency,
+            amount: 0
+          };
+
+          // Cache successful result
+          await this.idempotencyService.storeResult(idempotencyKey, result, 'completed');
+
+          return result;
+        } catch (error) {
+          await transaction.rollback();
+          console.error('[Payment Routing] Free access creation error:', error);
+          throw new Error('Failed to grant free access');
+        }
       }
 
       // Check for existing purchase
