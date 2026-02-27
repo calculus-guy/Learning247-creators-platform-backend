@@ -138,13 +138,17 @@ class PaymentRoutingService {
         const transaction = await sequelize.transaction();
         
         try {
+          // Use the gateway that would have been used (based on currency)
+          // This keeps the enum valid while the reference shows it's a coupon
+          const gatewayForCurrency = currency === 'USD' ? 'stripe' : 'paystack';
+          
           const purchase = await Purchase.create({
             userId,
             contentType,
             contentId,
             amount: 0,
             currency,
-            paymentGateway: 'coupon',
+            paymentGateway: gatewayForCurrency,
             paymentReference: `COUPON-${couponCode || 'FREE'}-${Date.now()}`,
             paymentStatus: 'completed'
           }, { transaction });
