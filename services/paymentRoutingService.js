@@ -55,22 +55,23 @@ class PaymentRoutingService {
    * Initialize payment with automatic gateway routing
    * @param {Object} params - Payment parameters
    * @param {number} params.userId - User ID
-   * @param {string} params.contentType - Content type (video/live_class/course)
+   * @param {string} params.contentType - Content type (video/live_class/course/live_series)
    * @param {string} params.contentId - Content ID
    * @param {string} params.userEmail - User email
    * @param {string} params.idempotencyKey - Idempotency key
    * @param {string} params.forceCurrency - Optional currency override
+   * @param {string} params.couponCode - Optional coupon code (for live series)
    * @param {Object} params.metadata - Optional metadata (required for courses)
    * @returns {Promise<Object>} Payment initialization result
    */
-  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null, metadata = {} }) {
+  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null, couponCode = null, metadata = {} }) {
     try {
       // Validate idempotency
       const idempotencyResult = await this.idempotencyService.checkAndStore(
         idempotencyKey,
         userId,
         'payment_initialization',
-        { contentType, contentId, forceCurrency }
+        { contentType, contentId, forceCurrency, couponCode }
       );
 
       if (!idempotencyResult.isNew) {
@@ -103,7 +104,16 @@ class PaymentRoutingService {
       } else {
         // For videos, live classes, and live series - handle currency conversion
         const baseCurrency = contentDetails.currency || 'NGN';
-        const baseAmount = parseFloat(contentDetails.price);
+        let baseAmount = parseFloat(contentDetails.price);
+        
+        // Apply coupon discount for live series
+        if (contentType === 'live_series' && couponCode) {
+          const discountResult = this.applyCouponDiscount(contentId, baseAmount, couponCode);
+          if (discountResult.applied) {
+            baseAmount = discountResult.finalPrice;
+            console.log(`[Payment Routing] Coupon ${couponCode} applied: ${contentDetails.price} → ${baseAmount} ${baseCurrency}`);
+          }
+        }
         
         // Determine target currency
         currency = forceCurrency || baseCurrency;
@@ -177,6 +187,50 @@ class PaymentRoutingService {
       
       throw error;
     }
+  }
+
+  /**
+   * Apply coupon discount for live series
+   * @param {string} seriesId - Live series ID
+   * @param {number} originalPrice - Original price in NGN
+   * @param {string} couponCode - Coupon code
+   * @returns {Object} Discount result
+   */
+  applyCouponDiscount(seriesId, originalPrice, couponCode) {
+    // Get promo configuration from environment
+    const promoSeriesId = process.env.LIVE_SERIES_PROMO_SERIES_ID;
+    
+    // Check if this series is eligible for promo
+    if (!promoSeriesId || seriesId !== promoSeriesId) {
+      return { applied: false, finalPrice: originalPrice };
+    }
+    
+    // Normalize coupon code
+    const code = couponCode.trim().toUpperCase();
+    
+    // Check coupon codes
+    if (code === 'FLASHDISCOUNT') {
+      // 100% off
+      return {
+        applied: true,
+        finalPrice: 0,
+        discount: originalPrice,
+        couponCode: code
+      };
+    } else if (code === 'SAVEBIG10' || code === 'KINGSLEYEXCLUSIVE') {
+      // 10,000 NGN off
+      const discount = 10000;
+      const finalPrice = Math.max(0, originalPrice - discount);
+      return {
+        applied: true,
+        finalPrice,
+        discount,
+        couponCode: code
+      };
+    }
+    
+    // Invalid coupon
+    return { applied: false, finalPrice: originalPrice };
   }
 
   /**

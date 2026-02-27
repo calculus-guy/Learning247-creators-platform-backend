@@ -14,7 +14,7 @@ const paymentRoutingService = new PaymentRoutingService();
  */
 exports.initializeCheckout = async (req, res) => {
   try {
-    const { contentType, contentId, currency: forceCurrency } = req.body;
+    const { contentType, contentId, currency: forceCurrency, couponCode } = req.body;
     const userId = req.user.id;
     const idempotencyKey = req.headers['idempotency-key'];
 
@@ -56,7 +56,8 @@ exports.initializeCheckout = async (req, res) => {
       contentId,
       userEmail: user.email,
       idempotencyKey,
-      forceCurrency
+      forceCurrency,
+      couponCode
     });
 
     return res.status(200).json({
