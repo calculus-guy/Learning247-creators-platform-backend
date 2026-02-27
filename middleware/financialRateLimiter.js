@@ -150,9 +150,12 @@ class FinancialRateLimiter {
     const userLimits = customLimits.userLimits || this.config.userLimits[operationType] || this.config.userLimits.wallet_operations;
     const ipLimits = customLimits.ipLimits || this.config.ipLimits[operationType] || this.config.ipLimits.wallet_operations;
 
+    // Initialize userCheck outside the if block
+    let userCheck = null;
+
     // Check user limits
     if (userId) {
-      const userCheck = this.checkUserLimits(userId, operationType, amount, userLimits, windowStart);
+      userCheck = this.checkUserLimits(userId, operationType, amount, userLimits, windowStart);
       if (!userCheck.allowed) {
         return {
           allowed: false,
