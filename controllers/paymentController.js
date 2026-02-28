@@ -67,13 +67,45 @@ exports.initializeCheckout = async (req, res) => {
       gateway: result.gateway,
       requiredGateway: result.requiredGateway,
       cached: result.cached || false,
-      data: result.data
+      freeAccess: result.freeAccess || false,
+      couponApplied: result.couponApplied || false,
+      data: result.data,
+      purchase: result.purchase
     });
   } catch (error) {
     console.error('Initialize checkout error:', error);
+    
+    // Handle specific business logic errors with appropriate status codes
+    if (error.message.includes('already purchased')) {
+      return res.status(409).json({
+        success: false,
+        message: 'You have already purchased this content',
+        alreadyPurchased: true,
+        errorCode: 'ALREADY_PURCHASED'
+      });
+    }
+    
+    if (error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: error.message,
+        errorCode: 'CONTENT_NOT_FOUND'
+      });
+    }
+    
+    if (error.message.includes('free') || error.message.includes('No payment required')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errorCode: 'FREE_CONTENT'
+      });
+    }
+    
+    // Default server error
     return res.status(500).json({
       success: false,
-      message: error.message || 'Failed to initialize payment'
+      message: error.message || 'Failed to initialize payment',
+      errorCode: 'PAYMENT_INITIALIZATION_FAILED'
     });
   }
 };
