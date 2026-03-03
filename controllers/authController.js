@@ -53,7 +53,19 @@ exports.login = async (req, res) => {
     }
 
     const token = jwt.sign({ id: user.id, role: user.role }, SECRET_KEY, { expiresIn: '1d' });
-    res.json({ message: 'Logged in successfully', token });
+    
+    // Return user object with role for frontend redirect logic
+    res.json({ 
+      message: 'Logged in successfully', 
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        role: user.role
+      }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Server error' });
   }
