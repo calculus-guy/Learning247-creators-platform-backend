@@ -13,92 +13,188 @@ const transporter = nodemailer.createTransport({
     }
 });
 
+/**
+ * SOCIAL MEDIA FOOTER - Added to all emails
+ */
+const getSocialFooter = () => {
+  return `
+    <div style="background-color: #f8f9fa; padding: 25px; margin-top: 30px; border-radius: 8px; text-align: center;">
+      <h3 style="color: #333; margin-top: 0;">Stay Connected With Us!</h3>
+      
+      <div style="margin: 20px 0;">
+        <a href="https://www.linkedin.com/company/106357438/" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/linkedin.png" alt="LinkedIn" style="width: 32px; height: 32px;"/>
+        </a>
+        <a href="https://web.facebook.com/profile.php?id=61573028903471" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/facebook.png" alt="Facebook" style="width: 32px; height: 32px;"/>
+        </a>
+        <a href="https://www.instagram.com/learning247live/" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/instagram-new.png" alt="Instagram" style="width: 32px; height: 32px;"/>
+        </a>
+        <a href="https://www.tiktok.com/@learning247live?lang=en" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/tiktok.png" alt="TikTok" style="width: 32px; height: 32px;"/>
+        </a>
+        <a href="https://x.com/Learning247Live" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/twitter.png" alt="X (Twitter)" style="width: 32px; height: 32px;"/>
+        </a>
+        <a href="https://whatsapp.com/channel/0029VbAuQCzGpLHXVDV17t3u" style="margin: 0 10px; text-decoration: none;">
+          <img src="https://img.icons8.com/color/48/000000/whatsapp.png" alt="WhatsApp Channel" style="width: 32px; height: 32px;"/>
+        </a>
+      </div>
+
+      <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin: 0; color: #333;">
+          <strong>📞 Need Help?</strong><br/>
+          WhatsApp Support: <a href="https://wa.me/2347074119865" style="color: #25D366; text-decoration: none; font-weight: bold;">0707 411 9865</a>
+        </p>
+      </div>
+
+      <p style="color: #666; font-size: 14px; margin: 15px 0;">
+        Join our WhatsApp channel for exclusive updates, free resources every Thursday, and learning tips!
+      </p>
+    </div>
+
+    <hr style="margin: 25px 0; border: none; border-top: 1px solid #ddd;"/>
+    <p style="text-align: center; color: #666; font-size: 12px;">
+      <em>Empowering Creators. Elevating Knowledge Sharing.</em><br/>
+      © ${new Date().getFullYear()} hallos. All rights reserved.
+    </p>
+  `;
+};
+
 exports.sendEventRegistrationEmail = async (to, firstname) => {
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>You’re In! Get Ready to Connect, Create & Collaborate at the Creators’ Summit.</h2>
+      <h2>You're In! Get Ready to Connect, Create & Collaborate at the Creators' Summit.</h2>
 
       <p>Dear ${firstname},</p>
 
       <p>Welcome aboard! You've successfully registered for the 
-      <strong>Hallos Creators’ Summit – Enugu Edition</strong>.</p>
+      <strong>Hallos Creators' Summit – Enugu Edition</strong>.</p>
 
-      <p>This summit isn’t just another event — it’s a movement.</p>
+      <p>This summit isn't just another event — it's a movement.</p>
 
       <p><strong>Location:</strong> Enugu, Nigeria<br/>
       <strong>Date:</strong> ${process.env.EVENT_DATE}<br/>
       <strong>Time:</strong> ${process.env.EVENT_TIME}</p>
 
-      <p>We can’t wait to meet you and see what you’ll create!</p>
+      <p>We can't wait to meet you and see what you'll create!</p>
 
       <hr style="margin: 25px 0;">
 
       <h3>Spread the Word</h3>
 
       <p>
-      “Just signed up for the #hallosCreatorsSummit in Enugu!  
-      Can’t wait to connect and learn with amazing creators across Africa.  
-      Join me at www.hallos.com  
-      #hallos #CreatorsSummit #Enugu2025 #LearnCreateEarn”
+      "Just signed up for the #hallosCreatorsSummit in Enugu!  
+      Can't wait to connect and learn with amazing creators across Africa.  
+      Join me at www.hallos.net  
+      #hallos #CreatorsSummit #Enugu2025 #LearnCreateEarn"
       </p>
 
-      <p>Forward this message to your creative friends and invite them to register now at <a href="https://www.hallos.com">www.hallos.com</a>.</p>
+      <p>Forward this message to your creative friends and invite them to register now at <a href="https://www.hallos.net">www.hallos.net</a>.</p>
+      
+      ${getSocialFooter()}
     </div>
   `;
 
   await transporter.sendMail({
     from: `"hallos Creators Summit" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "You're In! hallos Creators’ Summit – Enugu",
+    subject: "You're In! hallos Creators' Summit – Enugu",
     html,
   });
 };
 
 
 /**
- * hallos PLATFORM WELCOME EMAIL
+ * hallos PLATFORM WELCOME EMAIL - UPDATED
  */
 exports.sendhallosWelcomeEmail = async (to, firstname) => {
   const html = `
-    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
-      <h2>Welcome to hallos — Empowering Creators!</h2>
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to hallos! 🎉</h1>
+      </div>
 
-      <p>Dear ${firstname},</p>
+      <div style="padding: 30px; background-color: #ffffff;">
+        <p style="font-size: 18px; color: #333;">Hi ${firstname},</p>
 
-      <p>
-        Welcome to <a href="https://www.hallos.com">www.hallos.com</a>, the creators’ marketplace for 
-        skill acquisition, knowledge sharing, and revenue generation.
-      </p>
+        <p style="font-size: 16px; line-height: 1.8; color: #555;">
+          Welcome to <strong>hallos</strong> — Africa's fastest-growing creators' marketplace for 
+          skill acquisition, knowledge sharing, and revenue generation!
+        </p>
 
-      <p>
-        We are thrilled to have you join this growing community of innovative learners, creators, 
-        and educators shaping the future of digital knowledge and entrepreneurship.
-      </p>
+        <p style="font-size: 16px; line-height: 1.8; color: #555;">
+          We're thrilled to have you join thousands of innovative learners, creators, and educators 
+          who are shaping the future of digital knowledge and entrepreneurship.
+        </p>
 
-      <p>
-        At hallos, we believe knowledge is power — but shared knowledge is impact.
-      </p>
+        <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #667eea;">
+          <h3 style="color: #333; margin-top: 0;">🚀 What You Can Do on hallos:</h3>
+          
+          <ul style="color: #555; line-height: 2;">
+            <li><strong>📚 Self-Paced Courses:</strong> Learn at your own pace with our comprehensive course library</li>
+            <li><strong>🎥 Live Classes:</strong> Join interactive live sessions with expert instructors</li>
+            <li><strong>📅 Live Series:</strong> Enroll in multi-week learning programs with scheduled sessions</li>
+            <li><strong>✅ Quizzes & Assessments:</strong> Test your knowledge and track your progress</li>
+            <li><strong>🎁 Free Resources:</strong> Access free learning materials dropped every Thursday!</li>
+            <li><strong>💰 Earn as a Creator:</strong> Share your knowledge and monetize your expertise</li>
+          </ul>
+        </div>
 
-      <p>
-        Take your time to explore, enroll in live courses that inspire you, or start building 
-        your own community of learners.
-      </p>
+        <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+          <h3 style="color: #333; margin-top: 0;">🎁 Don't Miss Our Weekly Freebies!</h3>
+          <p style="color: #555; margin: 10px 0;">
+            Every <strong>Thursday</strong>, we drop exclusive free learning materials, templates, and resources 
+            to help you grow. Make sure to check the platform weekly!
+          </p>
+        </div>
 
-      <p>
-        Thank you for trusting us to be part of your journey.
-      </p>
+        <div style="text-align: center; margin: 35px 0;">
+          <a href="https://www.hallos.net" style="background-color: #667eea; color: white; padding: 15px 40px; text-decoration: none; border-radius: 25px; font-weight: bold; display: inline-block; font-size: 16px;">
+            Start Exploring Now
+          </a>
+        </div>
 
-      <p><strong>With appreciation,<br/>Alexander Oseji<br/>Co-Founder, hallos.com</strong></p>
+        <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745;">
+          <h3 style="color: #333; margin-top: 0;">💡 Share the Knowledge!</h3>
+          <p style="color: #555; margin: 10px 0;">
+            Love what we're building? Invite your friends and family to join hallos! 
+            Together, we're creating Africa's largest learning community.
+          </p>
+          <p style="color: #555; margin: 10px 0;">
+            <strong>Share this link:</strong> <a href="https://www.hallos.net" style="color: #667eea;">www.hallos.net</a>
+          </p>
+        </div>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+        <p style="font-size: 16px; line-height: 1.8; color: #555; margin-top: 30px;">
+          At hallos, we believe <strong>knowledge is power</strong> — but <strong>shared knowledge is impact</strong>.
+        </p>
+
+        <p style="font-size: 16px; line-height: 1.8; color: #555;">
+          Take your time to explore, enroll in courses that inspire you, or start building 
+          your own community of learners as a creator.
+        </p>
+
+        <p style="font-size: 16px; line-height: 1.8; color: #555;">
+          Thank you for trusting us to be part of your learning journey. Let's grow together! 🌱
+        </p>
+
+        <p style="font-size: 16px; margin-top: 30px;">
+          <strong>With appreciation,</strong><br/>
+          <strong>Alexander Oseji</strong><br/>
+          Co-Founder, hallos
+        </p>
+      </div>
+
+      ${getSocialFooter()}
     </div>
   `;
 
   await transporter.sendMail({
     from: `"hallos Team" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "Welcome to hallos — The Creators' Marketplace",
+    subject: "Welcome to hallos — Let's Start Your Learning Journey! 🚀",
     html,
   });
 };
@@ -128,7 +224,7 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
 
       <p>
         You can access your purchased content anytime from your dashboard at 
-        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
+        <a href="https://www.hallos.net/dashboard">www.hallos.net/dashboard</a>.
       </p>
 
       <p>
@@ -137,8 +233,7 @@ exports.sendPurchaseConfirmationEmail = async (to, firstname, contentTitle, amou
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -175,7 +270,7 @@ exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studen
 
       <p>
         This amount has been added to your wallet. You can view your earnings and withdraw funds 
-        from your creator dashboard at <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
+        from your creator dashboard at <a href="https://www.hallos.net/dashboard">www.hallos.net/dashboard</a>.
       </p>
 
       <p>
@@ -184,8 +279,7 @@ exports.sendSaleNotificationEmail = async (to, creatorName, contentTitle, studen
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -227,13 +321,12 @@ exports.sendWithdrawalConfirmationEmail = async (to, firstname, amount, netAmoun
 
       <p>
         You can view your transaction history in your creator dashboard at 
-        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
+        <a href="https://www.hallos.net/dashboard">www.hallos.net/dashboard</a>.
       </p>
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -269,13 +362,12 @@ exports.sendWithdrawalFailureEmail = async (to, firstname, amount, reason) => {
 
       <p>
         You can retry the withdrawal from your creator dashboard at 
-        <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a>.
+        <a href="https://www.hallos.net/dashboard">www.hallos.net/dashboard</a>.
       </p>
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -321,8 +413,7 @@ exports.sendPasswordResetOTP = async (to, firstname, otp) => {
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -380,8 +471,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Secure. Trusted. Reliable.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -392,6 +482,7 @@ exports.sendWithdrawalOTP = async (to, firstname, otp, amount, currency, bankAcc
     html,
   });
 };
+
 /**
  * COURSE ENROLLMENT CONFIRMATION EMAIL
  */
@@ -440,8 +531,7 @@ exports.sendCourseEnrollmentConfirmationEmail = async (to, firstname, courseTitl
 
       <p><strong>The Hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Learners. Transforming Futures.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -499,7 +589,7 @@ exports.sendLiveSeriesPurchaseEmail = async (to, firstname, seriesTitle, totalSe
 
       <p><strong>How to Join Sessions:</strong></p>
       <ol>
-        <li>Log in to your dashboard at <a href="https://www.hallos.com/dashboard">www.hallos.com/dashboard</a></li>
+        <li>Log in to your dashboard at <a href="https://www.hallos.net/dashboard">www.hallos.net/dashboard</a></li>
         <li>Go to "My Live Series" or "Upcoming Sessions"</li>
         <li>Click "Join Session" when the session is live</li>
       </ol>
@@ -514,8 +604,7 @@ exports.sendLiveSeriesPurchaseEmail = async (to, firstname, seriesTitle, totalSe
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -602,8 +691,7 @@ exports.sendSessionReminderEmail = async (to, firstname, sessionData) => {
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
@@ -678,8 +766,7 @@ exports.sendNewContentEmail = async (to, firstname, contentData) => {
 
       <p><strong>The hallos Team</strong></p>
 
-      <hr/>
-      <em>Empowering Creators. Elevating Knowledge Sharing.</em>
+      ${getSocialFooter()}
     </div>
   `;
 
