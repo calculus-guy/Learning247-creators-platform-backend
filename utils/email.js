@@ -45,7 +45,7 @@ const getSocialFooter = () => {
       <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 20px 0;">
         <p style="margin: 0; color: #333;">
           <strong>📞 Need Help?</strong><br/>
-          WhatsApp Support: <a href="https://wa.me/2347074119865" style="color: #25D366; text-decoration: none; font-weight: bold;">0707 411 9865</a>
+          WhatsApp Support: <a href="https://wa.me/2347074119865" style="color: #25D366; text-decoration: none; font-weight: bold;">+234 707 411 9865</a>
         </p>
       </div>
 
