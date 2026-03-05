@@ -19,12 +19,12 @@ module.exports = {
         TRUNCATE TABLE video_views CASCADE;
       `, { transaction });
 
-      // Step 2: Change column type from UUID to INTEGER
+      // Step 2: Change column type from UUID to INTEGER with explicit casting
       console.log('Step 2: Changing user_id column type to INTEGER...');
-      await queryInterface.changeColumn('video_views', 'user_id', {
-        type: Sequelize.INTEGER,
-        allowNull: true
-      }, { transaction });
+      await queryInterface.sequelize.query(`
+        ALTER TABLE video_views 
+        ALTER COLUMN user_id TYPE INTEGER USING user_id::text::integer;
+      `, { transaction });
 
       await transaction.commit();
       console.log('✅ Migration completed successfully!');

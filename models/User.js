@@ -53,6 +53,17 @@ const User = sequelize.define('User', {
     defaultValue: false,
     field: 'newsletter_subscribed'
   },
+  feedbackSubmitted: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'feedback_submitted'
+  },
+  feedbackDismissedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'feedback_dismissed_at'
+  },
   createdAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW,

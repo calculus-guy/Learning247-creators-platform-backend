@@ -21,6 +21,7 @@ const walletRoutes = require('./routes/walletRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const feedbackRoutes = require('./routes/feedbackRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
@@ -88,6 +89,7 @@ app.use('/api/wallet', walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/feedback', feedbackRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
