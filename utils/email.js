@@ -777,3 +777,81 @@ exports.sendNewContentEmail = async (to, firstname, contentData) => {
     html,
   });
 };
+
+/**
+ * COLLABORATION REQUEST EMAIL (to company)
+ * Sent when a user requests collaboration with a company
+ * CC'd to the user who sent the request
+ */
+exports.sendCollaborationRequestEmail = async (companyEmail, userEmail, collaborationData) => {
+  const { 
+    companyName, 
+    contactName, 
+    userFullName, 
+    userFirstName,
+    message 
+  } = collaborationData;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+      <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 24px;">Collaboration Opportunity</h1>
+      </div>
+
+      <div style="padding: 30px; background-color: #ffffff;">
+        <p style="font-size: 16px; color: #333;">Dear ${contactName || 'Team'},</p>
+
+        <p style="font-size: 15px; line-height: 1.8; color: #555;">
+          I hope this email finds you well. My name is <strong>${userFullName}</strong>, and I am a content creator on the <strong>Hallos</strong> platform.
+        </p>
+
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #667eea;">
+          <p style="font-size: 15px; line-height: 1.8; color: #333; margin: 0;">
+            ${message}
+          </p>
+        </div>
+
+        <p style="font-size: 15px; line-height: 1.8; color: #555;">
+          I believe a collaboration between us would be mutually beneficial, and I would love to discuss how we can work together to create engaging content that resonates with your audience.
+        </p>
+
+        <p style="font-size: 15px; line-height: 1.8; color: #555;">
+          I am available for a call or meeting at your convenience to explore this opportunity further.
+        </p>
+
+        <p style="font-size: 15px; line-height: 1.8; color: #555;">
+          Looking forward to hearing from you.
+        </p>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e9ecef;">
+          <p style="font-size: 15px; margin: 5px 0;"><strong>Best regards,</strong></p>
+          <p style="font-size: 15px; margin: 5px 0;"><strong>${userFullName}</strong></p>
+          <p style="font-size: 14px; margin: 5px 0; color: #666;">
+            📧 Email: <a href="mailto:${userEmail}" style="color: #667eea; text-decoration: none;">${userEmail}</a>
+          </p>
+          <p style="font-size: 14px; margin: 5px 0; color: #666;">
+            🌐 Platform: <a href="https://www.hallos.net" style="color: #667eea; text-decoration: none;">Hallos (www.hallos.net)</a>
+          </p>
+        </div>
+
+        <div style="background-color: #e8f5e8; padding: 15px; border-radius: 8px; margin: 25px 0; text-align: center;">
+          <p style="margin: 0; color: #333; font-size: 14px;">
+            <strong>💡 About Hallos:</strong> Africa's fastest-growing creators' marketplace for skill acquisition, knowledge sharing, and revenue generation.
+          </p>
+        </div>
+      </div>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  // Send email to company with CC to user
+  await transporter.sendMail({
+    from: `"${userFullName} via Hallos" <${process.env.EMAIL_USER}>`,
+    to: companyEmail,
+    cc: userEmail, // CC the user
+    replyTo: userEmail, // Company can reply directly to user
+    subject: `Collaboration Opportunity with ${userFullName} - Content Creator on Hallos`,
+    html,
+  });
+};

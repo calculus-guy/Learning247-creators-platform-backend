@@ -22,6 +22,7 @@ const adminRoutes = require('./routes/adminRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
+const ugcRoutes = require('./routes/ugcRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
@@ -30,6 +31,7 @@ const emailSchedulerService = require('./services/emailSchedulerService');
 require('./models/walletIndex');
 require('./models/courseIndex');
 require('./models/liveSeriesIndex');
+require('./models/ugcIndex');
 
 const app = express();
 
@@ -90,6 +92,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/feedback', feedbackRoutes);
+app.use('/api/ugc', ugcRoutes);
 
 app.use('/uploads', express.static('uploads'));
 
