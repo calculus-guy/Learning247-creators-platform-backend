@@ -470,5 +470,3 @@ exports.deleteFeedback = async (req, res) => {
     });
   }
 };
-
-module.exports = exports;
