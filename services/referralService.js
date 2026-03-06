@@ -2,7 +2,8 @@ const ReferralCode = require('../models/ReferralCode');
 const ReferralCommission = require('../models/ReferralCommission');
 const User = require('../models/User');
 const Purchase = require('../models/Purchase');
-const { Op } = require('sequelize');
+const sequelize = require('../config/db');
+const { Op, fn, col } = require('sequelize');
 const crypto = require('crypto');
 
 /**
@@ -226,14 +227,14 @@ See you in class! 🚀`;
       });
 
       // Update referral code stats
+      await ReferralCode.increment('successfulReferrals', {
+        by: 1,
+        where: { referralCode }
+      });
+      
       await ReferralCode.update(
-        {
-          successfulReferrals: sequelize.literal('successful_referrals + 1'),
-          lastUsedAt: new Date()
-        },
-        {
-          where: { referralCode }
-        }
+        { lastUsedAt: new Date() },
+        { where: { referralCode } }
       );
 
       console.log(`[Referral Service] Created pending commission ${commission.id} for referrer ${referrerUserId}`);
@@ -282,8 +283,8 @@ See you in class! 🚀`;
         where: { referrerUserId: userId },
         attributes: [
           'status',
-          [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-          [sequelize.fn('SUM', sequelize.col('commission_amount')), 'total']
+          [fn('COUNT', col('id')), 'count'],
+          [fn('SUM', col('commission_amount')), 'total']
         ],
         group: ['status'],
         raw: true

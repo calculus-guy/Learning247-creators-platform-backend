@@ -1,7 +1,7 @@
 const ReferralCommission = require('../models/ReferralCommission');
 const ReferralCode = require('../models/ReferralCode');
 const User = require('../models/User');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
 
 const walletService = new MultiCurrencyWalletService();
@@ -251,14 +251,12 @@ exports.rejectCommission = async (req, res) => {
  */
 exports.getStats = async (req, res) => {
   try {
-    const sequelize = ReferralCommission.sequelize;
-
     // Total commissions by status
     const statusCounts = await ReferralCommission.findAll({
       attributes: [
         'status',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-        [sequelize.fn('SUM', sequelize.col('commission_amount')), 'total']
+        [fn('COUNT', col('id')), 'count'],
+        [fn('SUM', col('commission_amount')), 'total']
       ],
       group: ['status'],
       raw: true
@@ -269,7 +267,7 @@ exports.getStats = async (req, res) => {
 
     // Total clicks
     const clicksResult = await ReferralCode.findOne({
-      attributes: [[sequelize.fn('SUM', sequelize.col('clicks_count')), 'totalClicks']],
+      attributes: [[fn('SUM', col('clicks_count')), 'totalClicks']],
       raw: true
     });
 
@@ -277,12 +275,12 @@ exports.getStats = async (req, res) => {
     const topReferrers = await ReferralCommission.findAll({
       attributes: [
         'referrerUserId',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'referralCount'],
-        [sequelize.fn('SUM', sequelize.col('commission_amount')), 'totalEarnings']
+        [fn('COUNT', col('id')), 'referralCount'],
+        [fn('SUM', col('commission_amount')), 'totalEarnings']
       ],
       where: { status: ['approved', 'paid'] },
       group: ['referrerUserId'],
-      order: [[sequelize.fn('COUNT', sequelize.col('id')), 'DESC']],
+      order: [[fn('COUNT', col('id')), 'DESC']],
       limit: 10,
       include: [
         {
