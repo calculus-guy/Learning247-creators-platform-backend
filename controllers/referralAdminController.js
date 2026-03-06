@@ -275,12 +275,12 @@ exports.getStats = async (req, res) => {
     const topReferrers = await ReferralCommission.findAll({
       attributes: [
         'referrerUserId',
-        [fn('COUNT', col('id')), 'referralCount'],
+        [fn('COUNT', col('ReferralCommission.id')), 'referralCount'],
         [fn('SUM', col('commission_amount')), 'totalEarnings']
       ],
       where: { status: ['approved', 'paid'] },
       group: ['referrerUserId', 'referrer.id', 'referrer.firstname', 'referrer.lastname', 'referrer.email'],
-      order: [[fn('COUNT', col('id')), 'DESC']],
+      order: [[fn('COUNT', col('ReferralCommission.id')), 'DESC']],
       limit: 10,
       include: [
         {
