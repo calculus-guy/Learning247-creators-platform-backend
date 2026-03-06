@@ -165,10 +165,10 @@ async function setupReferralSystem() {
     console.log('   - GET /api/referral/my-earnings - View earnings');
     console.log('');
     console.log('   Admin Endpoints:');
-    console.log('   - GET /api/admin/referral-commissions - View all commissions');
-    console.log('   - GET /api/admin/referral-commissions/stats - View statistics');
-    console.log('   - PATCH /api/admin/referral-commissions/:id/approve - Approve & pay');
-    console.log('   - PATCH /api/admin/referral-commissions/:id/reject - Reject');
+    console.log('   - GET /api/referral/admin/commissions - View all commissions');
+    console.log('   - GET /api/referral/admin/commissions/stats - View statistics');
+    console.log('   - PATCH /api/referral/admin/commissions/:id/approve - Approve & pay');
+    console.log('   - PATCH /api/referral/admin/commissions/:id/reject - Reject');
     console.log('');
     console.log('💰 Referral Program Details:');
     console.log('   - Series: Digital Marketing Masterclass');

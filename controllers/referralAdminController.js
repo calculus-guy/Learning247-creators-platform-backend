@@ -279,7 +279,7 @@ exports.getStats = async (req, res) => {
         [fn('SUM', col('commission_amount')), 'totalEarnings']
       ],
       where: { status: ['approved', 'paid'] },
-      group: ['referrerUserId'],
+      group: ['referrerUserId', 'referrer.id'],
       order: [[fn('COUNT', col('id')), 'DESC']],
       limit: 10,
       include: [
