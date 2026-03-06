@@ -20,12 +20,12 @@ Feedback.belongsTo(User, {
 
 User.hasMany(Feedback, {
   foreignKey: 'userId',
-  as: 'feedbackSubmitted'
+  as: 'feedbacks'  // Changed from 'feedbackSubmitted' to avoid collision
 });
 
 User.hasMany(Feedback, {
   foreignKey: 'reviewedBy',
-  as: 'feedbackReviewed'
+  as: 'reviewedFeedbacks'  // Changed from 'feedbackReviewed'
 });
 
 module.exports = {
