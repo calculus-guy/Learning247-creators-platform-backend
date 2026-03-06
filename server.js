@@ -23,6 +23,7 @@ const courseRoutes = require('./routes/courseRoutes');
 const profileRoutes = require('./routes/profileRoutes');
 const feedbackRoutes = require('./routes/feedbackRoutes');
 const ugcRoutes = require('./routes/ugcRoutes');
+const referralRoutes = require('./routes/referralRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
@@ -33,6 +34,7 @@ require('./models/courseIndex');
 require('./models/liveSeriesIndex');
 require('./models/feedbackIndex');
 require('./models/ugcIndex');
+require('./models/referralIndex');
 
 const app = express();
 
@@ -94,6 +96,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/feedback', feedbackRoutes);
 app.use('/api/ugc', ugcRoutes);
+app.use('/api/referral', referralRoutes);
 
 app.use('/uploads', express.static('uploads'));
 

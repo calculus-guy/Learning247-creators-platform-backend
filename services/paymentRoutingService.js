@@ -61,17 +61,18 @@ class PaymentRoutingService {
    * @param {string} params.idempotencyKey - Idempotency key
    * @param {string} params.forceCurrency - Optional currency override
    * @param {string} params.couponCode - Optional coupon code (for live series)
+   * @param {string} params.referralCode - Optional referral code
    * @param {Object} params.metadata - Optional metadata (required for courses)
    * @returns {Promise<Object>} Payment initialization result
    */
-  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null, couponCode = null, metadata = {} }) {
+  async initializePayment({ userId, contentType, contentId, userEmail, idempotencyKey, forceCurrency = null, couponCode = null, referralCode = null, metadata = {} }) {
     try {
       // Validate idempotency
       const idempotencyResult = await this.idempotencyService.checkAndStore(
         idempotencyKey,
         userId,
         'payment_initialization',
-        { contentType, contentId, forceCurrency, couponCode }
+        { contentType, contentId, forceCurrency, couponCode, referralCode }
       );
 
       if (!idempotencyResult.isNew) {
@@ -80,6 +81,29 @@ class PaymentRoutingService {
           cached: true,
           data: idempotencyResult.storedResult
         };
+      }
+
+      // Validate referral code if provided
+      let referralValidation = null;
+      if (referralCode && contentType === 'live_series' && couponCode) {
+        const referralService = require('./referralService');
+        referralValidation = await referralService.validateReferral(
+          referralCode,
+          userId,
+          contentId,
+          couponCode
+        );
+
+        if (!referralValidation.valid) {
+          console.log(`[Payment Routing] Invalid referral: ${referralValidation.reason}`);
+          // Don't throw error - just log and continue without referral
+          referralValidation = null;
+        } else {
+          console.log(`[Payment Routing] Valid referral code: ${referralCode}`);
+          // Store for later use after payment success
+          metadata.referralCode = referralCode;
+          metadata.referrerUserId = referralValidation.referrerUserId;
+        }
       }
 
       // Get content details and determine currency
@@ -202,7 +226,12 @@ class PaymentRoutingService {
         amount,
         currency,
         email: userEmail,
-        contentTitle: contentDetails.title || contentDetails.name || `${contentType} purchase`
+        contentTitle: contentDetails.title || contentDetails.name || `${contentType} purchase`,
+        metadata: {
+          referralCode: metadata.referralCode || null,
+          referrerUserId: metadata.referrerUserId || null,
+          couponCode: couponCode || null
+        }
       });
 
       // Cache successful result
@@ -400,7 +429,7 @@ class PaymentRoutingService {
   /**
    * Process Paystack payment initialization
    */
-  async processPaystackPayment({ userId, contentType, contentId, amount, currency, email, contentTitle }) {
+  async processPaystackPayment({ userId, contentType, contentId, amount, currency, email, contentTitle, metadata = {} }) {
     try {
       // Build custom fields, excluding null contentId
       const customFields = [
@@ -433,6 +462,9 @@ class PaymentRoutingService {
           userId: userId.toString(),
           contentType,
           contentId: contentId ? contentId.toString() : null,  // Handle null
+          referralCode: metadata.referralCode || null,
+          referrerUserId: metadata.referrerUserId ? metadata.referrerUserId.toString() : null,
+          couponCode: metadata.couponCode || null,
           custom_fields: customFields
         },
         callback_url: `${process.env.CLIENT_URL}/payments/verify`
@@ -455,7 +487,7 @@ class PaymentRoutingService {
   /**
    * Process Stripe payment initialization
    */
-  async processStripePayment({ userId, contentType, contentId, amount, currency, email, contentTitle }) {
+  async processStripePayment({ userId, contentType, contentId, amount, currency, email, contentTitle, metadata = {} }) {
     try {
       const session = await stripeClient.checkout.sessions.create({
         payment_method_types: ['card'],
@@ -481,7 +513,10 @@ class PaymentRoutingService {
           contentType,
           contentId: contentId ? contentId.toString() : 'null',  // Handle null, Stripe doesn't accept null
           email,
-          contentTitle
+          contentTitle,
+          referralCode: metadata.referralCode || '',
+          referrerUserId: metadata.referrerUserId ? metadata.referrerUserId.toString() : '',
+          couponCode: metadata.couponCode || ''
         }
       });
 
@@ -664,6 +699,39 @@ class PaymentRoutingService {
         }
       } else {
         console.log(`[Payment Routing] Course purchase - no individual creator to credit`);
+      }
+
+      // Create referral commission if applicable
+      if (contentType === 'live_series' && paymentData.metadata.referralCode) {
+        try {
+          const referralService = require('./referralService');
+          const referralCode = paymentData.metadata.referralCode;
+          const referrerUserId = parseInt(paymentData.metadata.referrerUserId);
+
+          // Extract coupon code from payment metadata
+          let couponCode = null;
+          if (gateway === 'paystack') {
+            couponCode = paymentData.metadata.couponCode;
+          } else if (gateway === 'stripe') {
+            couponCode = paymentData.metadata.couponCode;
+          }
+
+          if (couponCode === 'SAVEBIG10') {
+            await referralService.createPendingCommission({
+              referralCode,
+              referrerUserId,
+              refereeUserId: userId,
+              purchaseId: purchase.id,
+              seriesId: contentId,
+              couponCode
+            });
+
+            console.log(`[Payment Routing] ✅ Created pending referral commission for referrer ${referrerUserId}`);
+          }
+        } catch (referralError) {
+          console.error(`[Payment Routing] ❌ Failed to create referral commission:`, referralError.message);
+          // Don't throw - purchase should succeed even if referral tracking fails
+        }
       }
 
       await transaction.commit();
