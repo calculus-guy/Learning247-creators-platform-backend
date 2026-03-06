@@ -31,6 +31,7 @@ const emailSchedulerService = require('./services/emailSchedulerService');
 require('./models/walletIndex');
 require('./models/courseIndex');
 require('./models/liveSeriesIndex');
+require('./models/feedbackIndex');
 require('./models/ugcIndex');
 
 const app = express();
