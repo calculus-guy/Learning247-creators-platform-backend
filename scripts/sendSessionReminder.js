@@ -13,14 +13,16 @@ async function sendRemindersForSeries(seriesId) {
   try {
     console.log(`\n🔔 Sending session reminders for series: ${seriesId}\n`);
 
-    // Get the next upcoming session for this series
-    const now = new Date();
+    // Get the session for March 7th, 2026 specifically
+    const march7Start = new Date('2026-03-07T00:00:00');
+    const march7End = new Date('2026-03-07T23:59:59');
+    
     const session = await LiveSession.findOne({
       where: {
         seriesId: seriesId,
-        status: 'scheduled',
         scheduledStartTime: {
-          [Op.gte]: now
+          [Op.gte]: march7Start,
+          [Op.lte]: march7End
         }
       },
       include: [{
@@ -32,7 +34,7 @@ async function sendRemindersForSeries(seriesId) {
     });
 
     if (!session) {
-      console.log('❌ No upcoming scheduled sessions found for this series');
+      console.log('❌ No session found for March 7th, 2026 for this series');
       return;
     }
 
@@ -104,7 +106,7 @@ async function sendRemindersForSeries(seriesId) {
 
     // Mark session as reminder sent
     await session.update({ reminderSent: true });
-    console.log('✓ Marked session as reminder sent\n');
+    console.log('✓ Marked March 7th session as reminder sent\n');
 
   } catch (error) {
     console.error('❌ Error:', error);
