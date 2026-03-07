@@ -107,6 +107,7 @@ class NotificationService {
       
       const sessionData = {
         sessionId: session.id,
+        seriesId: session.seriesId, // Add seriesId for the join link
         sessionNumber: session.sessionNumber,
         seriesTitle: session.series.title,
         scheduledStartTime: session.scheduledStartTime,

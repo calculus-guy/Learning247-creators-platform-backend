@@ -620,7 +620,7 @@ exports.sendLiveSeriesPurchaseEmail = async (to, firstname, seriesTitle, totalSe
  * SESSION REMINDER EMAIL (1 hour before)
  */
 exports.sendSessionReminderEmail = async (to, firstname, sessionData) => {
-  const { sessionId, sessionNumber, seriesTitle, scheduledStartTime, thumbnailUrl } = sessionData;
+  const { sessionId, seriesId, sessionNumber, seriesTitle, scheduledStartTime, thumbnailUrl } = sessionData;
   
   const startTime = new Date(scheduledStartTime);
   const formattedDate = startTime.toLocaleDateString('en-US', { 
@@ -635,7 +635,10 @@ exports.sendSessionReminderEmail = async (to, firstname, sessionData) => {
     timeZoneName: 'short'
   });
 
-  const joinUrl = `${process.env.CLIENT_URL}/session/${sessionId}/join`;
+  // Use seriesId if provided, otherwise fall back to sessionId
+  const joinUrl = seriesId 
+    ? `${process.env.CLIENT_URL}/series/${seriesId}`
+    : `${process.env.CLIENT_URL}/session/${sessionId}/join`;
   const calendarUrl = `${process.env.CLIENT_URL}/session/${sessionId}/calendar`;
 
   const html = `

@@ -73,6 +73,7 @@ async function sendRemindersForSeries(seriesId) {
     // Prepare session data
     const sessionData = {
       sessionId: session.id,
+      seriesId: seriesId, // Add seriesId for the join link
       sessionNumber: session.sessionNumber,
       seriesTitle: session.series.title,
       scheduledStartTime: session.scheduledStartTime,
