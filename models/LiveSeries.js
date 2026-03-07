@@ -71,7 +71,7 @@ const LiveSeries = sequelize.define('LiveSeries', {
   maxParticipants: {
     type: DataTypes.INTEGER,
     allowNull: true,
-    defaultValue: 50,
+    defaultValue: 200,
     field: 'max_participants'
   }
 }, {

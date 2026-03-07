@@ -98,7 +98,7 @@ exports.createSeries = async (req, res) => {
       endDate: end,
       recurrencePattern,
       privacy: privacy || 'public',
-      maxParticipants: maxParticipants || 50,
+      maxParticipants: maxParticipants || 200,
       status: 'active'
     });
     

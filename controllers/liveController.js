@@ -81,7 +81,7 @@ exports.createLiveClass = async (req, res) => {
         zego_room_id: null,
         zego_app_id: null,
         zego_room_token: null,
-        max_participants: req.body.maxParticipants || 50
+        max_participants: req.body.maxParticipants || 200
       };
     }
     
