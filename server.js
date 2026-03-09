@@ -103,7 +103,7 @@ app.use('/uploads', express.static('uploads'));
 app.use('/videos', videoRoutes); 
 
 const PORT = process.env.PORT || 8080; 
-   
+    
 sequelize.sync({ force: false })
   .then(() => {
     app.listen(PORT, () => {
