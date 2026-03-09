@@ -16,3 +16,5 @@ https://prod-api.aahbibi.com
   ssh -i "C:\Users\HP\Documents\Learning247-creators\backend\autoware.pem" ubuntu@34.251.237.6
 
   pm2 restart backend
+
+  ii have unfinidhed business with a script that sends auto email to users before class session starts
