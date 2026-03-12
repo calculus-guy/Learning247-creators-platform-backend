@@ -328,5 +328,3 @@ exports.getRecordingHistory = async (req, res) => {
     });
   }
 };
-
-module.exports = exports;

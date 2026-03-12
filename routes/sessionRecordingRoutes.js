@@ -1,8 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const sessionRecordingController = require('../controllers/sessionRecordingController');
-const { authenticateToken } = require('../middleware/authMiddleware');
-const { isAdmin } = require('../middleware/adminMiddleware');
+const authMiddleware = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 
 /**
  * Session Recording Routes
@@ -21,8 +21,8 @@ const { isAdmin } = require('../middleware/adminMiddleware');
  */
 router.post(
   '/:seriesId/send-recording/test',
-  authenticateToken,
-  isAdmin,
+  authMiddleware,
+  adminMiddleware,
   sessionRecordingController.sendTestRecordingEmail
 );
 
@@ -40,8 +40,8 @@ router.post(
  */
 router.post(
   '/:seriesId/send-recording',
-  authenticateToken,
-  isAdmin,
+  authMiddleware,
+  adminMiddleware,
   sessionRecordingController.sendRecordingToStudents
 );
 
@@ -51,8 +51,8 @@ router.post(
  */
 router.get(
   '/:seriesId/recording-history',
-  authenticateToken,
-  isAdmin,
+  authMiddleware,
+  adminMiddleware,
   sessionRecordingController.getRecordingHistory
 );
 
