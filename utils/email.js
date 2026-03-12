@@ -858,3 +858,92 @@ exports.sendCollaborationRequestEmail = async (companyEmail, userEmail, collabor
     html,
   });
 };
+
+
+/**
+ * SESSION RECORDING EMAIL
+ * Sends recording links to enrolled students
+ */
+exports.sendSessionRecordingEmail = async (to, firstname, recordingData) => {
+  const { seriesTitle, recordings, customMessage, thumbnailUrl } = recordingData;
+  
+  // Build recordings list HTML
+  const recordingsHtml = recordings.map(rec => `
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #007bff;">
+      <h4 style="color: #333; margin-top: 0;">Session ${rec.sessionNumber}</h4>
+      <div style="text-align: center; margin: 15px 0;">
+        <a href="${rec.driveLink}" style="background-color: #4285f4; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
+          📹 Watch Recording
+        </a>
+      </div>
+    </div>
+  `).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Session Recording Available! 🎥</h2>
+
+      <p>Hi ${firstname},</p>
+
+      <p>
+        Great news! The recording${recordings.length > 1 ? 's' : ''} for your live session${recordings.length > 1 ? 's are' : ' is'} now available.
+      </p>
+
+      <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <h3 style="color: #333; margin-top: 0;">${seriesTitle}</h3>
+        <p style="margin: 5px 0;">You can now watch the recording${recordings.length > 1 ? 's' : ''} at your convenience!</p>
+      </div>
+
+      ${thumbnailUrl ? `
+      <div style="text-align: center; margin: 20px 0;">
+        <img src="${thumbnailUrl}" alt="${seriesTitle}" style="max-width: 100%; height: auto; border-radius: 8px;" />
+      </div>
+      ` : ''}
+
+      ${customMessage ? `
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0;"><strong>Message from your instructor:</strong></p>
+        <p style="margin: 10px 0 0 0;">${customMessage}</p>
+      </div>
+      ` : ''}
+
+      <h3>Available Recordings:</h3>
+      ${recordingsHtml}
+
+      <div style="background-color: #f0f7ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+        <p style="margin: 0;"><strong>📝 How to Access:</strong></p>
+        <ol style="margin: 10px 0 0 0;">
+          <li>Click the "Watch Recording" button above</li>
+          <li>You'll be redirected to Google Drive</li>
+          <li>Stream or download the recording</li>
+          <li>Watch at your own pace and take notes</li>
+        </ol>
+      </div>
+
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <p style="margin: 0;"><strong>💡 Pro Tip:</strong> Rewatch the session to reinforce your learning and catch any details you might have missed!</p>
+      </div>
+
+      <p><strong>Need Help?</strong></p>
+      <p>
+        If you have any issues accessing the recording${recordings.length > 1 ? 's' : ''}, please contact our support team 
+        via WhatsApp at <a href="https://wa.me/2347074119865" style="color: #25D366; text-decoration: none; font-weight: bold;">+234 707 411 9865</a>
+      </p>
+
+      <p>
+        Keep learning and growing!
+      </p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Recordings" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Session Recording Available - ${seriesTitle}`,
+    html,
+  });
+};
