@@ -17,7 +17,7 @@ const { v4: uuidv4 } = require('uuid');
  */
 
 /**
- * Send test recording email
+ * Send recording email to individual student (manual send)
  * POST /api/admin/live-series/:seriesId/send-recording/test
  */
 exports.sendTestRecordingEmail = async (req, res) => {
@@ -29,7 +29,7 @@ exports.sendTestRecordingEmail = async (req, res) => {
     if (!testEmail) {
       return res.status(400).json({
         success: false,
-        message: 'Test email address is required'
+        message: 'Student email address is required'
       });
     }
 
@@ -60,6 +60,60 @@ exports.sendTestRecordingEmail = async (req, res) => {
       });
     }
 
+    // Look up student by email
+    const student = await User.findOne({
+      where: { email: testEmail },
+      attributes: ['id', 'email', 'firstname', 'lastname']
+    });
+
+    if (!student) {
+      return res.status(404).json({
+        success: false,
+        message: `No user found with email: ${testEmail}`
+      });
+    }
+
+    // Check if student is enrolled in this series
+    const enrollment = await Purchase.findOne({
+      where: {
+        contentType: 'live_series',
+        contentId: seriesId,
+        userId: student.id,
+        paymentStatus: 'completed'
+      }
+    });
+
+    if (!enrollment) {
+      return res.status(400).json({
+        success: false,
+        message: `${student.firstname} (${testEmail}) is not enrolled in this series`
+      });
+    }
+
+    // Check if student already received these recordings
+    const sessionNumbers = recordings.map(r => r.sessionNumber);
+    const existingSends = await SessionRecordingSend.findAll({
+      where: {
+        seriesId: seriesId,
+        userId: student.id,
+        sessionNumber: {
+          [Op.in]: sessionNumbers
+        }
+      },
+      attributes: ['sessionNumber']
+    });
+
+    const receivedSessionNumbers = existingSends.map(s => s.sessionNumber);
+    const alreadyReceived = sessionNumbers.filter(num => receivedSessionNumbers.includes(num));
+
+    if (alreadyReceived.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `${student.firstname} already received recording(s) for session(s): ${alreadyReceived.join(', ')}`,
+        alreadyReceivedSessions: alreadyReceived
+      });
+    }
+
     // Prepare recording data
     const recordingData = {
       seriesTitle: series.title,
@@ -71,25 +125,48 @@ exports.sendTestRecordingEmail = async (req, res) => {
       thumbnailUrl: series.thumbnailUrl
     };
 
-    // Send test email
+    // Generate batch ID for this manual send
+    const batchId = uuidv4();
+
+    // Send email with student's actual name
     await sendSessionRecordingEmail(
-      testEmail,
-      'Test User',
+      student.email,
+      student.firstname,
       recordingData
     );
 
-    console.log(`[Recording Controller] Test email sent to ${testEmail}`);
+    // Track in database
+    for (const recording of recordings) {
+      await SessionRecordingSend.create({
+        seriesId: seriesId,
+        sessionNumber: recording.sessionNumber,
+        userId: student.id,
+        driveLink: recording.driveLink,
+        sendBatchId: batchId,
+        sentAt: new Date()
+      });
+    }
+
+    console.log(`[Recording Controller] Manual send to ${student.email} (${student.firstname}) - Batch ID: ${batchId}`);
 
     return res.status(200).json({
       success: true,
-      message: `Test email sent successfully to ${testEmail}`
+      message: `Recording email sent successfully to ${student.firstname} (${testEmail})`,
+      batchId: batchId,
+      student: {
+        id: student.id,
+        email: student.email,
+        firstname: student.firstname,
+        lastname: student.lastname
+      },
+      sessionsSent: sessionNumbers
     });
 
   } catch (error) {
-    console.error('[Recording Controller] Send test email error:', error);
+    console.error('[Recording Controller] Manual send error:', error);
     return res.status(500).json({
       success: false,
-      message: 'Failed to send test email: ' + error.message
+      message: 'Failed to send recording email: ' + error.message
     });
   }
 };
