@@ -3,7 +3,8 @@ const { uploadVideo,
     getAllVideos,
   getVideoById,
   getUserVideos,
-  getMyVideos
+  getMyVideos,
+  deleteVideo
  } = require('../controllers/videoController');
 const { upload } = require('../utils/multerConfig');
 const authMiddleware = require('../middleware/authMiddleware');
@@ -27,5 +28,6 @@ router.get('/', getAllVideos);             // public feed
 router.get('/my-videos', authMiddleware, getMyVideos); // current user's videos
 router.get('/user/:userId', authMiddleware, getUserVideos); // creator dashboard
 router.get('/:id', checkContentAccess, getVideoById);          // single video + metadata (with access control)
+router.delete('/:id', authMiddleware, deleteVideo);             // delete video
 
 module.exports = router;

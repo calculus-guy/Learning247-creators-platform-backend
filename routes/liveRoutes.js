@@ -27,5 +27,6 @@ router.get('/:id/attendees', authMiddleware, liveController.getAttendees);
 // ZegoCloud specific routes
 router.post('/:id/start-zegocloud', authMiddleware, liveController.startZegoCloudSession);
 router.post('/:id/end-zegocloud', authMiddleware, liveController.endZegoCloudSession);
+router.delete('/:id', authMiddleware, liveController.deleteLiveClass);
 
 module.exports = router;

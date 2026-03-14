@@ -665,3 +665,99 @@ exports.getMyLiveClasses = async (req, res) => {
     return handleError(res, error);
   }
 };
+
+/**
+ * Delete live class
+ * DELETE /live/:id
+ */
+exports.deleteLiveClass = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const liveClass = await LiveClass.findByPk(id);
+
+    if (!liveClass) {
+      return res.status(404).json({ success: false, message: 'Live class not found' });
+    }
+
+    // Ownership check
+    if (liveClass.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own live classes' });
+    }
+
+    // Block deletion if currently live
+    if (liveClass.status === 'live') {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete a live class that is currently streaming. Please end the session first.'
+      });
+    }
+
+    // Check for completed purchases
+    const Purchase = require('../models/Purchase');
+    const purchaseCount = await Purchase.count({
+      where: {
+        contentType: 'live_class',
+        contentId: id,
+        paymentStatus: 'completed'
+      }
+    });
+
+    if (purchaseCount > 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'This live class has been purchased by users and cannot be deleted. Please contact support.',
+        hasPurchases: true
+      });
+    }
+
+    // Delete thumbnail from S3
+    if (liveClass.thumbnailUrl && liveClass.thumbnailUrl.startsWith('https://')) {
+      try {
+        const { deleteFileFromS3 } = require('../services/s3Service');
+        await deleteFileFromS3(liveClass.thumbnailUrl);
+        console.log(`[Live Controller] Deleted thumbnail from S3: ${liveClass.thumbnailUrl}`);
+      } catch (s3Error) {
+        console.error('[Live Controller] Failed to delete thumbnail from S3:', s3Error.message);
+        // Non-fatal - continue with deletion
+      }
+    }
+
+    // Delete Mux live stream and recording asset
+    if (liveClass.streaming_provider === 'mux') {
+      const mux = require('../config/mux');
+
+      if (liveClass.mux_stream_id) {
+        try {
+          await mux.video.liveStreams.delete(liveClass.mux_stream_id);
+          console.log(`[Live Controller] Deleted Mux live stream: ${liveClass.mux_stream_id}`);
+        } catch (muxError) {
+          console.error('[Live Controller] Failed to delete Mux live stream:', muxError.message);
+        }
+      }
+
+      if (liveClass.recording_asset_id) {
+        try {
+          await mux.video.assets.delete(liveClass.recording_asset_id);
+          console.log(`[Live Controller] Deleted Mux recording asset: ${liveClass.recording_asset_id}`);
+        } catch (muxError) {
+          console.error('[Live Controller] Failed to delete Mux recording asset:', muxError.message);
+        }
+      }
+    }
+
+    // Delete from DB (cascades to LiveHost and LiveAttendee)
+    await liveClass.destroy();
+
+    console.log(`[Live Controller] Live class ${id} deleted by user ${userId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Live class deleted successfully'
+    });
+
+  } catch (error) {
+    return handleError(res, error);
+  }
+};

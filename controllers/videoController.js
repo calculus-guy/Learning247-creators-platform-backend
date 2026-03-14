@@ -246,3 +246,80 @@ exports.getMyVideos = async (req, res) => {
     return res.status(500).json({ message: 'Server error fetching videos.' });
   }
 };
+
+// ============================
+//  DELETE VIDEO
+// ============================
+exports.deleteVideo = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const video = await Video.findByPk(id);
+
+    if (!video) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
+    }
+
+    // Ownership check
+    if (video.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own videos' });
+    }
+
+    // Check for completed purchases
+    const Purchase = require('../models/Purchase');
+    const purchaseCount = await Purchase.count({
+      where: {
+        contentType: 'video',
+        contentId: id,
+        paymentStatus: 'completed'
+      }
+    });
+
+    if (purchaseCount > 0) {
+      return res.status(403).json({
+        success: false,
+        message: 'This video has been purchased by users and cannot be deleted. Please contact support.',
+        hasPurchases: true
+      });
+    }
+
+    // Delete thumbnail from S3
+    if (video.thumbnailUrl && video.thumbnailUrl.startsWith('https://')) {
+      try {
+        const { deleteFileFromS3 } = require('../services/s3Service');
+        await deleteFileFromS3(video.thumbnailUrl);
+        console.log(`[Video Controller] Deleted thumbnail from S3: ${video.thumbnailUrl}`);
+      } catch (s3Error) {
+        console.error('[Video Controller] Failed to delete thumbnail from S3:', s3Error.message);
+        // Non-fatal - continue with deletion
+      }
+    }
+
+    // Delete Mux asset
+    if (video.muxAssetId) {
+      try {
+        const mux = require('../config/mux');
+        await mux.video.assets.delete(video.muxAssetId);
+        console.log(`[Video Controller] Deleted Mux asset: ${video.muxAssetId}`);
+      } catch (muxError) {
+        console.error('[Video Controller] Failed to delete Mux asset:', muxError.message);
+        // Non-fatal - continue with deletion
+      }
+    }
+
+    // Delete from DB
+    await video.destroy();
+
+    console.log(`[Video Controller] Video ${id} deleted by user ${userId}`);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Video deleted successfully'
+    });
+
+  } catch (error) {
+    console.error('[Video Controller] Delete video error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete video' });
+  }
+};
