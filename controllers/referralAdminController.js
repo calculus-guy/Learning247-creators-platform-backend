@@ -111,7 +111,7 @@ exports.approveCommission = async (req, res) => {
         currency: 'NGN',
         amount: parseFloat(commission.commissionAmount),
         reference: `REFERRAL-${commission.id}`,
-        description: `Referral commission from Digital Marketing class`,
+        description: `Referral commission from Video Editing class`,
         metadata: {
           commissionId: commission.id,
           refereeUserId: commission.refereeUserId,

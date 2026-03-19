@@ -25,7 +25,7 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 
 /**
  * @route   POST /api/referral/generate-link
- * @desc    Generate referral link for Digital Marketing class
+ * @desc    Generate referral link for Video Editing class
  * @access  Private (authenticated users)
  */
 router.post('/generate-link', authMiddleware, referralController.generateLink);

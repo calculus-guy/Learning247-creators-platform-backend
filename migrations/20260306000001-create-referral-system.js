@@ -7,7 +7,7 @@
  * - referral_codes: Stores unique referral codes per user
  * - referral_commissions: Tracks commissions from referrals
  * 
- * MVP Version: Hardcoded for Digital Marketing class + SaveBig10
+ * MVP Version: Hardcoded for Video Editing class + SaveBig10
  */
 
 module.exports = {
@@ -43,7 +43,7 @@ module.exports = {
       series_id: {
         type: Sequelize.UUID,
         allowNull: false,
-        comment: 'Live series ID (Digital Marketing)'
+        comment: 'Live series ID (Video Editing)'
       },
       clicks_count: {
         type: Sequelize.INTEGER,

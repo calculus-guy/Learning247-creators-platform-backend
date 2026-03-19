@@ -10,7 +10,7 @@ const crypto = require('crypto');
  * Referral Service
  * 
  * Handles referral link generation, tracking, and commission management
- * MVP Version: Hardcoded for Digital Marketing class + SaveBig10
+ * MVP Version: Hardcoded for Video Editing class + SaveBig10
  */
 
 class ReferralService {
@@ -35,16 +35,16 @@ class ReferralService {
   /**
    * Generate referral link for user
    * @param {number} userId - User ID
-   * @param {string} seriesId - Live series ID (optional, defaults to Digital Marketing)
+   * @param {string} seriesId - Live series ID (optional, defaults to Video Editing)
    * @returns {Promise<Object>} Referral link details
    */
   async generateReferralLink(userId, seriesId = null) {
     try {
-      // MVP: Only allow Digital Marketing series
+      // MVP: Only allow Video Editing series
       const targetSeriesId = seriesId || this.DIGITAL_MARKETING_SERIES_ID;
       
       if (targetSeriesId !== this.DIGITAL_MARKETING_SERIES_ID) {
-        throw new Error('Referral program only available for Digital Marketing class');
+        throw new Error('Referral program only available for Video Editing class');
       }
 
       // Check if user already has a referral code for this series
@@ -109,7 +109,7 @@ class ReferralService {
    * Build shareable message
    */
   buildShareMessage(referralLink, referralCode) {
-    return `🎓 Join me on Hallos for the Digital Marketing Masterclass!
+    return `🎓 Join me on Hallos for the Video Editing Masterclass!
 
 Learn from industry experts and transform your career.
 
