@@ -16,7 +16,7 @@ const referralService = require('../services/referralService');
 exports.generateLink = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { seriesId } = req.body;
+    const seriesId = req.body?.seriesId || null;
 
     const result = await referralService.generateReferralLink(userId, seriesId);
 
