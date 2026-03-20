@@ -49,7 +49,7 @@ const allowedOrigins = [
   'https://hallos.net',
   'https://www.quiz.hallos.net'
 ];
-  
+   
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
