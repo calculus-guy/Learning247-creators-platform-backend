@@ -1,4 +1,4 @@
-const { DatabaseTransactionService } = require('./databaseTransactionService');
+const databaseTransactionService = require('./databaseTransactionService');
 const sequelize = require('../config/db');
 
 /**
@@ -16,7 +16,7 @@ const sequelize = require('../config/db');
 
 class MultiCurrencyWalletService {
   constructor() {
-    this.transactionService = new DatabaseTransactionService(sequelize);
+    this.transactionService = databaseTransactionService;
     this.supportedCurrencies = ['NGN', 'USD'];
     this.gatewayMapping = {
       'NGN': 'paystack',

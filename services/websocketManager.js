@@ -1,0 +1,689 @@
+const socketIO = require('socket.io');
+const jwt = require('jsonwebtoken');
+const lobbyService = require('./lobbyService');
+const activeUserTracker = require('./activeUserTracker');
+
+/**
+ * WebSocket Manager
+ * 
+ * Manages real-time communication for quiz matches and tournaments
+ * Features:
+ * - Authentication
+ * - Room-based messaging
+ * - Heartbeat monitoring
+ * - Reconnection handling
+ * - Match and tournament events
+ * - Active user tracking
+ */
+
+class WebSocketManager {
+  constructor() {
+    this.io = null;
+    this.connectedUsers = new Map(); // userId -> { socketId, lastHeartbeat }
+    this.userSockets = new Map(); // socketId -> userId
+    this.matchRooms = new Map(); // matchId -> Set of socketIds
+    this.tournamentRooms = new Map(); // tournamentId -> Set of socketIds
+    this.disconnectedUsers = new Map(); // userId -> { disconnectedAt, matchId, tournamentId }
+    this.reconnectionTimers = new Map(); // userId -> timeoutId
+    this.RECONNECTION_GRACE_PERIOD = 30000; // 30 seconds
+  }
+
+  /**
+   * Initialize Socket.io server
+   * 
+   * @param {Object} server - HTTP server instance
+   */
+  initialize(server) {
+    this.io = socketIO(server, {
+      cors: {
+        origin: [
+          'https://www.hallos.net',
+          'https://hallos.net',
+          'https://www.quiz.hallos.net',
+          'http://localhost:3000',
+          'http://localhost:3001'
+        ],
+        credentials: true,
+        methods: ['GET', 'POST']
+      },
+      pingTimeout: 60000,
+      pingInterval: 25000
+    });
+
+    // Authentication middleware
+    this.io.use(async (socket, next) => {
+      try {
+        const token = socket.handshake.auth.token || socket.handshake.headers.authorization?.replace('Bearer ', '');
+
+        if (!token) {
+          return next(new Error('Authentication required'));
+        }
+
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.userId = decoded.id || decoded.userId;
+        socket.user = decoded;
+
+        next();
+      } catch (error) {
+        console.error('[WebSocket] Authentication error:', error.message);
+        next(new Error('Invalid token'));
+      }
+    });
+
+    // Connection handler
+    this.io.on('connection', (socket) => {
+      this.handleConnection(socket);
+    });
+
+    // Start heartbeat monitor
+    this.startHeartbeatMonitor();
+
+    console.log('✅ WebSocket Manager initialized');
+  }
+
+  /**
+   * Handle new socket connection
+   */
+  handleConnection(socket) {
+    const userId = socket.userId;
+    console.log(`[WebSocket] User ${userId} connected (${socket.id})`);
+
+    // Check if user is reconnecting
+    if (this.disconnectedUsers.has(userId)) {
+      this.handleReconnection(socket, userId);
+      return;
+    }
+
+    // Store connection
+    this.connectedUsers.set(userId, {
+      socketId: socket.id,
+      lastHeartbeat: Date.now()
+    });
+    this.userSockets.set(socket.id, userId);
+
+    // Mark user as active in Redis
+    activeUserTracker.markUserActive(userId).catch(err => {
+      console.error(`[WebSocket] Error marking user ${userId} active:`, err.message);
+    });
+
+    // Send authentication confirmation
+    socket.emit('authenticated', {
+      userId,
+      socketId: socket.id,
+      timestamp: Date.now()
+    });
+
+    // Register event handlers
+    this.registerMatchEvents(socket);
+    this.registerTournamentEvents(socket);
+    this.registerHeartbeatEvents(socket);
+    this.registerActiveUserEvents(socket);
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      this.handleDisconnection(socket);
+    });
+  }
+
+  /**
+   * Handle user reconnection
+   */
+  handleReconnection(socket, userId) {
+    console.log(`[WebSocket] User ${userId} reconnecting (${socket.id})`);
+
+    const disconnectInfo = this.disconnectedUsers.get(userId);
+    
+    // Clear reconnection timer
+    if (this.reconnectionTimers.has(userId)) {
+      clearTimeout(this.reconnectionTimers.get(userId));
+      this.reconnectionTimers.delete(userId);
+    }
+
+    // Remove from disconnected users
+    this.disconnectedUsers.delete(userId);
+
+    // Restore connection
+    this.connectedUsers.set(userId, {
+      socketId: socket.id,
+      lastHeartbeat: Date.now()
+    });
+    this.userSockets.set(socket.id, userId);
+
+    // Mark user as active in Redis
+    activeUserTracker.markUserActive(userId).catch(err => {
+      console.error(`[WebSocket] Error marking user ${userId} active:`, err.message);
+    });
+
+    // Send reconnection confirmation
+    socket.emit('reconnected', {
+      userId,
+      socketId: socket.id,
+      timestamp: Date.now(),
+      matchId: disconnectInfo?.matchId,
+      tournamentId: disconnectInfo?.tournamentId
+    });
+
+    // Rejoin rooms if applicable
+    if (disconnectInfo?.matchId) {
+      socket.join(`match:${disconnectInfo.matchId}`);
+      
+      if (!this.matchRooms.has(disconnectInfo.matchId)) {
+        this.matchRooms.set(disconnectInfo.matchId, new Set());
+      }
+      this.matchRooms.get(disconnectInfo.matchId).add(socket.id);
+
+      // Notify about reconnection
+      socket.emit('match_state_restored', {
+        matchId: disconnectInfo.matchId,
+        message: 'You have been reconnected to the match'
+      });
+    }
+
+    if (disconnectInfo?.tournamentId) {
+      socket.join(`tournament:${disconnectInfo.tournamentId}`);
+      
+      if (!this.tournamentRooms.has(disconnectInfo.tournamentId)) {
+        this.tournamentRooms.set(disconnectInfo.tournamentId, new Set());
+      }
+      this.tournamentRooms.get(disconnectInfo.tournamentId).add(socket.id);
+
+      // Notify about reconnection
+      socket.emit('tournament_state_restored', {
+        tournamentId: disconnectInfo.tournamentId,
+        message: 'You have been reconnected to the tournament'
+      });
+    }
+
+    // Register event handlers
+    this.registerMatchEvents(socket);
+    this.registerTournamentEvents(socket);
+    this.registerHeartbeatEvents(socket);
+    this.registerActiveUserEvents(socket);
+
+    // Handle disconnection
+    socket.on('disconnect', () => {
+      this.handleDisconnection(socket);
+    });
+
+    console.log(`[WebSocket] User ${userId} successfully reconnected`);
+  }
+
+  /**
+   * Register match-related events
+   */
+  registerMatchEvents(socket) {
+    const userId = socket.userId;
+
+    // Join match room
+    socket.on('join_match', async (data) => {
+      try {
+        const { matchId } = data;
+
+        // Verify user is participant
+        const match = await lobbyService.getMatch(matchId);
+        const isParticipant = match.participants.some(p => p.userId === userId);
+
+        if (!isParticipant) {
+          socket.emit('error', {
+            code: 'FORBIDDEN',
+            message: 'You are not a participant in this match'
+          });
+          return;
+        }
+
+        // Join room
+        socket.join(`match:${matchId}`);
+        
+        if (!this.matchRooms.has(matchId)) {
+          this.matchRooms.set(matchId, new Set());
+        }
+        this.matchRooms.get(matchId).add(socket.id);
+
+        socket.emit('match_joined', {
+          matchId,
+          timestamp: Date.now()
+        });
+
+        console.log(`[WebSocket] User ${userId} joined match ${matchId}`);
+      } catch (error) {
+        console.error('[WebSocket] Join match error:', error);
+        socket.emit('error', {
+          code: 'JOIN_MATCH_ERROR',
+          message: error.message
+        });
+      }
+    });
+
+    // Submit answer
+    socket.on('submit_answer', async (data) => {
+      try {
+        const { matchId, questionId, answerId, clientTimestamp } = data;
+
+        // Submit answer via service
+        const result = await lobbyService.submitAnswer(
+          matchId,
+          userId,
+          questionId,
+          answerId,
+          clientTimestamp
+        );
+
+        // Confirm to sender
+        socket.emit('answer_recorded', {
+          questionId,
+          success: result.success,
+          responseTime: result.responseTime
+        });
+
+        // Notify opponent of progress
+        this.io.to(`match:${matchId}`).emit('opponent_progress', {
+          userId,
+          questionId
+        });
+
+        console.log(`[WebSocket] User ${userId} answered question ${questionId} in match ${matchId}`);
+      } catch (error) {
+        console.error('[WebSocket] Submit answer error:', error);
+        socket.emit('error', {
+          code: 'SUBMIT_ANSWER_ERROR',
+          message: error.message
+        });
+      }
+    });
+
+    // Leave match room
+    socket.on('leave_match', (data) => {
+      const { matchId } = data;
+      socket.leave(`match:${matchId}`);
+      
+      if (this.matchRooms.has(matchId)) {
+        this.matchRooms.get(matchId).delete(socket.id);
+      }
+
+      console.log(`[WebSocket] User ${userId} left match ${matchId}`);
+    });
+  }
+
+  /**
+   * Register tournament-related events
+   */
+  registerTournamentEvents(socket) {
+    const userId = socket.userId;
+
+    // Join tournament room
+    socket.on('join_tournament', async (data) => {
+      try {
+        const { tournamentId } = data;
+
+        // Join room
+        socket.join(`tournament:${tournamentId}`);
+        
+        if (!this.tournamentRooms.has(tournamentId)) {
+          this.tournamentRooms.set(tournamentId, new Set());
+        }
+        this.tournamentRooms.get(tournamentId).add(socket.id);
+
+        socket.emit('tournament_joined', {
+          tournamentId,
+          timestamp: Date.now()
+        });
+
+        console.log(`[WebSocket] User ${userId} joined tournament ${tournamentId}`);
+      } catch (error) {
+        console.error('[WebSocket] Join tournament error:', error);
+        socket.emit('error', {
+          code: 'JOIN_TOURNAMENT_ERROR',
+          message: error.message
+        });
+      }
+    });
+
+    // Submit tournament answer
+    socket.on('submit_tournament_answer', async (data) => {
+      try {
+        const { tournamentId, roundNumber, questionId, answerId, clientTimestamp } = data;
+
+        // TODO: Implement tournament answer submission
+        // This would be similar to match answer submission but for tournaments
+
+        socket.emit('tournament_answer_recorded', {
+          questionId,
+          success: true
+        });
+
+        console.log(`[WebSocket] User ${userId} answered tournament question`);
+      } catch (error) {
+        console.error('[WebSocket] Submit tournament answer error:', error);
+        socket.emit('error', {
+          code: 'SUBMIT_TOURNAMENT_ANSWER_ERROR',
+          message: error.message
+        });
+      }
+    });
+
+    // Leave tournament room
+    socket.on('leave_tournament', (data) => {
+      const { tournamentId } = data;
+      socket.leave(`tournament:${tournamentId}`);
+      
+      if (this.tournamentRooms.has(tournamentId)) {
+        this.tournamentRooms.get(tournamentId).delete(socket.id);
+      }
+
+      console.log(`[WebSocket] User ${userId} left tournament ${tournamentId}`);
+    });
+  }
+
+  /**
+   * Register heartbeat events
+   */
+  registerHeartbeatEvents(socket) {
+    const userId = socket.userId;
+
+    socket.on('heartbeat', (data) => {
+      const serverTime = Date.now();
+      const clientTime = data.timestamp;
+      const latency = serverTime - clientTime;
+
+      // Update last heartbeat
+      if (this.connectedUsers.has(userId)) {
+        this.connectedUsers.get(userId).lastHeartbeat = serverTime;
+      }
+
+      // Mark user as active in Redis
+      activeUserTracker.markUserActive(userId).catch(err => {
+        console.error(`[WebSocket] Error marking user ${userId} active:`, err.message);
+      });
+
+      // Send acknowledgment
+      socket.emit('heartbeat_ack', {
+        serverTime,
+        latency
+      });
+
+      // Warn if high latency
+      if (latency > 500) {
+        socket.emit('connection_warning', {
+          latency,
+          message: 'High latency detected. Your connection may be unstable.'
+        });
+      }
+    });
+  }
+
+  /**
+   * Register active user tracking events
+   */
+  registerActiveUserEvents(socket) {
+    const userId = socket.userId;
+
+    // User activity ping (when user interacts with quiz screen)
+    socket.on('user_activity', async () => {
+      try {
+        await activeUserTracker.markUserActive(userId);
+      } catch (error) {
+        console.error(`[WebSocket] Error handling user activity for ${userId}:`, error.message);
+      }
+    });
+
+    // Request active user count
+    socket.on('get_active_users', async () => {
+      try {
+        const count = await activeUserTracker.getActiveUserCount();
+        socket.emit('active_users_update', {
+          count,
+          timestamp: Date.now()
+        });
+      } catch (error) {
+        console.error('[WebSocket] Error getting active users:', error.message);
+        socket.emit('error', {
+          code: 'ACTIVE_USERS_ERROR',
+          message: 'Failed to get active user count'
+        });
+      }
+    });
+  }
+
+  /**
+   * Handle socket disconnection
+   */
+  handleDisconnection(socket) {
+    const userId = socket.userId;
+    console.log(`[WebSocket] User ${userId} disconnected (${socket.id})`);
+
+    // Check if user is in an active match or tournament
+    let matchId = null;
+    let tournamentId = null;
+
+    // Find match room
+    for (const [mId, sockets] of this.matchRooms.entries()) {
+      if (sockets.has(socket.id)) {
+        matchId = mId;
+        break;
+      }
+    }
+
+    // Find tournament room
+    for (const [tId, sockets] of this.tournamentRooms.entries()) {
+      if (sockets.has(socket.id)) {
+        tournamentId = tId;
+        break;
+      }
+    }
+
+    // If user is in active match/tournament, start reconnection grace period
+    if (matchId || tournamentId) {
+      console.log(`[WebSocket] User ${userId} disconnected from active game. Starting ${this.RECONNECTION_GRACE_PERIOD / 1000}s grace period...`);
+
+      // Store disconnection info
+      this.disconnectedUsers.set(userId, {
+        disconnectedAt: Date.now(),
+        matchId,
+        tournamentId,
+        socketId: socket.id
+      });
+
+      // Set reconnection timer
+      const timerId = setTimeout(() => {
+        this.handleReconnectionTimeout(userId, matchId, tournamentId);
+      }, this.RECONNECTION_GRACE_PERIOD);
+
+      this.reconnectionTimers.set(userId, timerId);
+
+      // Notify other participants
+      if (matchId) {
+        this.io.to(`match:${matchId}`).emit('opponent_disconnected', {
+          userId,
+          reconnectionDeadline: Date.now() + this.RECONNECTION_GRACE_PERIOD
+        });
+      }
+
+      if (tournamentId) {
+        this.io.to(`tournament:${tournamentId}`).emit('participant_disconnected', {
+          userId,
+          reconnectionDeadline: Date.now() + this.RECONNECTION_GRACE_PERIOD
+        });
+      }
+    }
+
+    // Remove from tracking
+    this.connectedUsers.delete(userId);
+    this.userSockets.delete(socket.id);
+
+    // Mark user as inactive in Redis (only if not in grace period)
+    if (!matchId && !tournamentId) {
+      activeUserTracker.markUserInactive(userId).catch(err => {
+        console.error(`[WebSocket] Error marking user ${userId} inactive:`, err.message);
+      });
+    }
+
+    // Remove from all rooms
+    this.matchRooms.forEach((sockets, matchId) => {
+      sockets.delete(socket.id);
+    });
+    this.tournamentRooms.forEach((sockets, tournamentId) => {
+      sockets.delete(socket.id);
+    });
+  }
+
+  /**
+   * Handle reconnection timeout (forfeit)
+   */
+  async handleReconnectionTimeout(userId, matchId, tournamentId) {
+    console.log(`[WebSocket] User ${userId} failed to reconnect within grace period. Forfeiting...`);
+
+    // Remove from disconnected users
+    this.disconnectedUsers.delete(userId);
+    this.reconnectionTimers.delete(userId);
+
+    // Mark user as inactive
+    activeUserTracker.markUserInactive(userId).catch(err => {
+      console.error(`[WebSocket] Error marking user ${userId} inactive:`, err.message);
+    });
+
+    // Forfeit match if applicable
+    if (matchId) {
+      try {
+        const lobbyService = require('./lobbyService');
+        await lobbyService.forfeitMatch(matchId, userId);
+
+        // Notify other participants
+        this.io.to(`match:${matchId}`).emit('opponent_forfeited', {
+          userId,
+          reason: 'Failed to reconnect',
+          timestamp: Date.now()
+        });
+
+        console.log(`[WebSocket] User ${userId} forfeited match ${matchId} due to disconnect`);
+      } catch (error) {
+        console.error(`[WebSocket] Error forfeiting match for user ${userId}:`, error.message);
+      }
+    }
+
+    // Handle tournament forfeit if applicable
+    if (tournamentId) {
+      try {
+        // TODO: Implement tournament forfeit logic
+        // const tournamentService = require('./tournamentService');
+        // await tournamentService.forfeitTournament(tournamentId, userId);
+
+        // Notify other participants
+        this.io.to(`tournament:${tournamentId}`).emit('participant_forfeited', {
+          userId,
+          reason: 'Failed to reconnect',
+          timestamp: Date.now()
+        });
+
+        console.log(`[WebSocket] User ${userId} forfeited tournament ${tournamentId} due to disconnect`);
+      } catch (error) {
+        console.error(`[WebSocket] Error forfeiting tournament for user ${userId}:`, error.message);
+      }
+    }
+  }
+
+  /**
+   * Start heartbeat monitor
+   * Checks for stale connections every 30 seconds
+   */
+  startHeartbeatMonitor() {
+    setInterval(() => {
+      const now = Date.now();
+      const timeout = 60000; // 60 seconds
+
+      this.connectedUsers.forEach((connection, userId) => {
+        const timeSinceHeartbeat = now - connection.lastHeartbeat;
+
+        if (timeSinceHeartbeat > timeout) {
+          console.log(`[WebSocket] User ${userId} connection timeout`);
+          
+          // Disconnect stale connection
+          const socket = this.io.sockets.sockets.get(connection.socketId);
+          if (socket) {
+            socket.disconnect(true);
+          }
+        }
+      });
+    }, 30000);
+  }
+
+  /**
+   * Broadcast match started event
+   */
+  broadcastMatchStarted(matchId, data) {
+    this.io.to(`match:${matchId}`).emit('match_started', {
+      matchId,
+      ...data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Broadcast match ended event
+   */
+  broadcastMatchEnded(matchId, data) {
+    this.io.to(`match:${matchId}`).emit('match_ended', {
+      matchId,
+      ...data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Broadcast tournament started event
+   */
+  broadcastTournamentStarted(tournamentId, data) {
+    this.io.to(`tournament:${tournamentId}`).emit('tournament_started', {
+      tournamentId,
+      ...data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Broadcast tournament round ended event
+   */
+  broadcastRoundEnded(tournamentId, data) {
+    this.io.to(`tournament:${tournamentId}`).emit('round_ended', {
+      tournamentId,
+      ...data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Broadcast tournament ended event
+   */
+  broadcastTournamentEnded(tournamentId, data) {
+    this.io.to(`tournament:${tournamentId}`).emit('tournament_ended', {
+      tournamentId,
+      ...data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Get connected user count
+   */
+  getConnectedUserCount() {
+    return this.connectedUsers.size;
+  }
+
+  /**
+   * Check if user is connected
+   */
+  isUserConnected(userId) {
+    return this.connectedUsers.has(userId);
+  }
+
+  /**
+   * Get user's socket
+   */
+  getUserSocket(userId) {
+    const connection = this.connectedUsers.get(userId);
+    if (!connection) return null;
+    
+    return this.io.sockets.sockets.get(connection.socketId);
+  }
+}
+
+module.exports = new WebSocketManager();

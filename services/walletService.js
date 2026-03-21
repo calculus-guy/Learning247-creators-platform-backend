@@ -4,11 +4,11 @@ const User = require('../models/User');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
 const { Op } = require('sequelize');
-const { DatabaseTransactionService } = require('./databaseTransactionService');
+const databaseTransactionService = require('./databaseTransactionService');
 const sequelize = require('../config/db');
 
-// Initialize transaction service
-const transactionService = new DatabaseTransactionService(sequelize);
+// Initialize transaction service (singleton instance)
+const transactionService = databaseTransactionService;
 
 /**
  * Get or create wallet for a user (with multi-currency support)

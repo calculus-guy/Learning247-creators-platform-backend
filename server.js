@@ -25,10 +25,16 @@ const feedbackRoutes = require('./routes/feedbackRoutes');
 const ugcRoutes = require('./routes/ugcRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const sessionRecordingRoutes = require('./routes/sessionRecordingRoutes');
+const quizRoutes = require('./routes/quizRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
 const emailSchedulerService = require('./services/emailSchedulerService');
+const websocketManager = require('./services/websocketManager');
+const activeUserTracker = require('./services/activeUserTracker');
+const leaderboardService = require('./services/leaderboardService');
+const quizRateLimiter = require('./middleware/quizRateLimiter');
+const suspiciousActivityService = require('./services/suspiciousActivityService');
 
 require('./models/walletIndex');
 require('./models/courseIndex');
@@ -36,6 +42,7 @@ require('./models/liveSeriesIndex');
 require('./models/feedbackIndex');
 require('./models/ugcIndex');
 require('./models/referralIndex');
+require('./models/quizIndex');
 
 const app = express();
 
@@ -49,7 +56,7 @@ const allowedOrigins = [
   'https://hallos.net',
   'https://www.quiz.hallos.net'
 ];
-    
+
 const corsOptions = {
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
@@ -99,6 +106,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/ugc', ugcRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/admin/live-series', sessionRecordingRoutes);
+app.use('/api/quiz', quizRoutes);
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes); 
@@ -107,11 +115,35 @@ const PORT = process.env.PORT || 8080;
     
 sequelize.sync({ force: false })
   .then(() => {
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`Server running on http://localhost:${PORT}`);
+      
+      // Initialize WebSocket Manager
+      websocketManager.initialize(server);
+      
+      // Initialize Active User Tracker
+      activeUserTracker.initialize(websocketManager).catch(err => {
+        console.error('❌ Failed to initialize Active User Tracker:', err.message);
+      });
+      
+      // Initialize Leaderboard Service with Redis caching
+      leaderboardService.initialize().catch(err => {
+        console.error('❌ Failed to initialize Leaderboard Service:', err.message);
+      });
+      
+      // Initialize Quiz Rate Limiter
+      quizRateLimiter.initialize().catch(err => {
+        console.error('❌ Failed to initialize Quiz Rate Limiter:', err.message);
+      });
+      
+      // Initialize Suspicious Activity Service
+      suspiciousActivityService.initialize().catch(err => {
+        console.error('❌ Failed to initialize Suspicious Activity Service:', err.message);
+      });
       
       setupLiveClassCleanup();
       setupEmailScheduler();
+      setupQuizScheduledTasks();
     });
   })
   .catch(err => console.error('DB Connection Failed:', err));
@@ -175,5 +207,68 @@ function setupLiveClassCleanup() {
   console.log('⏰ Live class cleanup cron jobs scheduled:');
   console.log('   - Hourly: Auto-end stale live classes and sessions');
   console.log('   - Weekly: Archive old ended classes');
+}
+
+/**
+ * Setup quiz platform scheduled tasks
+ */
+function setupQuizScheduledTasks() {
+  const QuizMatch = require('./models/QuizMatch');
+  const leaderboardService = require('./services/leaderboardService');
+  
+  console.log('🎮 Starting quiz platform scheduled tasks...');
+  
+  // 🕐 Every 5 minutes: Refresh leaderboard cache
+  cron.schedule('*/5 * * * *', async () => {
+    try {
+      console.log('🔄 [Cron] Refreshing leaderboard cache...');
+      await leaderboardService.invalidateCache('all');
+      console.log('✅ [Cron] Leaderboard cache refreshed');
+    } catch (error) {
+      console.error('❌ [Cron] Leaderboard cache refresh failed:', error.message);
+    }
+  });
+  
+  // 🕐 Every hour: Expire old challenges
+  cron.schedule('0 * * * *', async () => {
+    try {
+      console.log('🧹 [Cron] Expiring old challenges...');
+      
+      const expiredChallenges = await QuizMatch.findAll({
+        where: {
+          status: 'pending',
+          createdAt: {
+            [require('sequelize').Op.lt]: new Date(Date.now() - 24 * 60 * 60 * 1000) // 24 hours ago
+          }
+        }
+      });
+      
+      let expiredCount = 0;
+      for (const challenge of expiredChallenges) {
+        try {
+          // Update status to cancelled
+          challenge.status = 'cancelled';
+          await challenge.save();
+          
+          // Refund escrowed funds would be handled by wallet service
+          // This is a placeholder - actual refund logic should be in lobbyService
+          
+          expiredCount++;
+        } catch (error) {
+          console.error(`❌ [Cron] Failed to expire challenge ${challenge.id}:`, error.message);
+        }
+      }
+      
+      if (expiredCount > 0) {
+        console.log(`✅ [Cron] Expired ${expiredCount} old challenges`);
+      }
+    } catch (error) {
+      console.error('❌ [Cron] Challenge expiration failed:', error.message);
+    }
+  });
+  
+  console.log('⏰ Quiz platform scheduled tasks configured:');
+  console.log('   - Every 5 minutes: Refresh leaderboard cache');
+  console.log('   - Hourly: Expire old challenges (24h+)');
 }
   
