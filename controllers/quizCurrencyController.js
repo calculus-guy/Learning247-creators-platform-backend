@@ -3,28 +3,36 @@ const quizWalletService = require('../services/quizWalletService');
 /**
  * Quiz Currency Controller
  * 
- * Handles currency operations:
- * - Purchase Chuta with USD
- * - Withdraw Chuta to USD
+ * Handles currency operations (Option B - Unified Bridge):
+ * - Purchase Chuta from platform wallet
+ * - Withdraw Chuta to platform wallet
  */
 
 /**
- * Purchase Chuta with USD
+ * Purchase Chuta from platform wallet
  * POST /api/quiz/currency/purchase
+ * Body: { amount: number, currency: 'USD' | 'NGN' }
  */
 exports.purchaseCurrency = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { usdAmount, paymentMethod = 'card' } = req.body;
+    const { amount, currency = 'USD' } = req.body;
 
-    if (!usdAmount || usdAmount <= 0) {
+    if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid USD amount'
+        message: 'Invalid amount'
       });
     }
 
-    const result = await quizWalletService.purchaseCurrency(userId, usdAmount, paymentMethod);
+    if (!['USD', 'NGN'].includes(currency)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Currency must be USD or NGN'
+      });
+    }
+
+    const result = await quizWalletService.purchaseCurrency(userId, amount, currency);
 
     return res.status(200).json(result);
   } catch (error) {
@@ -37,13 +45,14 @@ exports.purchaseCurrency = async (req, res) => {
 };
 
 /**
- * Withdraw Chuta to USD
+ * Withdraw Chuta to platform wallet
  * POST /api/quiz/currency/withdraw
+ * Body: { chutaAmount: number, currency: 'USD' | 'NGN' }
  */
 exports.withdrawFunds = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { chutaAmount } = req.body;
+    const { chutaAmount, currency = 'USD' } = req.body;
 
     if (!chutaAmount || chutaAmount <= 0) {
       return res.status(400).json({
@@ -52,7 +61,14 @@ exports.withdrawFunds = async (req, res) => {
       });
     }
 
-    const result = await quizWalletService.withdrawFunds(userId, chutaAmount);
+    if (!['USD', 'NGN'].includes(currency)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Currency must be USD or NGN'
+      });
+    }
+
+    const result = await quizWalletService.withdrawFunds(userId, chutaAmount, currency);
 
     return res.status(200).json(result);
   } catch (error) {

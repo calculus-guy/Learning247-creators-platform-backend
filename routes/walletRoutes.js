@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const walletController = require('../controllers/walletController');
+const walletTopUpController = require('../controllers/walletTopUpController');
 const withdrawal2FAController = require('../controllers/withdrawal2FAController');
 const currencyWithdrawalController = require('../controllers/currencyWithdrawalController');
 const transactionHistoryController = require('../controllers/transactionHistoryController');
@@ -9,6 +10,18 @@ const fraudDetectionMiddleware = require('../middleware/fraudDetectionMiddleware
 const withdrawalLimitMiddleware = require('../middleware/withdrawalLimitMiddleware');
 const withdrawal2FAMiddleware = require('../middleware/withdrawal2FAMiddleware');
 const { walletOperations, transfers } = require('../middleware/financialRateLimiter');
+
+// ===== NEW: WALLET TOP-UP ROUTES (Quiz Integration - Option B) =====
+// Initialize wallet top-up (Stripe/Paystack)
+router.post('/topup/initialize', authMiddleware, walletTopUpController.initializeTopUp);
+
+// Verify and complete wallet top-up
+router.post('/topup/verify', authMiddleware, walletTopUpController.verifyTopUp);
+
+// Get top-up transaction history
+router.get('/topup/history', authMiddleware, walletTopUpController.getTopUpHistory);
+
+// ===== EXISTING WALLET ROUTES (DO NOT REMOVE) =====
 
 // Get wallet balance
 router.get('/balance', authMiddleware, walletController.getWalletBalance);
@@ -103,13 +116,40 @@ router.post('/resolve-account', authMiddleware, walletController.resolveAccount)
 router.get('/transactions', authMiddleware, walletController.getTransactions);
 
 // Enhanced transaction history endpoints
-router.get('/history', authMiddleware, transactionHistoryController.getTransactionHistory.bind(transactionHistoryController));
-router.get('/analytics', authMiddleware, transactionHistoryController.getTransactionAnalytics.bind(transactionHistoryController));
-router.get('/transaction/:id', authMiddleware, transactionHistoryController.getTransactionById.bind(transactionHistoryController));
-router.post('/search-transactions', authMiddleware, transactionHistoryController.searchTransactions.bind(transactionHistoryController));
-router.get('/summary', authMiddleware, transactionHistoryController.getTransactionSummary.bind(transactionHistoryController));
-router.get('/export', authMiddleware, transactionHistoryController.exportTransactionHistory.bind(transactionHistoryController));
-router.get('/config', authMiddleware, transactionHistoryController.getConfiguration.bind(transactionHistoryController));
+router.get('/history', 
+  authMiddleware, 
+  transactionHistoryController.getTransactionHistory.bind(transactionHistoryController)
+);
+
+router.get('/analytics', 
+  authMiddleware, 
+  transactionHistoryController.getTransactionAnalytics.bind(transactionHistoryController)
+);
+
+router.get('/transaction/:id', 
+  authMiddleware, 
+  transactionHistoryController.getTransactionById.bind(transactionHistoryController)
+);
+
+router.post('/search-transactions', 
+  authMiddleware, 
+  transactionHistoryController.searchTransactions.bind(transactionHistoryController)
+);
+
+router.get('/summary', 
+  authMiddleware, 
+  transactionHistoryController.getTransactionSummary.bind(transactionHistoryController)
+);
+
+router.get('/export', 
+  authMiddleware, 
+  transactionHistoryController.exportTransactionHistory.bind(transactionHistoryController)
+);
+
+router.get('/config', 
+  authMiddleware, 
+  transactionHistoryController.getConfiguration.bind(transactionHistoryController)
+);
 
 // Get transaction statistics
 router.get('/transaction-stats', authMiddleware, walletController.getTransactionStats);
@@ -117,35 +157,68 @@ router.get('/transaction-stats', authMiddleware, walletController.getTransaction
 // Export transactions to CSV (legacy endpoint - kept for backward compatibility)
 router.get('/export-transactions', authMiddleware, walletController.exportTransactions);
 
-// ===== MULTI-CURRENCY WALLET ENDPOINTS (New) =====
+// ===== MULTI-CURRENCY WALLET ENDPOINTS =====
 // These endpoints provide enhanced multi-currency functionality
 // while maintaining backward compatibility with existing endpoints
 
 // Initialize multi-currency wallets
-router.post('/initialize', authMiddleware, walletOperations, fraudDetectionMiddleware.walletOperations, walletController.initializeWallets);
+router.post('/initialize', 
+  authMiddleware, 
+  walletOperations, 
+  fraudDetectionMiddleware.walletOperations, 
+  walletController.initializeWallets
+);
 
 // Credit wallet (for earnings, refunds, etc.)
-router.post('/credit', authMiddleware, walletOperations, fraudDetectionMiddleware.walletOperations, walletController.creditWallet);
+router.post('/credit', 
+  authMiddleware, 
+  walletOperations, 
+  fraudDetectionMiddleware.walletOperations, 
+  walletController.creditWallet
+);
 
 // Transfer between wallets
-router.post('/transfer', authMiddleware, transfers, fraudDetectionMiddleware.transfers, walletController.transferBetweenWallets);
+router.post('/transfer', 
+  authMiddleware, 
+  transfers, 
+  fraudDetectionMiddleware.transfers, 
+  walletController.transferBetweenWallets
+);
 
 // Get currency-specific balance with history
-router.get('/balance/:currency/history', authMiddleware, walletController.getCurrencyBalanceWithHistory);
+router.get('/balance/:currency/history', 
+  authMiddleware, 
+  walletController.getCurrencyBalanceWithHistory
+);
 
 // Get detailed balances for all currencies
-router.get('/balances/detailed', authMiddleware, walletController.getAllBalancesDetailed);
+router.get('/balances/detailed', 
+  authMiddleware, 
+  walletController.getAllBalancesDetailed
+);
 
 // Get filtered transactions across currencies
-router.get('/transactions/filtered', authMiddleware, walletController.getFilteredTransactions);
+router.get('/transactions/filtered', 
+  authMiddleware, 
+  walletController.getFilteredTransactions
+);
 
 // Get balance analytics for specific currency
-router.get('/analytics/:currency', authMiddleware, walletController.getBalanceAnalytics);
+router.get('/analytics/:currency', 
+  authMiddleware, 
+  walletController.getBalanceAnalytics
+);
 
 // Get gateway information for currency
-router.get('/gateway/:currency', authMiddleware, walletController.getRequiredGateway);
+router.get('/gateway/:currency', 
+  authMiddleware, 
+  walletController.getRequiredGateway
+);
 
 // Validate currency-gateway pairing
-router.post('/validate-gateway', authMiddleware, walletController.validateGatewayPairing);
+router.post('/validate-gateway', 
+  authMiddleware, 
+  walletController.validateGatewayPairing
+);
 
 module.exports = router;

@@ -1,7 +1,6 @@
 const sequelize = require('../config/db');
 const ChutaCoinTransaction = require('../models/ChutaCoinTransaction');
 const UserQuizStats = require('../models/UserQuizStats');
-const User = require('../models/User');
 
 /**
  * Quiz Wallet Service
@@ -9,13 +8,14 @@ const User = require('../models/User');
  * Manages Chuta coin operations for the quiz platform:
  * - Currency conversions (USD ↔ Morgan ↔ Chuta)
  * - Initial bonus credits
- * - Purchases and withdrawals
+ * - Purchases and withdrawals (Option B - Unified Bridge)
  * - Escrow management for wagers
  * - Transaction recording
  * 
  * Currency System:
  * - 1 USD = 1 Morgan = 100 Chuta
  * - 1 Chuta = $0.01 USD (1 cent)
+ * - 1 USD = 1400 NGN (from environment)
  */
 
 class QuizWalletService {
@@ -123,45 +123,91 @@ class QuizWalletService {
   }
 
   /**
-   * Purchase Chuta with USD
+   * Purchase Chuta by transferring from platform wallet (Option B - Unified Bridge)
    * @param {number} userId - User ID
-   * @param {number} usdAmount - Amount in USD
-   * @param {string} paymentMethod - Payment method used
+   * @param {number} amount - Amount to transfer (in USD or NGN)
+   * @param {string} currency - Source currency ('USD' or 'NGN')
    * @returns {Promise<{success: boolean, chutaAmount: number, newBalance: number, transactionId: string}>}
    */
-  async purchaseCurrency(userId, usdAmount, paymentMethod = 'card') {
-    if (usdAmount < 1 || usdAmount > 1000) {
-      throw new Error('Purchase amount must be between $1 and $1000');
+  async purchaseCurrency(userId, amount, currency = 'USD') {
+    const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
+    const platformWalletService = new MultiCurrencyWalletService();
+
+    // Validate currency
+    if (!['USD', 'NGN'].includes(currency)) {
+      throw new Error('Currency must be USD or NGN');
     }
 
+    if (amount < 1) {
+      throw new Error(`Minimum purchase is 1 ${currency}`);
+    }
+
+    // Convert to USD if NGN
+    let usdAmount = amount;
+    if (currency === 'NGN') {
+      const conversionRate = parseFloat(process.env.CURRENCY_CONVERSION_RATE_NGN_TO_USD);
+      usdAmount = amount / conversionRate;
+    }
+
+    // Convert USD to Chuta
     const chutaAmount = this.usdToChuta(usdAmount);
 
-    const transaction = await this.recordTransaction(
-      userId,
-      'purchase',
-      chutaAmount,
-      {
-        usdAmount,
-        paymentMethod,
-        description: `Purchased ${chutaAmount} Chuta for $${usdAmount}`
-      }
-    );
+    // Use database transaction for atomicity
+    const result = await sequelize.transaction(async (t) => {
+      // 1. Debit platform wallet
+      await platformWalletService.debitWallet({
+        userId,
+        currency,
+        amount,
+        reference: `quiz_purchase_${Date.now()}`,
+        description: `Transfer to quiz wallet: ${chutaAmount} Chuta`,
+        metadata: { type: 'quiz_purchase', chutaAmount }
+      });
 
-    return {
-      success: true,
-      chutaAmount,
-      newBalance: parseFloat(transaction.balanceAfter),
-      transactionId: transaction.id
-    };
+      // 2. Credit quiz wallet
+      const transaction = await this.recordTransaction(
+        userId,
+        'purchase',
+        chutaAmount,
+        {
+          sourceAmount: amount,
+          sourceCurrency: currency,
+          usdAmount,
+          conversionRate: currency === 'NGN' ? process.env.CURRENCY_CONVERSION_RATE_NGN_TO_USD : 1,
+          description: `Purchased ${chutaAmount} Chuta from ${currency} wallet`
+        },
+        t
+      );
+
+      return {
+        success: true,
+        chutaAmount,
+        newBalance: parseFloat(transaction.balanceAfter),
+        transactionId: transaction.id,
+        sourceAmount: amount,
+        sourceCurrency: currency
+      };
+    });
+
+    return result;
   }
 
   /**
-   * Withdraw Chuta to USD
+   * Withdraw Chuta back to platform wallet (Option B - Unified Bridge)
    * @param {number} userId - User ID
    * @param {number} chutaAmount - Amount in Chuta
-   * @returns {Promise<{success: boolean, usdAmount: number, feeAmount: number, newBalance: number, transactionId: string}>}
+   * @param {string} targetCurrency - Target currency ('USD' or 'NGN')
+   * @returns {Promise<{success: boolean, amount: number, currency: string, feeAmount: number, newBalance: number, transactionId: string}>}
    */
-  async withdrawFunds(userId, chutaAmount) {
+  async withdrawFunds(userId, chutaAmount, targetCurrency = 'USD') {
+    const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
+    const platformWalletService = new MultiCurrencyWalletService();
+
+    // Validate currency
+    if (!['USD', 'NGN'].includes(targetCurrency)) {
+      throw new Error('Target currency must be USD or NGN');
+    }
+
     const currentBalance = await this.getBalance(userId);
 
     // Validate minimum withdrawal
@@ -176,31 +222,51 @@ class QuizWalletService {
 
     // Calculate fee (10%)
     const feeAmount = Math.floor(chutaAmount * (QuizWalletService.WITHDRAWAL_FEE_PERCENT / 100));
-    const netAmount = chutaAmount - feeAmount;
-    const usdAmount = this.chutaToUsd(netAmount);
+    const netChuta = chutaAmount - feeAmount;
+    
+    // Convert to USD first
+    const usdAmount = this.chutaToUsd(netChuta);
 
-    // Use transaction to ensure atomicity
+    // Convert to target currency if NGN
+    let targetAmount = usdAmount;
+    if (targetCurrency === 'NGN') {
+      const conversionRate = parseFloat(process.env.CURRENCY_CONVERSION_RATE_NGN_TO_USD) || 1400;
+      targetAmount = usdAmount * conversionRate;
+    }
+
+    // Use database transaction for atomicity
     const result = await sequelize.transaction(async (t) => {
-      // Deduct from balance
+      // 1. Debit quiz wallet
       const transaction = await this.recordTransaction(
         userId,
         'withdrawal',
         -chutaAmount,
         {
+          targetAmount,
+          targetCurrency,
           usdAmount,
           feeAmount,
-          netChuta: netAmount,
-          description: `Withdrew ${chutaAmount} Chuta (${feeAmount} fee) = $${usdAmount.toFixed(2)}`
+          netChuta,
+          conversionRate: targetCurrency === 'NGN' ? process.env.CURRENCY_CONVERSION_RATE_NGN_TO_USD : 1,
+          description: `Withdrew ${chutaAmount} Chuta (${feeAmount} fee) to ${targetCurrency} wallet`
         },
         t
       );
 
-      // TODO: Integrate with existing Wallet_System for actual withdrawal processing
-      // This would call the existing multiCurrencyWalletService to process the USD withdrawal
+      // 2. Credit platform wallet
+      await platformWalletService.creditWallet({
+        userId,
+        currency: targetCurrency,
+        amount: targetAmount,
+        reference: `quiz_withdrawal_${Date.now()}`,
+        description: `Withdrawal from quiz wallet: ${chutaAmount} Chuta`,
+        metadata: { type: 'quiz_withdrawal', chutaAmount, feeAmount }
+      });
 
       return {
         success: true,
-        usdAmount,
+        amount: targetAmount,
+        currency: targetCurrency,
         feeAmount,
         newBalance: parseFloat(transaction.balanceAfter),
         transactionId: transaction.id

@@ -1,6 +1,7 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const paystack = require('paystack')(process.env.PAYSTACK_SECRET_KEY);
 const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
+const sequelize = require('../config/db');
 
 const walletService = new MultiCurrencyWalletService();
 
@@ -10,6 +11,11 @@ const walletService = new MultiCurrencyWalletService();
  * Handles direct wallet top-ups via payment gateways:
  * - Stripe for USD
  * - Paystack for NGN
+ * 
+ * Security Features:
+ * - Idempotency: Prevents double-crediting with same reference
+ * - User validation: Ensures authenticated user matches payment
+ * - Payment verification: Validates payment status before crediting
  */
 
 /**
@@ -33,8 +39,8 @@ exports.initializeTopUp = async (req, res) => {
     walletService.validateCurrency(currency);
     walletService.validateAmount(amount);
 
-    // Minimum top-up amounts
-    const minimums = { NGN: 1000, USD: 1 };
+    // Minimum top-up amounts (as per plan)
+    const minimums = { NGN: 1400, USD: 1 };
     if (amount < minimums[currency]) {
       return res.status(400).json({
         success: false,
@@ -42,7 +48,7 @@ exports.initializeTopUp = async (req, res) => {
       });
     }
 
-    const reference = `topup_${Date.now()}_${userId}`;
+    const reference = `topup_${Date.now()}_${userId}_${Math.random().toString(36).substring(2, 9)}`;
 
     if (currency === 'USD') {
       // Stripe Payment Intent
@@ -56,13 +62,14 @@ exports.initializeTopUp = async (req, res) => {
           type: 'wallet_topup',
           reference
         },
-        description: `Wallet top-up: $${amount} USD`
+        description: `Wallet top-up: ${amount} USD`
       });
 
       return res.status(200).json({
         success: true,
         gateway: 'stripe',
         clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
         reference,
         amount,
         currency
@@ -107,7 +114,7 @@ exports.initializeTopUp = async (req, res) => {
     }
 
   } catch (error) {
-    console.error('Initialize top-up error:', error);
+    console.error('[Wallet Top-Up] Initialize error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to initialize wallet top-up'
@@ -118,17 +125,35 @@ exports.initializeTopUp = async (req, res) => {
 /**
  * Verify and complete wallet top-up
  * POST /api/wallet/topup/verify
- * Body: { reference: string, gateway: 'stripe' | 'paystack' }
+ * Body: { reference: string, gateway: 'stripe' | 'paystack', paymentIntentId?: string }
  */
 exports.verifyTopUp = async (req, res) => {
   try {
-    const { reference, gateway } = req.body;
+    const authenticatedUserId = req.user.id;
+    const { reference, gateway, paymentIntentId } = req.body;
 
     if (!reference || !gateway) {
       return res.status(400).json({
         success: false,
         message: 'Reference and gateway are required'
       });
+    }
+
+    // SECURITY: Check if this reference has already been processed (idempotency)
+    const WalletTransaction = sequelize.models.WalletTransaction;
+    if (WalletTransaction) {
+      const existingTransaction = await WalletTransaction.findOne({
+        where: {
+          reference: reference
+        }
+      });
+
+      if (existingTransaction) {
+        return res.status(400).json({
+          success: false,
+          message: 'This payment has already been processed'
+        });
+      }
     }
 
     let paymentData;
@@ -138,18 +163,27 @@ exports.verifyTopUp = async (req, res) => {
 
     if (gateway === 'stripe') {
       // Verify Stripe payment
-      const paymentIntents = await stripe.paymentIntents.list({
-        limit: 1
-      });
+      if (!paymentIntentId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment intent ID is required for Stripe'
+        });
+      }
 
-      const paymentIntent = paymentIntents.data.find(
-        pi => pi.metadata.reference === reference
-      );
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
 
       if (!paymentIntent) {
         return res.status(404).json({
           success: false,
           message: 'Payment not found'
+        });
+      }
+
+      // Verify reference matches
+      if (paymentIntent.metadata.reference !== reference) {
+        return res.status(400).json({
+          success: false,
+          message: 'Payment reference mismatch'
         });
       }
 
@@ -188,6 +222,15 @@ exports.verifyTopUp = async (req, res) => {
       });
     }
 
+    // SECURITY: Verify that the authenticated user matches the payment user
+    if (userId !== authenticatedUserId) {
+      console.error(`[Wallet Top-Up] User mismatch: authenticated=${authenticatedUserId}, payment=${userId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Unauthorized: User mismatch'
+      });
+    }
+
     // Credit the wallet
     const result = await walletService.creditWallet({
       userId,
@@ -202,6 +245,8 @@ exports.verifyTopUp = async (req, res) => {
       }
     });
 
+    console.log(`[Wallet Top-Up] Successfully credited ${amount} ${currency} to user ${userId}`);
+
     return res.status(200).json({
       success: true,
       message: `Successfully topped up ${amount} ${currency}`,
@@ -215,7 +260,7 @@ exports.verifyTopUp = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Verify top-up error:', error);
+    console.error('[Wallet Top-Up] Verify error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to verify wallet top-up'
@@ -232,7 +277,6 @@ exports.getTopUpHistory = async (req, res) => {
     const userId = req.user.id;
     const { currency, limit = 20, offset = 0 } = req.query;
 
-    const sequelize = require('../config/db');
     const WalletTransaction = sequelize.models.WalletTransaction;
 
     if (!WalletTransaction) {
@@ -254,16 +298,44 @@ exports.getTopUpHistory = async (req, res) => {
       const wallet = await walletService.getWalletAccount(userId, currency.toUpperCase());
       if (wallet) {
         where.wallet_account_id = wallet.id;
+      } else {
+        // No wallet for this currency, return empty
+        return res.status(200).json({
+          success: true,
+          transactions: [],
+          pagination: {
+            total: 0,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            pages: 0
+          }
+        });
       }
     } else {
       // Get all user's wallets
       const wallets = await walletService.getAllWalletBalances(userId);
-      const walletIds = Object.values(wallets).map(w => w.id);
+      const walletIds = Object.values(wallets).map(w => w.id).filter(id => id);
+      
+      if (walletIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          transactions: [],
+          pagination: {
+            total: 0,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            pages: 0
+          }
+        });
+      }
+      
       where.wallet_account_id = { [sequelize.Op.in]: walletIds };
     }
 
-    // Filter for top-up transactions only
-    where['metadata.type'] = 'topup';
+    // Filter for top-up transactions only using JSONB query
+    where.metadata = {
+      [sequelize.Op.contains]: { type: 'topup' }
+    };
 
     const { count, rows } = await WalletTransaction.findAndCountAll({
       where,
@@ -284,7 +356,7 @@ exports.getTopUpHistory = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get top-up history error:', error);
+    console.error('[Wallet Top-Up] Get history error:', error);
     return res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch top-up history'
