@@ -116,6 +116,31 @@ async function setupQuizPlatform() {
 
     // Step 4: Create quiz_matches table
     console.log('4️⃣ Creating quiz_matches table...');
+    
+    // Check if table exists and has tournament_id column
+    const [columnCheck] = await sequelize.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'quiz_matches' 
+      AND column_name = 'tournament_id'
+      AND table_schema = 'public';
+    `);
+    
+    // If table exists but column is missing, drop and recreate
+    if (columnCheck.length === 0) {
+      const [tableExists] = await sequelize.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_name = 'quiz_matches' 
+        AND table_schema = 'public';
+      `);
+      
+      if (tableExists.length > 0) {
+        console.log('   ⚠️  quiz_matches table exists but missing tournament_id column. Recreating...');
+        await sequelize.query(`DROP TABLE IF EXISTS quiz_matches CASCADE;`);
+      }
+    }
+    
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS quiz_matches (
         id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
