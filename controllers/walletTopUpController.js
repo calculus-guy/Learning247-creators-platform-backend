@@ -1,4 +1,4 @@
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+const { stripeClient } = require('../config/stripe');
 const { paystackClient } = require('../config/paystack');
 const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
 const sequelize = require('../config/db');
@@ -60,25 +60,38 @@ exports.initializeTopUp = async (req, res) => {
     const idempotencyKey = uuidv4();
 
     if (currency === 'USD') {
-      // Stripe Payment Intent
-      const amountInCents = Math.round(amount * 100);
-      
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount: amountInCents,
-        currency: 'usd',
+      // Stripe Checkout Session - returns hosted payment URL (same pattern as paymentService.js)
+      const session = await stripeClient.checkout.sessions.create({
+        payment_method_types: ['card'],
+        mode: 'payment',
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              unit_amount: Math.round(amount * 100),
+              product_data: {
+                name: 'Wallet Top-Up',
+                description: `Add ${amount} USD to your wallet`
+              }
+            },
+            quantity: 1
+          }
+        ],
+        customer_email: user.email,
         metadata: {
           userId: userId.toString(),
           type: 'wallet_topup',
           reference
         },
-        description: `Wallet top-up: ${amount} USD`
+        success_url: `${process.env.CLIENT_URL}/wallet/topup/verify?reference=${reference}&gateway=stripe&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_URL}/wallet/topup/cancelled`
       });
 
       return res.status(200).json({
         success: true,
         gateway: 'stripe',
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
+        authorizationUrl: session.url,  // consistent with Paystack response
+        sessionId: session.id,
         reference,
         amount,
         currency
@@ -139,7 +152,7 @@ exports.initializeTopUp = async (req, res) => {
 exports.verifyTopUp = async (req, res) => {
   try {
     const authenticatedUserId = req.user.id;
-    const { reference, gateway, paymentIntentId } = req.body;
+    const { reference, gateway, sessionId } = req.body;
     const { v4: uuidv4 } = require('uuid');
 
     if (!reference || !gateway) {
@@ -175,42 +188,31 @@ exports.verifyTopUp = async (req, res) => {
     let currency;
 
     if (gateway === 'stripe') {
-      // Verify Stripe payment
-      if (!paymentIntentId) {
+      if (!sessionId) {
         return res.status(400).json({
           success: false,
-          message: 'Payment intent ID is required for Stripe'
+          message: 'Session ID is required for Stripe'
         });
       }
 
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const session = await stripeClient.checkout.sessions.retrieve(sessionId);
 
-      if (!paymentIntent) {
-        return res.status(404).json({
-          success: false,
-          message: 'Payment not found'
-        });
+      if (!session) {
+        return res.status(404).json({ success: false, message: 'Payment session not found' });
       }
 
-      // Verify reference matches
-      if (paymentIntent.metadata.reference !== reference) {
-        return res.status(400).json({
-          success: false,
-          message: 'Payment reference mismatch'
-        });
+      if (session.metadata.reference !== reference) {
+        return res.status(400).json({ success: false, message: 'Payment reference mismatch' });
       }
 
-      if (paymentIntent.status !== 'succeeded') {
-        return res.status(400).json({
-          success: false,
-          message: `Payment status: ${paymentIntent.status}`
-        });
+      if (session.payment_status !== 'paid') {
+        return res.status(400).json({ success: false, message: `Payment status: ${session.payment_status}` });
       }
 
-      userId = parseInt(paymentIntent.metadata.userId);
-      amount = paymentIntent.amount / 100;
+      userId = parseInt(session.metadata.userId);
+      amount = session.amount_total / 100;
       currency = 'USD';
-      paymentData = paymentIntent;
+      paymentData = session;
 
     } else if (gateway === 'paystack') {
       // Verify Paystack payment
