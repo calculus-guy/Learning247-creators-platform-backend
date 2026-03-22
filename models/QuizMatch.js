@@ -75,6 +75,34 @@ const QuizMatch = sequelize.define('QuizMatch', {
     type: DataTypes.DATE,
     allowNull: true,
     field: 'completed_at'
+  },
+  challengerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'challenger_id',
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  opponentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    field: 'opponent_id',
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  counterOfferId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'counter_offer_id'
+  },
+  expiresAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'expires_at'
   }
 }, {
   tableName: 'quiz_matches',
