@@ -1,5 +1,5 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const paystack = require('paystack')(process.env.PAYSTACK_SECRET_KEY);
+const { paystackClient } = require('../config/paystack');
 const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
 const sequelize = require('../config/db');
 
@@ -81,7 +81,7 @@ exports.initializeTopUp = async (req, res) => {
       // Paystack Transaction
       const amountInKobo = Math.round(amount * 100);
 
-      const response = await paystack.transaction.initialize({
+      const response = await paystackClient.post('/transaction/initialize', {
         email: req.user.email,
         amount: amountInKobo,
         currency: 'NGN',
@@ -100,15 +100,15 @@ exports.initializeTopUp = async (req, res) => {
         callback_url: `${process.env.CLIENT_URL}/wallet/topup/verify?reference=${reference}`
       });
 
-      if (!response.status) {
-        throw new Error('Failed to initialize Paystack transaction');
+      if (!response.data.status) {
+        throw new Error(response.data.message || 'Failed to initialize Paystack transaction');
       }
 
       return res.status(200).json({
         success: true,
         gateway: 'paystack',
-        authorizationUrl: response.data.authorization_url,
-        accessCode: response.data.access_code,
+        authorizationUrl: response.data.data.authorization_url,
+        accessCode: response.data.data.access_code,
         reference,
         amount,
         currency
@@ -207,19 +207,19 @@ exports.verifyTopUp = async (req, res) => {
 
     } else if (gateway === 'paystack') {
       // Verify Paystack payment
-      const response = await paystack.transaction.verify(reference);
+      const response = await paystackClient.get(`/transaction/verify/${reference}`);
 
-      if (!response.status || response.data.status !== 'success') {
+      if (!response.data.status || response.data.data.status !== 'success') {
         return res.status(400).json({
           success: false,
           message: 'Payment verification failed'
         });
       }
 
-      userId = parseInt(response.data.metadata.userId);
-      amount = response.data.amount / 100;
+      userId = parseInt(response.data.data.metadata.userId);
+      amount = response.data.data.amount / 100;
       currency = 'NGN';
-      paymentData = response.data;
+      paymentData = response.data.data;
 
     } else {
       return res.status(400).json({
