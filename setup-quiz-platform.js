@@ -170,6 +170,32 @@ async function setupQuizPlatform() {
     `);
     console.log('✅ quiz_matches table created\n');
 
+    // Step 4b: Add missing columns to quiz_matches (safe - uses IF NOT EXISTS)
+    console.log('4️⃣b Adding missing columns to quiz_matches...');
+    const [matchColumns] = await sequelize.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'quiz_matches' AND table_schema = 'public';
+    `);
+    const existingMatchCols = matchColumns.map(r => r.column_name);
+
+    if (!existingMatchCols.includes('challenger_id')) {
+      await sequelize.query(`ALTER TABLE quiz_matches ADD COLUMN challenger_id INTEGER REFERENCES "Users"(id) ON UPDATE CASCADE ON DELETE SET NULL;`);
+      console.log('   ✅ Added challenger_id');
+    }
+    if (!existingMatchCols.includes('opponent_id')) {
+      await sequelize.query(`ALTER TABLE quiz_matches ADD COLUMN opponent_id INTEGER REFERENCES "Users"(id) ON UPDATE CASCADE ON DELETE SET NULL;`);
+      console.log('   ✅ Added opponent_id');
+    }
+    if (!existingMatchCols.includes('counter_offer_id')) {
+      await sequelize.query(`ALTER TABLE quiz_matches ADD COLUMN counter_offer_id UUID;`);
+      console.log('   ✅ Added counter_offer_id');
+    }
+    if (!existingMatchCols.includes('expires_at')) {
+      await sequelize.query(`ALTER TABLE quiz_matches ADD COLUMN expires_at TIMESTAMP;`);
+      console.log('   ✅ Added expires_at');
+    }
+    console.log('✅ quiz_matches columns up to date\n');
+
     // Step 5: Create quiz_tournament_participants table
     console.log('5️⃣ Creating quiz_tournament_participants table...');
     await sequelize.query(`
