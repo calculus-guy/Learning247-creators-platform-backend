@@ -75,11 +75,14 @@ class LobbyService {
     await sequelize.query(
       `UPDATE chuta_coin_transactions 
        SET metadata = jsonb_set(metadata, '{matchId}', :matchId::jsonb)
-       WHERE user_id = :userId 
-         AND type = 'match_wager' 
-         AND metadata->>'matchId' = 'pending'
-       ORDER BY created_at DESC 
-       LIMIT 1`,
+       WHERE id = (
+         SELECT id FROM chuta_coin_transactions
+         WHERE user_id = :userId 
+           AND type = 'match_wager' 
+           AND metadata->>'matchId' = 'pending'
+         ORDER BY created_at DESC 
+         LIMIT 1
+       )`,
       {
         replacements: { matchId: `"${match.id}"`, userId },
         type: sequelize.QueryTypes.UPDATE
