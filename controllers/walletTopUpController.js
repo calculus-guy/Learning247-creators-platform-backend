@@ -2,6 +2,7 @@ const { stripeClient } = require('../config/stripe');
 const { paystackClient } = require('../config/paystack');
 const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
 const sequelize = require('../config/db');
+const { Op } = require('sequelize');
 
 const walletService = new MultiCurrencyWalletService();
 
@@ -346,12 +347,12 @@ exports.getTopUpHistory = async (req, res) => {
         });
       }
       
-      where.wallet_account_id = { [sequelize.Op.in]: walletIds };
+      where.wallet_account_id = { [Op.in]: walletIds };
     }
 
     // Filter for top-up transactions only using JSONB query
     where.metadata = {
-      [sequelize.Op.contains]: { type: 'topup' }
+      [Op.contains]: { type: 'topup' }
     };
 
     const { count, rows } = await WalletTransaction.findAndCountAll({
