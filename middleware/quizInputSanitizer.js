@@ -209,7 +209,9 @@ class QuizInputSanitizer {
         req.body = this.sanitizeObject(req.body);
       }
       if (req.query) {
-        req.query = this.sanitizeObject(req.query);
+        const sanitized = this.sanitizeObject(req.query);
+        Object.keys(req.query).forEach(key => delete req.query[key]);
+        Object.assign(req.query, sanitized);
       }
       if (req.params) {
         req.params = this.sanitizeObject(req.params);
