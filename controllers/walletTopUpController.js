@@ -40,12 +40,19 @@ exports.initializeTopUp = async (req, res) => {
     walletService.validateAmount(amount);
 
     // Minimum top-up amounts
-    const minimums = { NGN: 1400, USD: 1 };
+    const minimums = { NGN: 1000, USD: 1 };
     if (amount < minimums[currency]) {
       return res.status(400).json({
         success: false,
         message: `Minimum top-up is ${minimums[currency]} ${currency}`
       });
+    }
+
+    // Fetch user email from DB since JWT only contains id and role
+    const User = sequelize.models.User;
+    const user = await User.findByPk(userId, { attributes: ['id', 'email'] });
+    if (!user || !user.email) {
+      return res.status(400).json({ success: false, message: 'User email not found' });
     }
 
     const reference = `topup_${Date.now()}_${userId}_${Math.random().toString(36).substring(2, 9)}`;
@@ -82,7 +89,7 @@ exports.initializeTopUp = async (req, res) => {
       const amountInKobo = Math.round(amount * 100);
 
       const response = await paystackClient.post('/transaction/initialize', {
-        email: req.user.email,
+        email: user.email,
         amount: amountInKobo,
         currency: 'NGN',
         reference,
