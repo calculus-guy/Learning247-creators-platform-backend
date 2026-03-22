@@ -259,7 +259,7 @@ exports.verifyTopUp = async (req, res) => {
         paymentId: paymentData.id,
         type: 'topup',
         idempotencyKey,
-        externalReference: gateway === 'stripe' ? paymentIntentId : reference
+        externalReference: gateway === 'stripe' ? sessionId : reference
       }
     });
 

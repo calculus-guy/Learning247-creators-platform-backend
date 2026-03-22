@@ -549,9 +549,11 @@ function sanitizationMiddleware(req, res, next) {
       req.body = sanitizeObject(req.body);
     }
     
-    // Sanitize query parameters
+    // Sanitize query parameters - must mutate in-place (Express 5 req.query is a getter)
     if (req.query) {
-      req.query = sanitizeObject(req.query);
+      const sanitizedQuery = sanitizeObject(req.query);
+      Object.keys(req.query).forEach(key => delete req.query[key]);
+      Object.assign(req.query, sanitizedQuery);
     }
     
     // Sanitize URL parameters

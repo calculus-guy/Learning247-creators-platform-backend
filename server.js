@@ -1,8 +1,13 @@
 const dotenv = require("dotenv");
 dotenv.config();
 
+// Startup environment guards
+if (!process.env.SESSION_SECRET) throw new Error('SESSION_SECRET env variable is required');
+if (!process.env.JWT_SECRET_KEY) throw new Error('JWT_SECRET_KEY env variable is required');
+
 const cors = require('cors');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const passport = require('passport');
 const session = require('express-session');
 const cookieParser = require('cookie-parser');
@@ -69,7 +74,34 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-       
+
+// Generous enough for normal use, tight enough to block abuse
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,                  // 300 requests per IP per window
+  standardHeaders: true,     // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' }
+}));
+
+// Stricter limiter for auth endpoints (login, signup, password reset)
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // 20 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
+});
+
+// Stricter limiter for financial endpoints (top-up, withdrawal, payment)
+const financialRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,                   // 30 requests per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many financial requests, please try again later.' }
+});
+
 app.use(
   "/api/webhooks", webhookRoutes
 );
@@ -83,22 +115,22 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false, // don't create sessions for unauthenticated visitors
 }));
 
 app.use(passport.initialize());
 app.use(passport.session()); 
  
-app.use('/auth', authRoutes);
-app.use('/auth', passwordResetRoutes); //  Password reset routes
+app.use('/auth', authRateLimiter, authRoutes);
+app.use('/auth', authRateLimiter, passwordResetRoutes); //  Password reset routes
 app.use('/register', rateLimiter);
 app.use('/event', registrationRoutes);
 app.use('/live', liveRoutes);
 app.use('/api/live/zegocloud', zegoCloudRoutes);
 app.use('/api/live/series', liveSeriesRoutes);
 app.use('/api/users', userRoutes);
-app.use('/api/payments', paymentRoutes);
-app.use('/api/wallet', walletRoutes);
+app.use('/api/payments', financialRateLimiter, paymentRoutes);
+app.use('/api/wallet', financialRateLimiter, walletRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/profile', profileRoutes);
@@ -110,6 +142,21 @@ app.use('/api/quiz', quizRoutes);
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes); 
+
+// Global error handler - catches any unhandled errors from routes/middleware
+// Must be defined after all routes
+app.use((err, req, res, next) => {
+  console.error('[Global Error Handler]', err.stack || err.message || err);
+  
+  // Don't leak internal error details in production
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  res.status(err.status || 500).json({
+    success: false,
+    message: isDev ? err.message : 'An unexpected error occurred',
+    ...(isDev && { stack: err.stack })
+  });
+});
 
 const PORT = process.env.PORT || 8080; 
     
