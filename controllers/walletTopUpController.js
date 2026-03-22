@@ -39,7 +39,7 @@ exports.initializeTopUp = async (req, res) => {
     walletService.validateCurrency(currency);
     walletService.validateAmount(amount);
 
-    // Minimum top-up amounts (as per plan)
+    // Minimum top-up amounts
     const minimums = { NGN: 1400, USD: 1 };
     if (amount < minimums[currency]) {
       return res.status(400).json({
@@ -49,6 +49,8 @@ exports.initializeTopUp = async (req, res) => {
     }
 
     const reference = `topup_${Date.now()}_${userId}_${Math.random().toString(36).substring(2, 9)}`;
+    const { v4: uuidv4 } = require('uuid');
+    const idempotencyKey = uuidv4();
 
     if (currency === 'USD') {
       // Stripe Payment Intent
@@ -131,6 +133,7 @@ exports.verifyTopUp = async (req, res) => {
   try {
     const authenticatedUserId = req.user.id;
     const { reference, gateway, paymentIntentId } = req.body;
+    const { v4: uuidv4 } = require('uuid');
 
     if (!reference || !gateway) {
       return res.status(400).json({
@@ -138,6 +141,9 @@ exports.verifyTopUp = async (req, res) => {
         message: 'Reference and gateway are required'
       });
     }
+
+    // Generate idempotency key for this transaction
+    const idempotencyKey = uuidv4();
 
     // SECURITY: Check if this reference has already been processed (idempotency)
     const WalletTransaction = sequelize.models.WalletTransaction;
@@ -241,7 +247,9 @@ exports.verifyTopUp = async (req, res) => {
       metadata: {
         gateway,
         paymentId: paymentData.id,
-        type: 'topup'
+        type: 'topup',
+        idempotencyKey,
+        externalReference: gateway === 'stripe' ? paymentIntentId : reference
       }
     });
 

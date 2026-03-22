@@ -184,11 +184,13 @@ class MultiCurrencyWalletService {
             walletId: wallet.id,
             type: 'credit',
             amount: amountInCents,
-            balanceBefore: wallet.balance_available - amountInCents,
-            balanceAfter: wallet.balance_available,
+            currency,
             reference,
             description,
             metadata: { ...metadata, currency },
+            gateway: metadata.gateway || null,
+            externalReference: metadata.externalReference || null,
+            status: 'completed',
             transaction
           });
 
@@ -240,11 +242,13 @@ class MultiCurrencyWalletService {
             walletId: wallet.id,
             type: 'debit',
             amount: amountInCents,
-            balanceBefore: wallet.balance_available + amountInCents,
-            balanceAfter: wallet.balance_available,
+            currency,
             reference,
             description,
             metadata: { ...metadata, currency },
+            gateway: metadata.gateway || null,
+            externalReference: metadata.externalReference || null,
+            status: 'completed',
             transaction
           });
 
@@ -300,8 +304,7 @@ class MultiCurrencyWalletService {
               walletId: wallet.id,
               type: 'transfer_out',
               amount: amountInCents,
-              balanceBefore: wallet.balance_available + amountInCents,
-              balanceAfter: wallet.balance_available,
+              currency,
               reference,
               description: `Transfer to user ${toUserId}: ${description}`,
               metadata: { currency, toUserId, transferType: 'outgoing' },
@@ -327,8 +330,7 @@ class MultiCurrencyWalletService {
               walletId: wallet.id,
               type: 'transfer_in',
               amount: amountInCents,
-              balanceBefore: wallet.balance_available - amountInCents,
-              balanceAfter: wallet.balance_available,
+              currency,
               reference,
               description: `Transfer from user ${fromUserId}: ${description}`,
               metadata: { currency, fromUserId, transferType: 'incoming' },
@@ -473,25 +475,34 @@ class MultiCurrencyWalletService {
     walletId, 
     type, 
     amount, 
-    balanceBefore, 
-    balanceAfter, 
+    currency,
     reference, 
     description, 
-    metadata = {}, 
+    metadata = {},
+    gateway = null,
+    externalReference = null,
+    status = 'completed',
     transaction 
   }) {
     try {
       const WalletTransaction = sequelize.models.WalletTransaction;
       if (WalletTransaction) {
+        const { v4: uuidv4 } = require('uuid');
+        const idempotencyKey = metadata.idempotencyKey || uuidv4();
+        
         await WalletTransaction.create({
           wallet_account_id: walletId,
           transaction_type: type,
           amount,
-          balance_before: balanceBefore,
-          balance_after: balanceAfter,
+          currency,
           reference,
           description,
-          metadata
+          metadata,
+          status,
+          gateway,
+          external_reference: externalReference,
+          idempotency_key: idempotencyKey,
+          completed_at: status === 'completed' ? new Date() : null
         }, { transaction });
       }
     } catch (error) {

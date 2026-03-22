@@ -2,6 +2,7 @@ const User = require('./User');
 const Purchase = require('./Purchase');
 const Wallet = require('./Wallet');
 const WalletAccount = require('./WalletAccount');
+const WalletTransaction = require('./WalletTransaction');
 const Payout = require('./Payout');
 const Transaction = require('./Transaction');
 const Video = require('./Video');
@@ -22,6 +23,10 @@ Wallet.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // WalletAccount associations
 WalletAccount.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+WalletAccount.hasMany(WalletTransaction, { foreignKey: 'wallet_account_id', as: 'transactions' });
+
+// WalletTransaction associations
+WalletTransaction.belongsTo(WalletAccount, { foreignKey: 'wallet_account_id', as: 'walletAccount' });
 
 // Payout associations
 Payout.belongsTo(User, { foreignKey: 'userId', as: 'user' });
@@ -54,6 +59,7 @@ module.exports = {
   Purchase,
   Wallet,
   WalletAccount,
+  WalletTransaction,
   Payout,
   Transaction,
   Video,
