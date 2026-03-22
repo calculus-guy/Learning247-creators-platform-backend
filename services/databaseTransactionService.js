@@ -125,6 +125,95 @@ class DatabaseTransactionService {
   async getTransaction() {
     return sequelize.transaction();
   }
+
+  /**
+   * Create a wallet account within an existing transaction
+   */
+  async createWalletInTransaction(userId, currency, transaction) {
+    const WalletAccount = sequelize.models.WalletAccount;
+    if (!WalletAccount) throw new Error('WalletAccount model not loaded');
+
+    const [wallet] = await WalletAccount.findOrCreate({
+      where: { user_id: userId, currency },
+      defaults: {
+        user_id: userId,
+        currency,
+        balance_available: 0,
+        balance_pending: 0
+      },
+      transaction
+    });
+
+    return wallet;
+  }
+
+  /**
+   * Execute an operation on a wallet account within a transaction
+   */
+  async executeWalletOperation(userId, currency, operation, options = {}) {
+    return this.executeWithTransaction(async (transaction) => {
+      const WalletAccount = sequelize.models.WalletAccount;
+      if (!WalletAccount) throw new Error('WalletAccount model not loaded');
+
+      let wallet = await WalletAccount.findOne({
+        where: { user_id: userId, currency },
+        lock: transaction.LOCK.UPDATE,
+        transaction
+      });
+
+      if (!wallet) {
+        wallet = await this.createWalletInTransaction(userId, currency, transaction);
+      }
+
+      return operation(wallet, transaction);
+    });
+  }
+
+  /**
+   * Update wallet balance within a transaction
+   */
+  async updateWalletBalance(wallet, availableDelta, pendingDelta, transaction) {
+    const newAvailable = parseInt(wallet.balance_available) + availableDelta;
+    const newPending = parseInt(wallet.balance_pending) + pendingDelta;
+
+    if (newAvailable < 0) throw new Error('Insufficient balance');
+    if (newPending < 0) throw new Error('Insufficient pending balance');
+
+    await wallet.update({
+      balance_available: newAvailable,
+      balance_pending: newPending
+    }, { transaction });
+
+    wallet.balance_available = newAvailable;
+    wallet.balance_pending = newPending;
+
+    return wallet;
+  }
+
+  /**
+   * Execute operations on multiple wallets atomically
+   */
+  async executeMultiWalletOperation(userId, operations, options = {}) {
+    return this.executeWithTransaction(async (transaction) => {
+      const results = [];
+      for (const op of operations) {
+        const WalletAccount = sequelize.models.WalletAccount;
+        let wallet = await WalletAccount.findOne({
+          where: { user_id: op.userId || userId, currency: op.currency },
+          lock: transaction.LOCK.UPDATE,
+          transaction
+        });
+
+        if (!wallet) {
+          wallet = await this.createWalletInTransaction(op.userId || userId, op.currency, transaction);
+        }
+
+        const result = await op.operation(wallet, transaction);
+        results.push(result);
+      }
+      return results;
+    });
+  }
 }
 
 module.exports = new DatabaseTransactionService();
