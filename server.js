@@ -84,19 +84,19 @@ app.use(rateLimit({
   message: { success: false, message: 'Too many requests, please try again later.' }
 }));
 
-// Stricter limiter for auth endpoints (login, signup, password reset)
+// Auth endpoints - 100 attempts per 15 min per IP
 const authRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,                   // 20 attempts per IP per window
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' }
 });
 
-// Stricter limiter for financial endpoints (top-up, withdrawal, payment)
+// Financial endpoints - 60 requests per 15 min per IP
 const financialRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 30,                   // 30 requests per IP per window
+  windowMs: 15 * 60 * 1000,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many financial requests, please try again later.' }
