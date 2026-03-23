@@ -39,7 +39,6 @@
     "nodemailer": "^7.0.10",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "paystack": "^2.0.1",
     "pg": "^8.16.3",
     "pg-hstore": "^2.3.4",
     "rate-limit-redis": "^4.2.3",
@@ -47,6 +46,7 @@
     "sequelize": "^6.37.7",
     "socket.io": "^4.8.3",
     "stripe": "^20.0.0",
+    "uuid": "^9.0.1",
     "xlsx": "^0.18.5",
     "zego-express-engine-webrtc": "^3.11.0"
   },

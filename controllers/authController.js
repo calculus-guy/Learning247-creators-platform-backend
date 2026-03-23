@@ -29,6 +29,7 @@ exports.signup = async (req, res) => {
 
     res.status(201).json({ message: 'User created successfully', token });
   } catch (error) {
+    console.error('[Auth] Signup error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -67,6 +68,7 @@ exports.login = async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('[Auth] Login error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

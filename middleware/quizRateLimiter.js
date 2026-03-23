@@ -45,7 +45,8 @@ class QuizRateLimiter {
    */
   async checkLimit(key, limit, windowSeconds) {
     if (!this.initialized || !this.redis) {
-      // If Redis not available, allow request
+      // Redis unavailable - rate limiting is disabled, log a warning
+      console.warn('[QuizRateLimiter] Redis unavailable - rate limiting is DISABLED for key:', key);
       return { allowed: true, remaining: limit, resetAt: Date.now() + windowSeconds * 1000 };
     }
 
@@ -93,7 +94,7 @@ class QuizRateLimiter {
       };
 
     } catch (error) {
-      console.error('[QuizRateLimiter] Check limit error:', error);
+      console.error('[QuizRateLimiter] Check limit error - rate limiting bypassed for key:', key, error.message);
       // On error, allow request
       return { allowed: true, remaining: limit, resetAt: Date.now() + windowSeconds * 1000 };
     }

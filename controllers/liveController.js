@@ -540,7 +540,7 @@ exports.endZegoCloudSession = async (req, res) => {
 
 exports.getAllLiveClasses = async (req, res) => {
   try {
-    const { status, privacy, category, showAll } = req.query;
+    const { status, privacy, category, showAll, limit = 20, offset = 0 } = req.query;
     
     const filters = {};
     
@@ -566,9 +566,11 @@ exports.getAllLiveClasses = async (req, res) => {
     // Filter by category if provided
     if (category) filters.category = category;
 
-    const liveClasses = await LiveClass.findAll({
+    const { count, rows: liveClasses } = await LiveClass.findAndCountAll({
       where: filters,
       order: [['startTime', 'ASC']],
+      limit: Math.min(parseInt(limit), 100), // cap at 100
+      offset: parseInt(offset),
       include: [
         {
           model: LiveHost,
@@ -577,21 +579,6 @@ exports.getAllLiveClasses = async (req, res) => {
         }
       ]
     });
-
-    // The status is managed by Mux webhooks for Mux streams:
-    // - "scheduled" = created but not streaming yet
-    // - "live" = actively streaming (set by webhook: video.live_stream.active)
-    // - "ended" = stream stopped (set by webhook: video.live_stream.idle)
-    // - "recorded" = recording available (set by webhook: video.live_stream.completed)
-    
-    // For ZegoCloud streams, status is managed by our service:
-    // - "scheduled" = created but not started yet
-    // - "live" = ZegoCloud room is active
-    // - "ended" = ZegoCloud session ended
-
-    // 📊 UX Enhancement: By default, only 'scheduled' and 'live' classes are shown
-    // This keeps the frontend clean and focused on actionable content
-    // Use ?showAll=true to see ended/recorded classes (for creators/admins)
 
     // Add dual pricing to each live class
     const liveClassesWithPricing = liveClasses.map(liveClass => {
@@ -602,7 +589,13 @@ exports.getAllLiveClasses = async (req, res) => {
 
     return res.json({
       count: liveClassesWithPricing.length,
-      liveClasses: liveClassesWithPricing
+      liveClasses: liveClassesWithPricing,
+      pagination: {
+        total: count,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        pages: Math.ceil(count / parseInt(limit))
+      }
     });
   } catch (error) {
     return handleError(res, error);
@@ -616,7 +609,7 @@ exports.getAllLiveClasses = async (req, res) => {
 exports.getMyLiveClasses = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { status, showAll } = req.query;
+    const { status, showAll, limit = 20, offset = 0 } = req.query;
     
     console.log(`[Live Controller] Getting live classes for user ${userId}`);
     
@@ -631,9 +624,11 @@ exports.getMyLiveClasses = async (req, res) => {
       filters.status = { [Op.in]: ['scheduled', 'live'] };
     }
     
-    const liveClasses = await LiveClass.findAll({
+    const { count, rows: liveClasses } = await LiveClass.findAndCountAll({
       where: filters,
       order: [['createdAt', 'DESC']], // Most recent first for user's own classes
+      limit: Math.min(parseInt(limit), 100), // cap at 100
+      offset: parseInt(offset),
       include: [
         {
           model: LiveHost,
@@ -654,6 +649,12 @@ exports.getMyLiveClasses = async (req, res) => {
       success: true,
       count: liveClassesWithPricing.length,
       liveClasses: liveClassesWithPricing,
+      pagination: {
+        total: count,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        pages: Math.ceil(count / parseInt(limit))
+      },
       filters: {
         userId,
         status,
