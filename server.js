@@ -75,32 +75,32 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// // Generous enough for normal use, tight enough to block abuse
-// app.use(rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 300,                  // 300 requests per IP per window
-//   standardHeaders: true,     // Return rate limit info in RateLimit-* headers
-//   legacyHeaders: false,
-//   message: { success: false, message: 'Too many requests, please try again later.' }
-// }));
+// Generous enough for normal use, tight enough to block abuse
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 300,                  // 300 requests per IP per window
+  standardHeaders: true,     // Return rate limit info in RateLimit-* headers
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests, please try again later.' }
+}));
 
-// // Stricter limiter for auth endpoints (login, signup, password reset)
-// const authRateLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 20,                   // 20 attempts per IP per window
-//   standardHeaders: true,
-//   legacyHeaders: false,
-//   message: { success: false, message: 'Too many authentication attempts, please try again later.' }
-// });
+// Stricter limiter for auth endpoints (login, signup, password reset)
+const authRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,                   // 20 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
+});
 
-// // Stricter limiter for financial endpoints (top-up, withdrawal, payment)
-// const financialRateLimiter = rateLimit({
-//   windowMs: 15 * 60 * 1000, // 15 minutes
-//   max: 30,                   // 30 requests per IP per window
-//   standardHeaders: true,
-//   legacyHeaders: false,
-//   message: { success: false, message: 'Too many financial requests, please try again later.' }
-// });
+// Stricter limiter for financial endpoints (top-up, withdrawal, payment)
+const financialRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,                   // 30 requests per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many financial requests, please try again later.' }
+});
 
 app.use(
   "/api/webhooks", webhookRoutes
