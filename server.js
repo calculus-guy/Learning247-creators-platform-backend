@@ -103,7 +103,7 @@ const financialRateLimiter = rateLimit({
 });
 
 app.use(
-  "/api/webhooks", webhookRoutes  
+  "/api/webhooks", webhookRoutes   
 );
 
 app.use(cookieParser());
