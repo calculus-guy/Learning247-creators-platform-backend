@@ -55,6 +55,7 @@ const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',
   'http://localhost:3000',
+  'http://localhost:8080',
   'http://localhost:3001',
   'https://aistudio.google.com',
   'https://www.hallos.net',
