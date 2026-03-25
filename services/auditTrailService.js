@@ -254,7 +254,7 @@ class AuditTrailService {
         replacements.endDate = endDate;
       }
 
-      const [results] = await sequelize.query(`
+      const results = await sequelize.query(`
         SELECT 
           id, user_id, operation_type, resource_type, resource_id,
           old_values, new_values, ip_address, user_agent, request_id,
@@ -272,7 +272,7 @@ class AuditTrailService {
         type: sequelize.QueryTypes.SELECT
       });
 
-      return results.map(entry => ({
+      return (results || []).map(entry => ({
         ...entry,
         data: this.parseJSON(entry.old_values),
         metadata: this.parseJSON(entry.new_values)
