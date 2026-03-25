@@ -8,6 +8,7 @@ const withdrawalLimitController = require('../controllers/withdrawalLimitControl
 const auditTrailController = require('../controllers/auditTrailController');
 const manualReviewController = require('../controllers/manualReviewController');
 const transactionHistoryController = require('../controllers/transactionHistoryController');
+const adminDashboardController = require('../controllers/adminDashboardController');
 
 /**
  * Admin Routes for System Management
@@ -185,29 +186,34 @@ router.get('/transactions/summary', (req, res, next) => {
   transactionHistoryController.getTransactionSummary.call(transactionHistoryController, req, res);
 });
 
-module.exports = router;
+/**
+ * Platform Dashboard & User Management
+ */
+router.get('/dashboard', adminDashboardController.getDashboard);
+router.get('/revenue', adminDashboardController.getRevenue);
+router.get('/content-stats', adminDashboardController.getContentStats);
+
+// User management
+router.get('/users', adminDashboardController.getUsers);
+router.get('/users/:id', adminDashboardController.getUserById);
+router.patch('/users/:id/role', adminDashboardController.updateUserRole);
+
+// Payout management
+router.get('/payouts', adminDashboardController.getPayouts);
+router.patch('/payouts/:id/approve', adminDashboardController.approvePayout);
+router.patch('/payouts/:id/reject', adminDashboardController.rejectPayout);
+
 /**
  * Course Enrollment Management (Admin)
  */
 const courseEnrollmentController = require('../controllers/courseEnrollmentController');
 
-// Get course enrollments for admin dashboard (✅ UPDATED: supports accessType and expiryStatus filters)
 router.get('/course-enrollments', courseEnrollmentController.getEnrollments);
-
-// ✅ NEW: Get enrollments expiring soon (must be before /:id route)
 router.get('/course-enrollments/expiring-soon', courseEnrollmentController.getExpiringSoon);
-
-// Get enrollment statistics (✅ UPDATED: includes access type and expiry breakdown)
 router.get('/course-enrollments/stats', courseEnrollmentController.getEnrollmentStats);
-
-// Export enrollments
 router.get('/course-enrollments/export', courseEnrollmentController.exportEnrollments);
-
-// Get specific enrollment details
 router.get('/course-enrollments/:id', courseEnrollmentController.getEnrollmentById);
-
-// Toggle credentials sent status
 router.patch('/course-enrollments/:id/mark-sent', courseEnrollmentController.markCredentialsSent);
-
-// Batch update credentials sent status
 router.patch('/course-enrollments/batch-mark-sent', courseEnrollmentController.batchMarkCredentialsSent);
+
+module.exports = router;
