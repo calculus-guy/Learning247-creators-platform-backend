@@ -114,6 +114,27 @@ router.get('/user/stats', authMiddleware, quizUserController.getStats);
  */
 router.get('/user/transactions', authMiddleware, quizUserController.getTransactions);
 
+/**
+ * @route   GET /api/quiz/user/check-nickname
+ * @desc    Check if a nickname is available (no auth needed)
+ * @access  Public
+ */
+router.get('/user/check-nickname', quizUserController.checkNickname);
+
+/**
+ * @route   GET /api/quiz/user/profile/:userId
+ * @desc    Get quiz profile (nickname, avatar, stats) for any user
+ * @access  Private
+ */
+router.get('/user/profile/:userId', authMiddleware, quizUserController.getProfile);
+
+/**
+ * @route   PATCH /api/quiz/user/profile
+ * @desc    Update avatar (anytime) or nickname (2-week cooldown)
+ * @access  Private
+ */
+router.patch('/user/profile', authMiddleware, quizUserController.updateProfile);
+
 // ==================== CURRENCY ROUTES ====================
 
 /**

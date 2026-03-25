@@ -196,7 +196,28 @@ async function setupQuizPlatform() {
     }
     console.log('✅ quiz_matches columns up to date\n');
 
-    // Step 5: Create quiz_tournament_participants table
+    // Step 4c: Add nickname + avatar_url to user_quiz_stats (safe - uses IF NOT EXISTS)
+    console.log('4️⃣c Adding nickname and avatar_url to user_quiz_stats...');
+    const [statsColumns] = await sequelize.query(`
+      SELECT column_name FROM information_schema.columns 
+      WHERE table_name = 'user_quiz_stats' AND table_schema = 'public';
+    `);
+    const existingStatsCols = statsColumns.map(r => r.column_name);
+
+    if (!existingStatsCols.includes('nickname')) {
+      await sequelize.query(`ALTER TABLE user_quiz_stats ADD COLUMN nickname VARCHAR(30) UNIQUE;`);
+      console.log('   ✅ Added nickname');
+    }
+    if (!existingStatsCols.includes('avatar_url')) {
+      await sequelize.query(`ALTER TABLE user_quiz_stats ADD COLUMN avatar_url TEXT;`);
+      console.log('   ✅ Added avatar_url');
+    }
+    if (!existingStatsCols.includes('nickname_changed_at')) {
+      await sequelize.query(`ALTER TABLE user_quiz_stats ADD COLUMN nickname_changed_at TIMESTAMP;`);
+      console.log('   ✅ Added nickname_changed_at');
+    }
+    console.log('✅ user_quiz_stats columns up to date\n');
+
     console.log('5️⃣ Creating quiz_tournament_participants table...');
     await sequelize.query(`
       CREATE TABLE IF NOT EXISTS quiz_tournament_participants (

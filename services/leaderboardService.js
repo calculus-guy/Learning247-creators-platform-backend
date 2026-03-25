@@ -141,7 +141,8 @@ class LeaderboardService {
         return {
           rank: offset + index + 1,
           userId: stat.userId,
-          username: `${stat.user.firstname} ${stat.user.lastname}`,
+          nickname: stat.nickname || `Player_${stat.userId}`,
+          avatarUrl: stat.avatarUrl || null,
           totalWinnings,
           lobbyWinnings,
           tournamentPrizes,
@@ -240,7 +241,8 @@ class LeaderboardService {
       const rankings = stats.map((stat, index) => ({
         rank: offset + index + 1,
         userId: stat.userId,
-        username: `${stat.user.firstname} ${stat.user.lastname}`,
+        nickname: stat.nickname || `Player_${stat.userId}`,
+        avatarUrl: stat.avatarUrl || null,
         totalWinnings: parseFloat(stat.lobbyStats?.totalWinnings || 0),
         matches: stat.lobbyStats?.totalMatches || 0,
         wins: stat.lobbyStats?.wins || 0,
@@ -292,7 +294,8 @@ class LeaderboardService {
       const rankings = stats.map((stat, index) => ({
         rank: offset + index + 1,
         userId: stat.userId,
-        username: `${stat.user.firstname} ${stat.user.lastname}`,
+        nickname: stat.nickname || `Player_${stat.userId}`,
+        avatarUrl: stat.avatarUrl || null,
         totalPrizeMoney: parseFloat(stat.tournamentStats?.totalPrizeMoney || 0),
         tournamentsEntered: stat.tournamentStats?.tournamentsEntered || 0,
         tournamentsWon: stat.tournamentStats?.tournamentsWon || 0,

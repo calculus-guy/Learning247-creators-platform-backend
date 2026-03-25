@@ -80,6 +80,25 @@ const UserQuizStats = sequelize.define('UserQuizStats', {
     type: DataTypes.DATE,
     allowNull: true,
     field: 'last_tournament_at'
+  },
+  nickname: {
+    type: DataTypes.STRING(30),
+    allowNull: true,
+    unique: true,
+    validate: {
+      len: [3, 30],
+      is: /^[a-zA-Z0-9_]+$/  // alphanumeric + underscore only
+    }
+  },
+  avatarUrl: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    field: 'avatar_url'
+  },
+  nicknameChangedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    field: 'nickname_changed_at'
   }
 }, {
   tableName: 'user_quiz_stats',

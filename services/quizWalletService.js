@@ -80,9 +80,11 @@ class QuizWalletService {
   /**
    * Credit initial bonus to new user (idempotent)
    * @param {number} userId - User ID
+   * @param {string} nickname - Quiz platform nickname
+   * @param {string} avatarUrl - DiceBear avatar URL
    * @returns {Promise<{success: boolean, balance: number, transaction: Object}>}
    */
-  async creditInitialBonus(userId) {
+  async creditInitialBonus(userId, nickname, avatarUrl) {
     // Check if user already received initial bonus
     const existingBonus = await ChutaCoinTransaction.findOne({
       where: {
@@ -101,6 +103,12 @@ class QuizWalletService {
       };
     }
 
+    // Check nickname uniqueness
+    const existingNickname = await UserQuizStats.findOne({ where: { nickname } });
+    if (existingNickname) {
+      throw new Error('Nickname already taken. Please choose a different one.');
+    }
+
     // Credit the bonus
     const transaction = await this.recordTransaction(
       userId,
@@ -109,15 +117,23 @@ class QuizWalletService {
       { description: 'Welcome bonus' }
     );
 
-    // Initialize user quiz stats
+    // Initialize user quiz stats with nickname and avatar
     await UserQuizStats.findOrCreate({
       where: { userId },
-      defaults: { userId }
+      defaults: { userId, nickname, avatarUrl }
     });
+
+    // If stats already existed (edge case), update nickname/avatar
+    await UserQuizStats.update(
+      { nickname, avatarUrl },
+      { where: { userId, nickname: null } }
+    );
 
     return {
       success: true,
       balance: parseFloat(transaction.balanceAfter),
+      nickname,
+      avatarUrl,
       transaction
     };
   }
