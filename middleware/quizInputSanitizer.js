@@ -87,15 +87,18 @@ class QuizInputSanitizer {
       return obj;
     }
 
+    // Fields that contain URLs — skip HTML escaping, only trim
+    const URL_FIELDS = ['avatarUrl', 'url', 'imageUrl', 'thumbnailUrl', 'redirectUrl', 'callbackUrl', 'linkUrl', 'fileUrl'];
+
     const sanitized = {};
-    
+
     for (const [key, value] of Object.entries(obj)) {
-      // Sanitize key
       const sanitizedKey = this.sanitizeString(key);
-      
-      // Sanitize value
+
       if (typeof value === 'string') {
-        sanitized[sanitizedKey] = this.sanitizeString(value);
+        sanitized[sanitizedKey] = URL_FIELDS.includes(key)
+          ? value.trim()
+          : this.sanitizeString(value);
       } else if (typeof value === 'object') {
         sanitized[sanitizedKey] = this.sanitizeObject(value);
       } else {
