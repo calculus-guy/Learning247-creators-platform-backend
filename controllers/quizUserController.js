@@ -41,7 +41,22 @@ exports.register = async (req, res) => {
     const userId = req.user.id;
     const { nickname, avatarUrl } = req.body;
 
-    // Validate nickname
+    // Temporary debug logs — remove after fix confirmed
+    console.log('[register] body received:', JSON.stringify(req.body));
+    console.log('[register] avatarUrl value:', avatarUrl);
+    console.log('[register] avatarUrl type:', typeof avatarUrl);
+    console.log('[register] avatarUrl valid?', isValidDiceBearUrl(avatarUrl));
+    if (avatarUrl) {
+      try {
+        const p = new URL(avatarUrl);
+        console.log('[register] parsed hostname:', p.hostname);
+        console.log('[register] parsed pathname:', p.pathname);
+      } catch (e) {
+        console.log('[register] URL parse failed:', e.message);
+      }
+    }
+
+    // Validate nickname 
     if (!nickname || typeof nickname !== 'string') {
       return res.status(400).json({ success: false, message: 'nickname is required' });
     }
