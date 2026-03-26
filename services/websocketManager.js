@@ -106,14 +106,15 @@ class WebSocketManager {
       console.error(`[WebSocket] Error marking user ${userId} active:`, err.message);
     });
 
+    // Notify all clients that player list changed
+    setTimeout(() => this.broadcastPlayersUpdated(), 200);
+
     // Send authentication confirmation
     socket.emit('authenticated', {
       userId,
       socketId: socket.id,
       timestamp: Date.now()
     });
-
-    // Register event handlers
     this.registerMatchEvents(socket);
     this.registerTournamentEvents(socket);
     this.registerHeartbeatEvents(socket);
@@ -442,6 +443,87 @@ class WebSocketManager {
         });
       }
     });
+
+    // Request online players list (for Players screen)
+    socket.on('get_online_players', async (data) => {
+      try {
+        const page = parseInt(data?.page) || 1;
+        const limit = parseInt(data?.limit) || 12;
+        const players = await this.getOnlinePlayers(userId, page, limit);
+        socket.emit('online_players', players);
+      } catch (error) {
+        console.error('[WebSocket] Error getting online players:', error.message);
+        socket.emit('error', {
+          code: 'ONLINE_PLAYERS_ERROR',
+          message: 'Failed to get online players'
+        });
+      }
+    });
+  }
+
+  /**
+   * Fetch paginated online players enriched with quiz stats
+   * Excludes the requesting user
+   * @param {number} requestingUserId - The user making the request (excluded from results)
+   * @param {number} page
+   * @param {number} limit
+   */
+  async getOnlinePlayers(requestingUserId, page = 1, limit = 12) {
+    const UserQuizStats = require('../models/UserQuizStats');
+    const { Op } = require('sequelize');
+
+    const allActiveIds = await activeUserTracker.getActiveUserIds();
+
+    // Exclude the requesting user
+    const otherIds = allActiveIds.filter(id => id !== requestingUserId);
+    const total = otherIds.length;
+
+    // Paginate the IDs
+    const offset = (page - 1) * limit;
+    const pageIds = otherIds.slice(offset, offset + limit);
+
+    if (pageIds.length === 0) {
+      return {
+        players: [],
+        total,
+        page,
+        totalPages: Math.ceil(total / limit)
+      };
+    }
+
+    // Fetch quiz stats + nickname + avatar for these users
+    const stats = await UserQuizStats.findAll({
+      where: { userId: { [Op.in]: pageIds } },
+      attributes: ['userId', 'nickname', 'avatarUrl', 'lobbyStats']
+    });
+
+    // Build a map for quick lookup
+    const statsMap = {};
+    stats.forEach(s => { statsMap[s.userId] = s; });
+
+    // Build player cards in the same order as pageIds
+    const players = pageIds.map(id => {
+      const s = statsMap[id];
+      const lobbyStats = s?.lobbyStats || {};
+      return {
+        userId: id,
+        nickname: s?.nickname || `Player_${id}`,
+        avatarUrl: s?.avatarUrl || null,
+        chutaBalance: null, // balance not exposed on players screen for privacy
+        wins: lobbyStats.wins || 0,
+        losses: lobbyStats.losses || 0,
+        winRate: lobbyStats.winRate || 0,
+        totalWinnings: lobbyStats.totalWinnings || 0,
+        isOnline: true
+      };
+    });
+
+    return {
+      players,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   /**
@@ -515,6 +597,8 @@ class WebSocketManager {
       activeUserTracker.markUserInactive(userId).catch(err => {
         console.error(`[WebSocket] Error marking user ${userId} inactive:`, err.message);
       });
+      // Notify all clients that player list changed
+      setTimeout(() => this.broadcastPlayersUpdated(), 200);
     }
 
     // Remove from all rooms
@@ -604,6 +688,20 @@ class WebSocketManager {
         }
       });
     }, 30000);
+  }
+
+  /**
+   * Broadcast that the online players list has changed
+   * Frontend should re-fetch or update its current page
+   */
+  broadcastPlayersUpdated() {
+    if (!this.io) return;
+    activeUserTracker.getActiveUserCount().then(count => {
+      this.io.emit('players_updated', {
+        onlineCount: count,
+        timestamp: Date.now()
+      });
+    }).catch(() => {});
   }
 
   /**

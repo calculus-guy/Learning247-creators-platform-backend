@@ -363,6 +363,28 @@ router.get('/active-users', async (req, res, next) => {
   }
 });
 
+/**
+ * @route   GET /api/quiz/lobby/players
+ * @desc    Get paginated list of currently online players (for Players screen)
+ *          Excludes the requesting user. Returns nickname, avatar, wins, losses.
+ * @access  Private
+ * @query   page (default 1), limit (default 12)
+ */
+router.get('/lobby/players', authMiddleware, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 12));
+
+    const websocketManager = require('../services/websocketManager');
+    const result = await websocketManager.getOnlinePlayers(userId, page, limit);
+
+    res.json({ success: true, ...result });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ==================== ERROR HANDLER ====================
 // Must be last - catches all errors from quiz routes
 router.use(quizErrorHandler);
