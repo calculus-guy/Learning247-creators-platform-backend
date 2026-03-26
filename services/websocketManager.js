@@ -470,6 +470,7 @@ class WebSocketManager {
    */
   async getOnlinePlayers(requestingUserId, page = 1, limit = 12) {
     const UserQuizStats = require('../models/UserQuizStats');
+    const quizWalletService = require('./quizWalletService');
     const { Op } = require('sequelize');
 
     const allActiveIds = await activeUserTracker.getActiveUserIds();
@@ -483,12 +484,7 @@ class WebSocketManager {
     const pageIds = otherIds.slice(offset, offset + limit);
 
     if (pageIds.length === 0) {
-      return {
-        players: [],
-        total,
-        page,
-        totalPages: Math.ceil(total / limit)
-      };
+      return { players: [], total, page, totalPages: Math.ceil(total / limit) };
     }
 
     // Fetch quiz stats + nickname + avatar for these users
@@ -497,19 +493,22 @@ class WebSocketManager {
       attributes: ['userId', 'nickname', 'avatarUrl', 'lobbyStats']
     });
 
-    // Build a map for quick lookup
     const statsMap = {};
     stats.forEach(s => { statsMap[s.userId] = s; });
 
-    // Build player cards in the same order as pageIds
-    const players = pageIds.map(id => {
+    // Fetch balances for all players in parallel
+    const balances = await Promise.all(
+      pageIds.map(id => quizWalletService.getBalance(id).catch(() => 0))
+    );
+
+    const players = pageIds.map((id, index) => {
       const s = statsMap[id];
       const lobbyStats = s?.lobbyStats || {};
       return {
         userId: id,
         nickname: s?.nickname || `Player_${id}`,
         avatarUrl: s?.avatarUrl || null,
-        chutaBalance: null, // balance not exposed on players screen for privacy
+        chutaBalance: balances[index] || 0,
         wins: lobbyStats.wins || 0,
         losses: lobbyStats.losses || 0,
         winRate: lobbyStats.winRate || 0,
@@ -518,12 +517,7 @@ class WebSocketManager {
       };
     });
 
-    return {
-      players,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit)
-    };
+    return { players, total, page, totalPages: Math.ceil(total / limit) };
   }
 
   /**
