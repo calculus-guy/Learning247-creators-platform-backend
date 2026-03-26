@@ -12,7 +12,8 @@ function isValidDiceBearUrl(url) {
   try {
     const parsed = new URL(url);
     if (parsed.hostname !== 'api.dicebear.com') return false;
-    const styleMatch = parsed.pathname.match(/^\/9\.x\/([^/]+)\/(svg|png)$/);
+    // Accept /9.x/{style}/svg or /9.x/{style}/png with optional trailing slash
+    const styleMatch = parsed.pathname.match(/^\/9\.x\/([^/]+)\/(svg|png)\/?$/);
     if (!styleMatch) return false;
     if (!DICEBEAR_STYLES.includes(styleMatch[1])) return false;
     return true;
