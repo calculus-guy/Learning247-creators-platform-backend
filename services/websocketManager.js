@@ -59,7 +59,7 @@ class WebSocketManager {
           return next(new Error('Authentication required'));
         }
 
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
         socket.userId = decoded.id || decoded.userId;
         socket.user = decoded;
 
