@@ -31,6 +31,7 @@ const ugcRoutes = require('./routes/ugcRoutes');
 const referralRoutes = require('./routes/referralRoutes');
 const sessionRecordingRoutes = require('./routes/sessionRecordingRoutes');
 const quizRoutes = require('./routes/quizRoutes');
+const freebieRoutes = require('./routes/freebieRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
@@ -48,6 +49,7 @@ require('./models/feedbackIndex');
 require('./models/ugcIndex');
 require('./models/referralIndex');
 require('./models/quizIndex');
+require('./models/freebieIndex');
 
 const app = express();
 
@@ -140,6 +142,7 @@ app.use('/api/ugc', ugcRoutes);
 app.use('/api/referral', referralRoutes);
 app.use('/api/admin/live-series', sessionRecordingRoutes);
 app.use('/api/quiz', quizRoutes);
+app.use('/api/freebies', freebieRoutes);
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes); 
