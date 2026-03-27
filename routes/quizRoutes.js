@@ -22,12 +22,15 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedMimes = [
       'application/vnd.ms-excel',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'text/csv',
+      'text/plain', // some OS send CSV as text/plain
+      'application/csv'
     ];
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only Excel files are allowed.'));
+      cb(new Error('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are allowed.'));
     }
   }
 });
