@@ -33,6 +33,24 @@ class LobbyService {
    * @param {number} opponentId - Specific opponent ID (optional)
    * @returns {Promise<{success: boolean, challengeId: string, status: string, escrowAmount: number}>}
    */
+  /**
+   * Emit a socket event to a specific user if they are connected
+   */
+  _emitToUser(userId, event, payload) {
+    try {
+      const websocketManager = require('./websocketManager');
+      const socket = websocketManager.getUserSocket(userId);
+      if (socket) {
+        socket.emit(event, payload);
+        console.log(`[LobbyService] Emitted '${event}' to user ${userId}`);
+      } else {
+        console.warn(`[LobbyService] User ${userId} not connected, could not emit '${event}'`);
+      }
+    } catch (e) {
+      console.error(`[LobbyService] Failed to emit '${event}' to user ${userId}:`, e.message);
+    }
+  }
+
   async createChallenge(userId, wagerAmount, categoryId, opponentId = null) {
     // Validate wager amount
     if (wagerAmount < 0) {
@@ -97,6 +115,28 @@ class LobbyService {
         type: sequelize.QueryTypes.UPDATE
       }
     );
+
+    // If targeting a specific opponent, notify them via socket
+    if (opponentId) {
+      const UserQuizStats = require('../models/UserQuizStats');
+      const QuizCategory = require('../models/QuizCategory');
+      const [challengerStats, category] = await Promise.all([
+        UserQuizStats.findOne({ where: { userId }, attributes: ['userId', 'nickname', 'avatarUrl', 'lobbyStats'] }),
+        match.categoryId ? QuizCategory.findByPk(match.categoryId, { attributes: ['name'] }) : null
+      ]);
+      this._emitToUser(opponentId, 'challenge_received', {
+        challengeId: match.id,
+        challenger: {
+          userId,
+          nickname: challengerStats?.nickname || `Player_${userId}`,
+          avatarUrl: challengerStats?.avatarUrl || null,
+          chutaBalance: 0
+        },
+        categoryName: category?.name || 'Unknown',
+        wagerAmount,
+        expiresAt: match.expiresAt
+      });
+    }
 
     return {
       success: true,
@@ -295,6 +335,12 @@ class LobbyService {
       completedAt: new Date()
     });
 
+    // Notify challenger their challenge was declined
+    this._emitToUser(challenger.userId, 'challenge_declined', {
+      challengeId: match.id,
+      refundAmount: challenger.wagerAmount
+    });
+
     return {
       success: true,
       refundAmount: challenger.wagerAmount
@@ -345,6 +391,15 @@ class LobbyService {
     await originalMatch.update({
       status: 'countered',
       counterOfferId: counterMatch.challengeId
+    });
+
+    // Notify original challenger about the counter-offer
+    const UserQuizStats = require('../models/UserQuizStats');
+    const counterStats = await UserQuizStats.findOne({ where: { userId }, attributes: ['nickname'] });
+    this._emitToUser(challenger.userId, 'challenge_counter', {
+      challengeId: counterMatch.challengeId,
+      newWagerAmount,
+      opponentNickname: counterStats?.nickname || `Player_${userId}`
     });
 
     return {
@@ -608,6 +663,11 @@ class LobbyService {
     await match.update({
       status: 'expired',
       completedAt: new Date()
+    });
+
+    // Notify challenger their challenge timed out
+    this._emitToUser(challenger.userId, 'challenge_timeout', {
+      challengeId: match.id
     });
   }
 
