@@ -4,6 +4,27 @@ const quizWalletService = require('../services/quizWalletService');
 const QuizCategory = require('../models/QuizCategory');
 
 /**
+ * Resolve categoryId — accepts either a UUID or a category name string.
+ * If a name is passed, looks it up (case-insensitive) and returns the UUID.
+ * Returns null if not found.
+ */
+async function resolveCategoryId(input) {
+  if (!input) return null;
+
+  // Check if it looks like a UUID
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (uuidRegex.test(input)) return input;
+
+  // Otherwise treat as a name — look it up
+  const { Op } = require('sequelize');
+  const category = await QuizCategory.findOne({
+    where: { name: { [Op.iLike]: input.trim() } }
+  });
+
+  return category ? category.id : null;
+}
+
+/**
  * Quiz Admin Controller
  * 
  * Handles admin operations:
@@ -24,33 +45,29 @@ exports.uploadQuestions = async (req, res) => {
     const { categoryId } = req.body;
 
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No file uploaded'
-      });
+      return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
     if (!categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Category ID is required'
-      });
+      return res.status(400).json({ success: false, message: 'categoryId (UUID or name) is required' });
+    }
+
+    const resolvedId = await resolveCategoryId(categoryId);
+    if (!resolvedId) {
+      return res.status(404).json({ success: false, message: `Category not found: "${categoryId}". Create it first via POST /api/quiz/admin/category` });
     }
 
     const result = await questionService.uploadQuestions(
       adminId,
       req.file.buffer,
-      categoryId,
+      resolvedId,
       req.file.originalname
     );
 
     return res.status(200).json(result);
   } catch (error) {
     console.error('[Quiz Admin Controller] Upload questions error:', error);
-    return res.status(500).json({
-      success: false,
-      message: error.message || 'Failed to upload questions'
-    });
+    return res.status(500).json({ success: false, message: error.message || 'Failed to upload questions' });
   }
 };
 
@@ -63,28 +80,24 @@ exports.getQuestions = async (req, res) => {
     const { categoryId, difficulty, page = 1, limit = 20 } = req.query;
 
     if (!categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: 'Category ID is required'
-      });
+      return res.status(400).json({ success: false, message: 'categoryId (UUID or name) is required' });
     }
 
-    const result = await questionService.getQuestionsByCategory(categoryId, {
+    const resolvedId = await resolveCategoryId(categoryId);
+    if (!resolvedId) {
+      return res.status(404).json({ success: false, message: `Category not found: "${categoryId}"` });
+    }
+
+    const result = await questionService.getQuestionsByCategory(resolvedId, {
       difficulty,
       page: parseInt(page),
       limit: parseInt(limit)
     });
 
-    return res.status(200).json({
-      success: true,
-      ...result
-    });
+    return res.status(200).json({ success: true, ...result });
   } catch (error) {
     console.error('[Quiz Admin Controller] Get questions error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to get questions'
-    });
+    return res.status(500).json({ success: false, message: 'Failed to get questions' });
   }
 };
 
