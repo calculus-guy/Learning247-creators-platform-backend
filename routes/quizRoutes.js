@@ -20,17 +20,19 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024 // 5MB limit
   },
   fileFilter: (req, file, cb) => {
+    console.log('[multer fileFilter] fieldname:', file.fieldname, '| mimetype:', file.mimetype, '| originalname:', file.originalname);
     const allowedMimes = [
       'application/vnd.ms-excel',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'text/csv',
-      'text/plain', // some OS send CSV as text/plain
-      'application/csv'
+      'text/plain',
+      'application/csv',
+      'application/octet-stream' // some clients send CSV/Excel as this
     ];
     if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Only Excel (.xlsx, .xls) and CSV files are allowed.'));
+      cb(new Error(`Invalid file type: ${file.mimetype}. Only Excel (.xlsx, .xls) and CSV files are allowed.`));
     }
   }
 });
