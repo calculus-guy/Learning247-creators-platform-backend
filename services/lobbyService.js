@@ -215,6 +215,37 @@ class LobbyService {
       attributes: ['userId', 'nickname', 'avatarUrl']
     });
 
+    // Fetch acceptor's quiz profile for the challenger to display
+    const acceptorStats = await UserQuizStats.findOne({
+      where: { userId },
+      attributes: ['userId', 'nickname', 'avatarUrl']
+    });
+
+    // Emit challenge_accepted to the challenger's socket so they navigate to /game
+    try {
+      const websocketManager = require('./websocketManager');
+      const challengerSocket = websocketManager.getUserSocket(match.challengerId);
+      if (challengerSocket) {
+        challengerSocket.emit('challenge_accepted', {
+          challengeId: match.id,
+          matchId: match.id,
+          startTime: match.startedAt,
+          questions: questionsForClient,
+          opponent: {
+            userId,
+            nickname: acceptorStats?.nickname || `Player_${userId}`,
+            avatarUrl: acceptorStats?.avatarUrl || null
+          }
+        });
+        console.log(`[LobbyService] Emitted challenge_accepted to challenger ${match.challengerId}`);
+      } else {
+        console.warn(`[LobbyService] Challenger ${match.challengerId} not connected via socket`);
+      }
+    } catch (wsError) {
+      console.error('[LobbyService] Failed to emit challenge_accepted:', wsError.message);
+      // Non-fatal — acceptor still gets their response
+    }
+
     return {
       success: true,
       matchId: match.id,

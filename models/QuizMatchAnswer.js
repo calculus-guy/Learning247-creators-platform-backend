@@ -80,6 +80,7 @@ const QuizMatchAnswer = sequelize.define('QuizMatchAnswer', {
 }, {
   tableName: 'quiz_match_answers',
   timestamps: true,
+  updatedAt: false,
   underscored: true,
   indexes: [
     {
