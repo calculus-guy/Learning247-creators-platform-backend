@@ -475,6 +475,7 @@ class LobbyService {
 
     // Check if answer is correct
     const isCorrect = question.correctAnswer === answerId.toLowerCase();
+    console.log(`[submitAnswer] correctAnswer: "${question.correctAnswer}" | answerId: "${answerId.toLowerCase()}" | isCorrect: ${isCorrect}`);
 
     // Record answer
     const answer = await QuizMatchAnswer.create({
