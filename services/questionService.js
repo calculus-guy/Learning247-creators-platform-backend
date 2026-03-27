@@ -183,12 +183,18 @@ class QuestionService {
       };
     }
 
-    // Validate correct answer
-    const correctAnswer = String(row['Correct Answer']).toLowerCase().trim();
-    if (!['a', 'b', 'c', 'd'].includes(correctAnswer)) {
+    // Validate correct answer — accept 'a'/'b'/'c'/'d' or 'OptionA'/'OptionB'/'OptionC'/'OptionD'
+    const rawAnswer = String(row['Correct Answer']).trim();
+    const answerMap = {
+      'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd',
+      'optiona': 'a', 'optionb': 'b', 'optionc': 'c', 'optiond': 'd',
+      'option a': 'a', 'option b': 'b', 'option c': 'c', 'option d': 'd'
+    };
+    const correctAnswer = answerMap[rawAnswer.toLowerCase()];
+    if (!correctAnswer) {
       return {
         valid: false,
-        error: 'Correct Answer must be a, b, c, or d'
+        error: `Correct Answer must be a/b/c/d or OptionA/OptionB/OptionC/OptionD. Got: "${rawAnswer}"`
       };
     }
 
