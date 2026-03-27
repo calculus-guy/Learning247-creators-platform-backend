@@ -44,12 +44,14 @@ exports.createChallenge = async (req, res) => {
  */
 exports.getChallenges = async (req, res) => {
   try {
+    const userId = req.user.id;
     const { status = 'pending', page = 1, limit = 20 } = req.query;
 
     const result = await lobbyService.getChallenges({
       status,
       page: parseInt(page),
-      limit: parseInt(limit)
+      limit: parseInt(limit),
+      excludeUserId: userId
     });
 
     return res.status(200).json({

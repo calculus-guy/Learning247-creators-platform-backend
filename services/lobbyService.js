@@ -556,7 +556,7 @@ class LobbyService {
    * @returns {Promise<{challenges: Array, totalCount: number}>}
    */
   async getChallenges(options = {}) {
-    const { status = 'pending', page = 1, limit = 20 } = options;
+    const { status = 'pending', page = 1, limit = 20, excludeUserId = null } = options;
     const offset = (page - 1) * limit;
 
     const where = {
@@ -566,6 +566,11 @@ class LobbyService {
 
     if (status === 'pending') {
       where.expiresAt = { [Op.gt]: new Date() };
+    }
+
+    // Exclude the requesting user's own challenges
+    if (excludeUserId) {
+      where.challengerId = { [Op.ne]: excludeUserId };
     }
 
     const { count, rows } = await QuizMatch.findAndCountAll({
