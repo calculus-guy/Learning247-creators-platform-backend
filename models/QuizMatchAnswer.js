@@ -61,16 +61,16 @@ const QuizMatchAnswer = sequelize.define('QuizMatchAnswer', {
     comment: 'Response time in seconds'
   },
   clientTimestamp: {
-    type: DataTypes.DATE,
+    type: DataTypes.BIGINT,
     allowNull: false,
     field: 'client_timestamp',
-    comment: 'Timestamp from client when answer was submitted'
+    comment: 'Unix timestamp in ms from client when answer was submitted'
   },
   serverTimestamp: {
-    type: DataTypes.DATE,
+    type: DataTypes.BIGINT,
     allowNull: false,
     field: 'server_timestamp',
-    comment: 'Timestamp when server received the answer'
+    comment: 'Unix timestamp in ms when server received the answer'
   },
   latency: {
     type: DataTypes.INTEGER,

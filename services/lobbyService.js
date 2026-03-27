@@ -484,8 +484,8 @@ class LobbyService {
       selectedAnswer: answerId.toLowerCase(),
       isCorrect,
       responseTime: adjustedTime,
-      clientTimestamp: new Date(clientTimestamp),
-      serverTimestamp: new Date(serverTime),
+      clientTimestamp: parseInt(clientTimestamp),
+      serverTimestamp: serverTime,
       latency
     });
 
