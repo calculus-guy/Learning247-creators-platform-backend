@@ -564,11 +564,8 @@ class LobbyService {
       status
     };
 
-    // Exclude expired challenges
     if (status === 'pending') {
-      where.expiresAt = {
-        [Op.gt]: new Date()
-      };
+      where.expiresAt = { [Op.gt]: new Date() };
     }
 
     const { count, rows } = await QuizMatch.findAndCountAll({
@@ -578,8 +575,54 @@ class LobbyService {
       order: [['createdAt', 'DESC']]
     });
 
+    // Enrich with challenger nickname, avatar, and category name
+    const UserQuizStats = require('../models/UserQuizStats');
+    const QuizCategory = require('../models/QuizCategory');
+
+    // Collect unique challenger IDs and category IDs
+    const challengerIds = [...new Set(rows.map(r => r.challengerId).filter(Boolean))];
+    const categoryIds = [...new Set(rows.map(r => r.categoryId).filter(Boolean))];
+
+    const [statsRows, categories] = await Promise.all([
+      challengerIds.length ? UserQuizStats.findAll({
+        where: { userId: { [Op.in]: challengerIds } },
+        attributes: ['userId', 'nickname', 'avatarUrl', 'lobbyStats']
+      }) : [],
+      categoryIds.length ? QuizCategory.findAll({
+        where: { id: { [Op.in]: categoryIds } },
+        attributes: ['id', 'name']
+      }) : []
+    ]);
+
+    const statsMap = {};
+    statsRows.forEach(s => { statsMap[s.userId] = s; });
+
+    const categoryMap = {};
+    categories.forEach(c => { categoryMap[c.id] = c.name; });
+
+    const challenges = rows.map(match => {
+      const challenger = statsMap[match.challengerId];
+      const wagerAmount = match.participants?.[0]?.wagerAmount ?? match.escrowAmount ?? 0;
+
+      return {
+        id: match.id,
+        challengerId: match.challengerId,
+        challengerNickname: challenger?.nickname || `Player_${match.challengerId}`,
+        challengerAvatar: challenger?.avatarUrl || null,
+        challengerWins: challenger?.lobbyStats?.wins || 0,
+        challengerLosses: challenger?.lobbyStats?.losses || 0,
+        opponentId: match.opponentId || null,
+        wagerAmount,
+        categoryId: match.categoryId,
+        categoryName: categoryMap[match.categoryId] || 'Unknown',
+        status: match.status,
+        createdAt: match.createdAt,
+        expiresAt: match.expiresAt
+      };
+    });
+
     return {
-      challenges: rows,
+      challenges,
       totalCount: count,
       page,
       totalPages: Math.ceil(count / limit)
