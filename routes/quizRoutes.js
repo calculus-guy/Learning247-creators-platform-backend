@@ -86,8 +86,14 @@ const upload = multer({
  */
 
 // ==================== GLOBAL MIDDLEWARE ====================
-// Apply input sanitization to all quiz routes
-router.use(quizInputSanitizer.sanitizeAll());
+// Apply input sanitization to all quiz routes except file uploads
+router.use((req, res, next) => {
+  // Skip sanitizer for multipart/form-data (file uploads) — multer handles those
+  if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+    return next();
+  }
+  return quizInputSanitizer.sanitizeAll()(req, res, next);
+});
 
 // ==================== USER ROUTES ====================
 
