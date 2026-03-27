@@ -293,6 +293,25 @@ router.put('/admin/question/:id', authMiddleware, adminMiddleware, quizAdminCont
 router.delete('/admin/question/:id', authMiddleware, adminMiddleware, quizAdminController.deleteQuestion);
 
 /**
+ * @route   GET /api/quiz/categories
+ * @desc    Get all active quiz categories (for challenge/tournament creation)
+ * @access  Private
+ */
+router.get('/categories', authMiddleware, async (req, res, next) => {
+  try {
+    const QuizCategory = require('../models/QuizCategory');
+    const categories = await QuizCategory.findAll({
+      where: { isActive: true },
+      attributes: ['id', 'name', 'description', 'questionCount'],
+      order: [['name', 'ASC']]
+    });
+    res.json({ success: true, categories });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
  * @route   POST /api/quiz/admin/category
  * @desc    Create a question category
  * @access  Admin only
