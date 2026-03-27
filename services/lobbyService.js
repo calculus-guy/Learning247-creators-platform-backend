@@ -208,11 +208,23 @@ class LobbyService {
       difficulty: q.difficulty
     }));
 
+    // Fetch challenger's quiz profile for the opponent to display
+    const UserQuizStats = require('../models/UserQuizStats');
+    const challengerStats = await UserQuizStats.findOne({
+      where: { userId: match.challengerId },
+      attributes: ['userId', 'nickname', 'avatarUrl']
+    });
+
     return {
       success: true,
       matchId: match.id,
       startTime: match.startedAt,
-      questions: questionsForClient
+      questions: questionsForClient,
+      challenger: {
+        userId: match.challengerId,
+        nickname: challengerStats?.nickname || `Player_${match.challengerId}`,
+        avatarUrl: challengerStats?.avatarUrl || null
+      }
     };
   }
 
