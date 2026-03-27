@@ -35,7 +35,7 @@ const QuizMatch = sequelize.define('QuizMatch', {
     comment: 'Array of { userId, wagerAmount, score, completionTime, answers, status }'
   },
   questions: {
-    type: DataTypes.ARRAY(DataTypes.UUID),
+    type: DataTypes.JSONB,
     allowNull: false,
     defaultValue: []
   },
