@@ -103,6 +103,15 @@ const QuizMatch = sequelize.define('QuizMatch', {
     type: DataTypes.DATE,
     allowNull: true,
     field: 'expires_at'
+  },
+  categoryId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'category_id',
+    references: {
+      model: 'quiz_categories',
+      key: 'id'
+    }
   }
 }, {
   tableName: 'quiz_matches',

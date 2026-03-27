@@ -39,6 +39,15 @@ class LobbyService {
       throw new Error('Wager amount must be non-negative');
     }
 
+    // Validate categoryId
+    if (!categoryId) {
+      throw new Error('categoryId is required. Call GET /api/quiz/categories to get valid category IDs.');
+    }
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(categoryId)) {
+      throw new Error('categoryId must be a valid UUID. Call GET /api/quiz/categories to get valid category IDs.');
+    }
+
     // Verify user balance
     const balanceCheck = await quizWalletService.verifyBalance(userId, wagerAmount);
     if (!balanceCheck.sufficient) {
@@ -131,6 +140,12 @@ class LobbyService {
     // If challenge is for specific opponent, verify
     if (match.opponentId && match.opponentId !== userId) {
       throw new Error('This challenge is for a specific opponent');
+    }
+
+    // Guard against broken challenges with no category
+    if (!match.categoryId) {
+      await match.update({ status: 'cancelled' });
+      throw new Error('This challenge is invalid (no category assigned) and has been cancelled. Please create a new challenge.');
     }
 
     // Verify user balance
