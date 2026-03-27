@@ -44,6 +44,10 @@ exports.uploadQuestions = async (req, res) => {
     const adminId = req.user.id;
     const { categoryId } = req.body;
 
+    console.log('[uploadQuestions] req.file:', req.file ? { fieldname: req.file.fieldname, mimetype: req.file.mimetype, size: req.file.size, originalname: req.file.originalname } : 'UNDEFINED');
+    console.log('[uploadQuestions] req.body:', req.body);
+    console.log('[uploadQuestions] Content-Type:', req.headers['content-type']);
+
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
