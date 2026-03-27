@@ -45,10 +45,13 @@ exports.uploadQuestions = async (req, res) => {
     const { categoryId } = req.body;
 
     console.log('[uploadQuestions] req.file:', req.file ? { fieldname: req.file.fieldname, mimetype: req.file.mimetype, size: req.file.size, originalname: req.file.originalname } : 'UNDEFINED');
+    console.log('[uploadQuestions] req.files:', req.files ? req.files.map(f => ({ fieldname: f.fieldname, mimetype: f.mimetype, originalname: f.originalname })) : 'UNDEFINED');
     console.log('[uploadQuestions] req.body:', req.body);
     console.log('[uploadQuestions] Content-Type:', req.headers['content-type']);
 
-    if (!req.file) {
+    const uploadedFile = req.file || (req.files && req.files[0]);
+
+    if (!uploadedFile) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
@@ -63,9 +66,9 @@ exports.uploadQuestions = async (req, res) => {
 
     const result = await questionService.uploadQuestions(
       adminId,
-      req.file.buffer,
+      uploadedFile.buffer,
       resolvedId,
-      req.file.originalname
+      uploadedFile.originalname
     );
 
     return res.status(200).json(result);

@@ -280,7 +280,7 @@ router.get('/leaderboard/tournament', authMiddleware, quizLeaderboardController.
  * @desc    Upload questions via Excel file
  * @access  Admin only
  */
-router.post('/admin/questions/upload', authMiddleware, adminMiddleware, upload.single('file'), quizAdminController.uploadQuestions);
+router.post('/admin/questions/upload', authMiddleware, adminMiddleware, upload.any(), quizAdminController.uploadQuestions);
 
 /**
  * @route   GET /api/quiz/admin/questions
