@@ -258,7 +258,14 @@ class WebSocketManager {
     // Submit answer
     socket.on('submit_answer', async (data) => {
       try {
-        const { matchId, questionId, answerId, clientTimestamp } = data;
+        const { matchId, questionId } = data;
+
+        // Normalize field names — frontend sends 'answer', backend uses 'answerId'
+        const answerId = data.answerId || data.answer;
+
+        // Normalize timestamp — frontend sends 'timeInSeconds', backend uses 'clientTimestamp' (ms)
+        const clientTimestamp = data.clientTimestamp ||
+          (data.timeInSeconds !== undefined ? Date.now() - (data.timeInSeconds * 1000) : Date.now());
 
         // Submit answer via service
         const result = await lobbyService.submitAnswer(

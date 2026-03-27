@@ -297,11 +297,15 @@ class QuizInputSanitizer {
       errors.push('Invalid question ID');
     }
 
-    if (!data.answerId || !['a', 'b', 'c', 'd'].includes(data.answerId.toLowerCase())) {
-      errors.push('Invalid answer ID');
+    // Accept both 'answer' and 'answerId' field names
+    const answer = data.answer || data.answerId;
+    if (!answer || !['a', 'b', 'c', 'd'].includes(String(answer).toLowerCase())) {
+      errors.push('Invalid answer — must be a, b, c, or d');
     }
 
-    if (!data.clientTimestamp || typeof data.clientTimestamp !== 'number') {
+    // Accept both 'clientTimestamp' (ms) and 'timeInSeconds' (seconds)
+    const hasTimestamp = data.clientTimestamp || data.timeInSeconds !== undefined;
+    if (!hasTimestamp) {
       errors.push('Invalid client timestamp');
     }
 
