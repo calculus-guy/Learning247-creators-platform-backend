@@ -143,48 +143,42 @@ class QuestionService {
    * @returns {{valid: boolean, data?: Object, error?: string}}
    */
   validateQuestionRow(row, rowNum) {
-    // Check required fields
-    const requiredFields = ['Question', 'Option A', 'Option B', 'Option C', 'Option D', 'Correct Answer', 'Difficulty'];
-    const missingFields = requiredFields.filter(field => !row[field] || String(row[field]).trim() === '');
-
-    if (missingFields.length > 0) {
-      return {
-        valid: false,
-        error: `Missing required fields: ${missingFields.join(', ')}`
-      };
-    }
-
-    // Validate question text
-    const questionText = String(row['Question']).trim();
-    if (questionText.length < 10) {
-      return {
-        valid: false,
-        error: 'Question text must be at least 10 characters'
-      };
-    }
-
-    // Validate options
-    const options = {
-      a: String(row['Option A']).trim(),
-      b: String(row['Option B']).trim(),
-      c: String(row['Option C']).trim(),
-      d: String(row['Option D']).trim()
+    // Check required fields — accept both "Option A" and "OptionA" formats
+    const getField = (row, ...keys) => {
+      for (const key of keys) {
+        if (row[key] !== undefined && String(row[key]).trim() !== '') return String(row[key]).trim();
+      }
+      return null;
     };
 
-    // Check for empty options
-    const emptyOptions = Object.entries(options)
-      .filter(([key, value]) => !value || value.length === 0)
-      .map(([key]) => key.toUpperCase());
+    const questionText = getField(row, 'Question');
+    const optionA = getField(row, 'Option A', 'OptionA');
+    const optionB = getField(row, 'Option B', 'OptionB');
+    const optionC = getField(row, 'Option C', 'OptionC');
+    const optionD = getField(row, 'Option D', 'OptionD');
+    const rawAnswer = getField(row, 'Correct Answer', 'CorrectAnswer');
+    const rawDifficulty = getField(row, 'Difficulty');
 
-    if (emptyOptions.length > 0) {
-      return {
-        valid: false,
-        error: `Empty options: ${emptyOptions.join(', ')}`
-      };
+    const missing = [];
+    if (!questionText) missing.push('Question');
+    if (!optionA) missing.push('Option A');
+    if (!optionB) missing.push('Option B');
+    if (!optionC) missing.push('Option C');
+    if (!optionD) missing.push('Option D');
+    if (!rawAnswer) missing.push('Correct Answer');
+    if (!rawDifficulty) missing.push('Difficulty');
+
+    if (missing.length > 0) {
+      return { valid: false, error: `Missing required fields: ${missing.join(', ')}` };
     }
 
-    // Validate correct answer — accept 'a'/'b'/'c'/'d' or 'OptionA'/'OptionB'/'OptionC'/'OptionD'
-    const rawAnswer = String(row['Correct Answer']).trim();
+    if (questionText.length < 10) {
+      return { valid: false, error: 'Question text must be at least 10 characters' };
+    }
+
+    const options = { a: optionA, b: optionB, c: optionC, d: optionD };
+
+    // Validate correct answer — accept a/b/c/d or OptionA/OptionB/OptionC/OptionD
     const answerMap = {
       'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd',
       'optiona': 'a', 'optionb': 'b', 'optionc': 'c', 'optiond': 'd',
@@ -192,30 +186,15 @@ class QuestionService {
     };
     const correctAnswer = answerMap[rawAnswer.toLowerCase()];
     if (!correctAnswer) {
-      return {
-        valid: false,
-        error: `Correct Answer must be a/b/c/d or OptionA/OptionB/OptionC/OptionD. Got: "${rawAnswer}"`
-      };
+      return { valid: false, error: `Correct Answer must be a/b/c/d or OptionA/OptionB/OptionC/OptionD. Got: "${rawAnswer}"` };
     }
 
-    // Validate difficulty
-    const difficulty = String(row['Difficulty']).toLowerCase().trim();
+    const difficulty = rawDifficulty.toLowerCase();
     if (!['easy', 'medium', 'hard'].includes(difficulty)) {
-      return {
-        valid: false,
-        error: 'Difficulty must be easy, medium, or hard'
-      };
+      return { valid: false, error: 'Difficulty must be easy, medium, or hard' };
     }
 
-    return {
-      valid: true,
-      data: {
-        questionText,
-        options,
-        correctAnswer,
-        difficulty
-      }
-    };
+    return { valid: true, data: { questionText, options, correctAnswer, difficulty } };
   }
 
   /**
