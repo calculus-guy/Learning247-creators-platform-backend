@@ -158,9 +158,14 @@ class LobbyService {
     // Escrow opponent's wager
     await quizWalletService.escrowFunds(userId, wagerAmount, match.id);
 
-    // Add opponent to participants
-    const participants = [
-      ...match.participants,
+    // Safety parse participants in case Postgres returned it as a string
+    const existingParticipants = Array.isArray(match.participants)
+      ? match.participants
+      : JSON.parse(match.participants || '[]');
+
+    // Add opponent to participants — clean serialize to avoid JSONB issues
+    const participants = JSON.parse(JSON.stringify([
+      ...existingParticipants,
       {
         userId,
         wagerAmount,
@@ -169,17 +174,16 @@ class LobbyService {
         completionTime: null,
         answers: []
       }
-    ];
+    ]));
 
     // Select questions for the match
     const questions = await questionService.selectBalancedQuestions(match.categoryId, 10);
     const questionIds = questions.map(q => q.id);
 
-    // Initialize question start times
-    const questionStartTimes = {};
-    questionIds.forEach(qId => {
-      questionStartTimes[qId] = null; // Will be set when question is displayed
-    });
+    // Initialize question start times — clean serialize to avoid JSONB issues
+    const questionStartTimesRaw = {};
+    questionIds.forEach(qId => { questionStartTimesRaw[qId] = null; });
+    const questionStartTimes = JSON.parse(JSON.stringify(questionStartTimesRaw));
 
     // Update match
     await match.update({
