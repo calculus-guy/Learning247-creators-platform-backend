@@ -497,8 +497,28 @@ class LobbyService {
     }
     await match.save();
 
-    // Check if match is complete (both players answered all questions)
-    const allAnswered = match.participants.every(p => p.answers.length === match.questions.length);
+    // Re-fetch fresh match from DB to get latest state from both players
+    const freshMatch = await QuizMatch.findByPk(matchId);
+    const allAnswered = freshMatch.participants.every(
+      p => p.answers.length === freshMatch.questions.length
+    );
+
+    // Broadcast opponent progress with current score
+    try {
+      const websocketManager = require('./websocketManager');
+      if (websocketManager.io) {
+        websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', {
+          userId,
+          questionId,
+          score: participant.score,
+          answersCount: participant.answers.length,
+          totalQuestions: match.questions.length
+        });
+      }
+    } catch (e) {
+      console.error('[LobbyService] Failed to emit opponent_progress:', e.message);
+    }
+
     if (allAnswered) {
       await this.endMatch(matchId);
     }

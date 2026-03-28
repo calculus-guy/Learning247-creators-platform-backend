@@ -286,12 +286,6 @@ class WebSocketManager {
           responseTime: result.responseTime
         });
 
-        // Notify opponent of progress
-        this.io.to(`match:${matchId}`).emit('opponent_progress', {
-          userId,
-          questionId
-        });
-
         console.log(`[WebSocket] User ${userId} answered question ${questionId} in match ${matchId}`);
       } catch (error) {
         console.error('[WebSocket] Submit answer error:', error);
