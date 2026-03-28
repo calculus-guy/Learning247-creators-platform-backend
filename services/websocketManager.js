@@ -670,7 +670,7 @@ class WebSocketManager {
   startHeartbeatMonitor() {
     setInterval(() => {
       const now = Date.now();
-      const timeout = 60000; // 60 seconds
+      const timeout = 120000; // 2 minutes — generous enough for active gameplay
 
       this.connectedUsers.forEach((connection, userId) => {
         const timeSinceHeartbeat = now - connection.lastHeartbeat;
