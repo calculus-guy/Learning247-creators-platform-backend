@@ -506,6 +506,7 @@ class LobbyService {
     return {
       success: true,
       correct: isCorrect,
+      correctAnswer: question.correctAnswer,
       responseTime: adjustedTime
     };
   }
@@ -582,6 +583,27 @@ class LobbyService {
       earnings[p.userId] = p.userId === winnerId ? match.escrowAmount : 0;
     });
 
+    // Emit match_ended to both players
+    try {
+      const websocketManager = require('./websocketManager');
+      if (websocketManager.io) {
+        websocketManager.io.to(`match:${matchId}`).emit('match_ended', {
+          winnerId,
+          player1Score: match.participants[0]?.score || 0,
+          player2Score: match.participants[1]?.score || 0,
+          scores,
+          earnings,
+          totalTime: Math.max(
+            match.participants[0]?.completionTime || 0,
+            match.participants[1]?.completionTime || 0
+          ),
+          reason: 'completed'
+        });
+      }
+    } catch (wsError) {
+      console.error('[LobbyService] Failed to emit match_ended:', wsError.message);
+    }
+
     return {
       success: true,
       winnerId,
@@ -632,6 +654,22 @@ class LobbyService {
 
     // Update user stats
     await this.updateUserStats(match);
+
+    // Emit match_ended to both players in the match room
+    try {
+      const websocketManager = require('./websocketManager');
+      if (websocketManager.io) {
+        websocketManager.io.to(`match:${matchId}`).emit('match_ended', {
+          winnerId,
+          player1Score: match.participants[0]?.score || 0,
+          player2Score: match.participants[1]?.score || 0,
+          totalTime: 0,
+          reason: 'forfeit'
+        });
+      }
+    } catch (wsError) {
+      console.error('[LobbyService] Failed to emit match_ended on forfeit:', wsError.message);
+    }
 
     return {
       success: true,

@@ -276,10 +276,13 @@ class WebSocketManager {
           clientTimestamp
         );
 
-        // Confirm to sender
+        // Confirm to sender with full result
         socket.emit('answer_recorded', {
           questionId,
           success: result.success,
+          correct: result.correct,
+          correctAnswer: result.correctAnswer,
+          pointsEarned: result.correct ? 5 : 0,
           responseTime: result.responseTime
         });
 
