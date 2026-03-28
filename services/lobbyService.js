@@ -587,10 +587,14 @@ class LobbyService {
     try {
       const websocketManager = require('./websocketManager');
       if (websocketManager.io) {
+        const p1 = match.participants.find(p => p.userId === match.challengerId) || match.participants[0];
+        const p2 = match.participants.find(p => p.userId !== match.challengerId) || match.participants[1];
         websocketManager.io.to(`match:${matchId}`).emit('match_ended', {
           winnerId,
-          player1Score: match.participants[0]?.score || 0,
-          player2Score: match.participants[1]?.score || 0,
+          player1Score: p1?.score ?? 0,
+          player2Score: p2?.score ?? 0,
+          player1UserId: p1?.userId,
+          player2UserId: p2?.userId,
           scores,
           earnings,
           totalTime: Math.max(
@@ -659,10 +663,14 @@ class LobbyService {
     try {
       const websocketManager = require('./websocketManager');
       if (websocketManager.io) {
+        const p1 = match.participants.find(p => p.userId === match.challengerId) || match.participants[0];
+        const p2 = match.participants.find(p => p.userId !== match.challengerId) || match.participants[1];
         websocketManager.io.to(`match:${matchId}`).emit('match_ended', {
           winnerId,
-          player1Score: match.participants[0]?.score || 0,
-          player2Score: match.participants[1]?.score || 0,
+          player1Score: p1?.score ?? 0,
+          player2Score: p2?.score ?? 0,
+          player1UserId: p1?.userId,
+          player2UserId: p2?.userId,
           totalTime: 0,
           reason: 'forfeit'
         });
