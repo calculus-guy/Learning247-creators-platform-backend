@@ -25,6 +25,7 @@ class WebSocketManager {
     this.tournamentRooms = new Map(); // tournamentId -> Set of socketIds
     this.disconnectedUsers = new Map(); // userId -> { disconnectedAt, matchId, tournamentId }
     this.reconnectionTimers = new Map(); // userId -> timeoutId
+    this.pendingEvents = new Map(); // userId -> Array of { event, payload } to emit on reconnect
     this.RECONNECTION_GRACE_PERIOD = 30000; // 30 seconds
   }
 
@@ -115,6 +116,9 @@ class WebSocketManager {
       socketId: socket.id,
       timestamp: Date.now()
     });
+
+    // Flush any queued events (e.g. challenge_accepted that was missed)
+    this.flushPendingEvents(userId, socket);
     this.registerMatchEvents(socket);
     this.registerTournamentEvents(socket);
     this.registerHeartbeatEvents(socket);
@@ -163,6 +167,9 @@ class WebSocketManager {
       matchId: disconnectInfo?.matchId,
       tournamentId: disconnectInfo?.tournamentId
     });
+
+    // Flush any queued events (e.g. challenge_accepted that was missed)
+    this.flushPendingEvents(userId, socket);
 
     // Rejoin rooms if applicable
     if (disconnectInfo?.matchId) {
@@ -755,6 +762,43 @@ class WebSocketManager {
       ...data,
       timestamp: Date.now()
     });
+  }
+
+  /**
+   * Send event to user immediately if connected, or queue it for when they reconnect
+   */
+  sendOrQueue(userId, event, payload) {
+    const socket = this.getUserSocket(userId);
+    if (socket) {
+      socket.emit(event, payload);
+      console.log(`[WebSocket] Emitted '${event}' to user ${userId}`);
+    } else {
+      // Queue for when user reconnects
+      if (!this.pendingEvents.has(userId)) {
+        this.pendingEvents.set(userId, []);
+      }
+      this.pendingEvents.get(userId).push({ event, payload, queuedAt: Date.now() });
+      console.log(`[WebSocket] Queued '${event}' for user ${userId} (not connected)`);
+    }
+  }
+
+  /**
+   * Flush any pending events for a user after they reconnect
+   */
+  flushPendingEvents(userId, socket) {
+    const pending = this.pendingEvents.get(userId);
+    if (!pending || pending.length === 0) return;
+
+    // Only deliver events queued in the last 5 minutes
+    const cutoff = Date.now() - 5 * 60 * 1000;
+    const fresh = pending.filter(e => e.queuedAt > cutoff);
+
+    fresh.forEach(({ event, payload }) => {
+      socket.emit(event, payload);
+      console.log(`[WebSocket] Flushed queued '${event}' to user ${userId}`);
+    });
+
+    this.pendingEvents.delete(userId);
   }
 
   /**

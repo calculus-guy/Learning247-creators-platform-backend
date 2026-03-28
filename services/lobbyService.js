@@ -262,34 +262,29 @@ class LobbyService {
     });
 
     // Emit challenge_accepted to the challenger's socket so they navigate to /game
+    // Uses sendOrQueue so it's delivered even if challenger briefly disconnected
     try {
       const websocketManager = require('./websocketManager');
-      const challengerSocket = websocketManager.getUserSocket(match.challengerId);
-      if (challengerSocket) {
-        challengerSocket.emit('challenge_accepted', {
-          challengeId: match.id,
-          matchId: match.id,
-          startTime: match.startedAt,
-          questions: questionsForClient,
-          opponent: {
-            userId,
-            nickname: acceptorStats?.nickname || `Player_${userId}`,
-            avatarUrl: acceptorStats?.avatarUrl || null
-          }
-        });
-        console.log(`[LobbyService] Emitted challenge_accepted to challenger ${match.challengerId}`);
-      } else {
-        console.warn(`[LobbyService] Challenger ${match.challengerId} not connected via socket`);
-      }
+      websocketManager.sendOrQueue(match.challengerId, 'challenge_accepted', {
+        challengeId: match.id,
+        matchId: match.id,
+        startTime: match.startedAt || new Date(),
+        questions: questionsForClient,
+        opponent: {
+          userId,
+          nickname: acceptorStats?.nickname || `Player_${userId}`,
+          avatarUrl: acceptorStats?.avatarUrl || null
+        }
+      });
     } catch (wsError) {
-      console.error('[LobbyService] Failed to emit challenge_accepted:', wsError.message);
-      // Non-fatal — acceptor still gets their response
+      console.error('[LobbyService] Failed to queue challenge_accepted:', wsError.message);
     }
 
     return {
       success: true,
       matchId: match.id,
-      startTime: match.startedAt,
+      challengeId: match.id,
+      startTime: match.startedAt || new Date(),
       questions: questionsForClient,
       challenger: {
         userId: match.challengerId,
