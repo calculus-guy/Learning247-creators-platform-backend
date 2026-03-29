@@ -61,7 +61,7 @@ class WebSocketManager {
         }
 
         const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
-        socket.userId = decoded.id || decoded.userId;
+        socket.userId = Number(decoded.id || decoded.userId);
         socket.user = decoded;
 
         next();
@@ -768,37 +768,34 @@ class WebSocketManager {
    * Send event to user immediately if connected, or queue it for when they reconnect
    */
   sendOrQueue(userId, event, payload) {
-    const socket = this.getUserSocket(userId);
+    const normalizedId = Number(userId);
+    const socket = this.getUserSocket(normalizedId);
     if (socket) {
       socket.emit(event, payload);
-      console.log(`[WebSocket] Emitted '${event}' to user ${userId}`);
+      console.log(`[WebSocket] Emitted '${event}' to user ${normalizedId}`);
     } else {
-      // Queue for when user reconnects
-      if (!this.pendingEvents.has(userId)) {
-        this.pendingEvents.set(userId, []);
+      if (!this.pendingEvents.has(normalizedId)) {
+        this.pendingEvents.set(normalizedId, []);
       }
-      this.pendingEvents.get(userId).push({ event, payload, queuedAt: Date.now() });
-      console.log(`[WebSocket] Queued '${event}' for user ${userId} (not connected)`);
+      this.pendingEvents.get(normalizedId).push({ event, payload, queuedAt: Date.now() });
+      console.log(`[WebSocket] Queued '${event}' for user ${normalizedId} (not connected)`);
     }
   }
 
-  /**
-   * Flush any pending events for a user after they reconnect
-   */
   flushPendingEvents(userId, socket) {
-    const pending = this.pendingEvents.get(userId);
+    const normalizedId = Number(userId);
+    const pending = this.pendingEvents.get(normalizedId);
     if (!pending || pending.length === 0) return;
 
-    // Only deliver events queued in the last 5 minutes
     const cutoff = Date.now() - 5 * 60 * 1000;
     const fresh = pending.filter(e => e.queuedAt > cutoff);
 
     fresh.forEach(({ event, payload }) => {
       socket.emit(event, payload);
-      console.log(`[WebSocket] Flushed queued '${event}' to user ${userId}`);
+      console.log(`[WebSocket] Flushed queued '${event}' to user ${normalizedId}`);
     });
 
-    this.pendingEvents.delete(userId);
+    this.pendingEvents.delete(normalizedId);
   }
 
   /**
@@ -812,16 +809,15 @@ class WebSocketManager {
    * Check if user is connected
    */
   isUserConnected(userId) {
-    return this.connectedUsers.has(userId);
+    return this.connectedUsers.has(Number(userId));
   }
 
   /**
    * Get user's socket
    */
   getUserSocket(userId) {
-    const connection = this.connectedUsers.get(userId);
+    const connection = this.connectedUsers.get(Number(userId));
     if (!connection) return null;
-    
     return this.io.sockets.sockets.get(connection.socketId);
   }
 }

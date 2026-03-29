@@ -39,7 +39,7 @@ class LobbyService {
   _emitToUser(userId, event, payload) {
     try {
       const websocketManager = require('./websocketManager');
-      const socket = websocketManager.getUserSocket(userId);
+      const socket = websocketManager.getUserSocket(Number(userId));
       if (socket) {
         socket.emit(event, payload);
         console.log(`[LobbyService] Emitted '${event}' to user ${userId}`);
