@@ -53,6 +53,9 @@ require('./models/freebieIndex');
 
 const app = express();
 
+// Trust the first proxy (AWS ALB/nginx) so req.ip returns the real client IP
+app.set('trust proxy', 1);
+
 const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',
@@ -87,10 +90,10 @@ app.use(rateLimit({
   message: { success: false, message: 'Too many requests, please try again later.' }
 }));
 
-// Auth endpoints - 100 attempts per 15 min per IP
+// Auth endpoints - 200 attempts per 15 min per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 200,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' }
