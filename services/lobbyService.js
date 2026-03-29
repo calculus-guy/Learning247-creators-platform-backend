@@ -382,9 +382,9 @@ class LobbyService {
       challenger.userId // Specific to original challenger
     );
 
-    // Mark original challenge as countered
+    // Mark original challenge as countered (cancelled and replaced by counter-offer)
     await originalMatch.update({
-      status: 'countered',
+      status: 'cancelled',
       counterOfferId: counterMatch.challengeId
     });
 
