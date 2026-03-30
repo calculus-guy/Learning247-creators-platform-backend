@@ -685,7 +685,6 @@ class LobbyService {
 
     // Mark as forfeited
     forfeitingParticipant.status = 'forfeited';
-    match.changed('participants', true); // Force Sequelize to detect JSONB mutation
 
     // Determine winner (the other participant)
     const winnerId = match.participants.find(p => p.userId !== userId).userId;
@@ -694,6 +693,7 @@ class LobbyService {
     await quizWalletService.releaseEscrow(matchId, winnerId, match.escrowAmount);
 
     // Update match
+    match.changed('participants', true); // Force Sequelize to detect JSONB mutation
     await match.update({
       winnerId,
       status: 'completed',
