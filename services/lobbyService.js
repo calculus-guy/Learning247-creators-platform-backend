@@ -504,6 +504,7 @@ class LobbyService {
     // Update participant's answers array and score with actual points
     participant.answers.push(answer.id);
     participant.score = (participant.score || 0) + pointsEarned;
+    match.changed('participants', true); // Force Sequelize to detect JSONB mutation
     await match.save();
 
     // Re-fetch fresh match from DB to get latest state from both players
@@ -684,6 +685,7 @@ class LobbyService {
 
     // Mark as forfeited
     forfeitingParticipant.status = 'forfeited';
+    match.changed('participants', true); // Force Sequelize to detect JSONB mutation
 
     // Determine winner (the other participant)
     const winnerId = match.participants.find(p => p.userId !== userId).userId;
