@@ -499,16 +499,29 @@ class LobbyService {
     );
 
     // Broadcast opponent progress with current score
+    // Emit to match room AND directly to each participant's socket as fallback
     try {
       const websocketManager = require('./websocketManager');
       if (websocketManager.io) {
-        websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', {
+        const progressPayload = {
           userId,
           questionId,
           score: participant.score,
           answersCount: participant.answers.length,
           totalQuestions: match.questions.length
-        });
+        };
+
+        // Emit to match room (for players who joined the room)
+        websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', progressPayload);
+
+        // Also emit directly to each participant's socket as fallback
+        const freshParticipants = freshMatch.participants;
+        for (const p of freshParticipants) {
+          if (p.userId !== userId) {
+            // Send to the opponent directly so they always get it
+            websocketManager.sendOrQueue(p.userId, 'opponent_progress', progressPayload);
+          }
+        }
       }
     } catch (e) {
       console.error('[LobbyService] Failed to emit opponent_progress:', e.message);
