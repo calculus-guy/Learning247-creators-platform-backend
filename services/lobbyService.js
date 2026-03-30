@@ -854,6 +854,9 @@ class LobbyService {
    * @returns {Promise<void>}
    */
   async updateUserStats(match) {
+    // Get actual answer counts from DB for accuracy
+    const totalQuestionsInMatch = Array.isArray(match.questions) ? match.questions.length : 10;
+
     for (const participant of match.participants) {
       const [stats] = await UserQuizStats.findOrCreate({
         where: { userId: participant.userId },
@@ -863,30 +866,35 @@ class LobbyService {
       const isWinner = participant.userId === match.winnerId;
       const isForfeited = participant.status === 'forfeited';
 
+      // Get actual correct answer count from DB (source of truth)
+      const correctCount = await QuizMatchAnswer.count({
+        where: { matchId: match.id, userId: participant.userId, isCorrect: true }
+      });
+
       // Update lobby stats
-      const lobbyStats = stats.lobbyStats || {};
+      const lobbyStats = { ...(stats.lobbyStats || {}) };
       lobbyStats.totalMatches = (lobbyStats.totalMatches || 0) + 1;
-      
+
       if (isWinner) {
         lobbyStats.wins = (lobbyStats.wins || 0) + 1;
-        lobbyStats.totalWinnings = (lobbyStats.totalWinnings || 0) + match.escrowAmount;
+        lobbyStats.totalWinnings = (lobbyStats.totalWinnings || 0) + parseFloat(match.escrowAmount || 0);
       } else if (isForfeited) {
         lobbyStats.forfeits = (lobbyStats.forfeits || 0) + 1;
-        lobbyStats.totalLosses = (lobbyStats.totalLosses || 0) + participant.wagerAmount;
+        lobbyStats.totalLosses = (lobbyStats.totalLosses || 0) + parseFloat(participant.wagerAmount || 0);
       } else {
         lobbyStats.losses = (lobbyStats.losses || 0) + 1;
-        lobbyStats.totalLosses = (lobbyStats.totalLosses || 0) + participant.wagerAmount;
+        lobbyStats.totalLosses = (lobbyStats.totalLosses || 0) + parseFloat(participant.wagerAmount || 0);
       }
 
-      lobbyStats.totalWagered = (lobbyStats.totalWagered || 0) + participant.wagerAmount;
+      lobbyStats.totalWagered = (lobbyStats.totalWagered || 0) + parseFloat(participant.wagerAmount || 0);
       lobbyStats.netProfit = (lobbyStats.totalWinnings || 0) - (lobbyStats.totalLosses || 0);
-      lobbyStats.winRate = ((lobbyStats.wins || 0) / lobbyStats.totalMatches) * 100;
+      lobbyStats.winRate = parseFloat(((lobbyStats.wins || 0) / lobbyStats.totalMatches * 100).toFixed(2));
 
-      // Update overall stats
-      const overallStats = stats.overallStats || {};
-      overallStats.totalQuestions = (overallStats.totalQuestions || 0) + match.questions.length;
-      overallStats.correctAnswers = (overallStats.correctAnswers || 0) + participant.score;
-      overallStats.accuracy = ((overallStats.correctAnswers || 0) / (overallStats.totalQuestions || 1)) * 100;
+      // Update overall stats using DB-sourced correct count
+      const overallStats = { ...(stats.overallStats || {}) };
+      overallStats.totalQuestions = (overallStats.totalQuestions || 0) + totalQuestionsInMatch;
+      overallStats.correctAnswers = (overallStats.correctAnswers || 0) + correctCount;
+      overallStats.accuracy = parseFloat(((overallStats.correctAnswers / overallStats.totalQuestions) * 100).toFixed(2));
 
       await stats.update({
         lobbyStats,
