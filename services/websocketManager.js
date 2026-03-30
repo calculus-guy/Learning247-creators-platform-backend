@@ -289,7 +289,7 @@ class WebSocketManager {
           success: result.success,
           correct: result.correct,
           correctAnswer: result.correctAnswer,
-          pointsEarned: result.correct ? 5 : 0,
+          pointsEarned: result.pointsEarned,
           responseTime: result.responseTime
         });
 

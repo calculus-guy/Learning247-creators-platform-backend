@@ -25,6 +25,19 @@ const suspiciousActivityService = require('./suspiciousActivityService');
 
 class LobbyService {
   /**
+   * Calculate points for a correct answer based on difficulty and response time
+   * @param {string} difficulty - 'easy' | 'medium' | 'hard'
+   * @param {number} responseTime - time in seconds
+   * @returns {number} points earned
+   */
+  calculatePoints(difficulty, responseTime) {
+    const basePoints = { easy: 5, medium: 8, hard: 12 };
+    const base = basePoints[difficulty?.toLowerCase()] || 5;
+    const speedBonus = responseTime <= 5 ? 3 : 0;
+    return base + speedBonus;
+  }
+
+  /**
    * Create a new challenge
    * 
    * @param {number} userId - Challenger user ID
@@ -472,6 +485,9 @@ class LobbyService {
     const isCorrect = question.correctAnswer === answerId.toLowerCase();
     console.log(`[submitAnswer] correctAnswer: "${question.correctAnswer}" | answerId: "${answerId.toLowerCase()}" | isCorrect: ${isCorrect}`);
 
+    // Calculate points earned (dynamic scoring)
+    const pointsEarned = isCorrect ? this.calculatePoints(question.difficulty, adjustedTime) : 0;
+
     // Record answer
     const answer = await QuizMatchAnswer.create({
       matchId,
@@ -485,11 +501,9 @@ class LobbyService {
       latency
     });
 
-    // Update participant's answers array
+    // Update participant's answers array and score with actual points
     participant.answers.push(answer.id);
-    if (isCorrect) {
-      participant.score++;
-    }
+    participant.score = (participant.score || 0) + pointsEarned;
     await match.save();
 
     // Re-fetch fresh match from DB to get latest state from both players
@@ -498,27 +512,26 @@ class LobbyService {
       p => p.answers.length === freshMatch.questions.length
     );
 
-    // Broadcast opponent progress with current score
-    // Emit to match room AND directly to each participant's socket as fallback
+    // Broadcast opponent progress with current points-based score
     try {
       const websocketManager = require('./websocketManager');
       if (websocketManager.io) {
         const progressPayload = {
           userId,
           questionId,
-          score: participant.score,
+          score: participant.score,       // cumulative points (not count)
+          pointsEarned,                   // points from this answer
           answersCount: participant.answers.length,
           totalQuestions: match.questions.length
         };
 
-        // Emit to match room (for players who joined the room)
+        // Emit to match room
         websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', progressPayload);
 
-        // Also emit directly to each participant's socket as fallback
+        // Also emit directly to opponent's socket as fallback
         const freshParticipants = freshMatch.participants;
         for (const p of freshParticipants) {
           if (p.userId !== userId) {
-            // Send to the opponent directly so they always get it
             websocketManager.sendOrQueue(p.userId, 'opponent_progress', progressPayload);
           }
         }
@@ -535,6 +548,7 @@ class LobbyService {
       success: true,
       correct: isCorrect,
       correctAnswer: question.correctAnswer,
+      pointsEarned,
       responseTime: adjustedTime
     };
   }
