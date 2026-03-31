@@ -124,6 +124,9 @@ class WebSocketManager {
     this.registerHeartbeatEvents(socket);
     this.registerActiveUserEvents(socket);
 
+    // Check for active matches in DB to handle full page reloads/new sessions
+    this.resyncActiveMatch(socket, userId);
+
     // Handle disconnection
     socket.on('disconnect', () => {
       this.handleDisconnection(socket);
@@ -819,6 +822,35 @@ class WebSocketManager {
     const connection = this.connectedUsers.get(Number(userId));
     if (!connection) return null;
     return this.io.sockets.sockets.get(connection.socketId);
+  }
+
+  /**
+   * Resync active match for a user upon connection
+   * Handles cases where memory-based grace period passed but match is still active in DB
+   */
+  async resyncActiveMatch(socket, userId) {
+    try {
+      const match = await lobbyService.getActiveMatchForUser(userId);
+      if (match && match.matchId) {
+        console.log(`[WebSocket] Resyncing active match ${match.matchId} for user ${userId}`);
+        
+        // Join room
+        socket.join(`match:${match.matchId}`);
+        if (!this.matchRooms.has(match.matchId)) {
+          this.matchRooms.set(match.matchId, new Set());
+        }
+        this.matchRooms.get(match.matchId).add(socket.id);
+
+        // Notify client with full state needed to resume
+        socket.emit('match_state_restored', {
+          matchId: match.matchId,
+          ...match,
+          timestamp: Date.now()
+        });
+      }
+    } catch (err) {
+      console.error(`[WebSocket] Error resyncing match for user ${userId}:`, err.message);
+    }
   }
 }
 

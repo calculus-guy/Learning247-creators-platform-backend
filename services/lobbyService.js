@@ -356,6 +356,56 @@ class LobbyService {
   }
 
   /**
+   * Cancel a challenge (by the challenger themselves)
+   * 
+   * @param {string} challengeId - Match UUID
+   * @param {number} userId - Cancelling user ID
+   * @returns {Promise<{success: boolean, refundAmount: number}>}
+   */
+  async cancelChallenge(challengeId, userId) {
+    const match = await QuizMatch.findByPk(challengeId);
+
+    if (!match) {
+      throw new Error('Challenge not found');
+    }
+
+    if (match.status !== 'pending') {
+      throw new Error('Challenge cannot be cancelled');
+    }
+
+    // Verify user is the challenger
+    if (match.challengerId !== userId) {
+      throw new Error('Only the creator can cancel this challenge');
+    }
+
+    const participant = match.participants[0];
+
+    // Refund challenger's escrow
+    await quizWalletService.refundEscrow(match.id, [
+      { userId: participant.userId, amount: participant.wagerAmount }
+    ]);
+
+    // Update match status
+    await match.update({
+      status: 'cancelled',
+      completedAt: new Date()
+    });
+
+    // Notify opponent if it was a direct challenge
+    if (match.opponentId) {
+      this._emitToUser(match.opponentId, 'challenge_cancelled', {
+        challengeId: match.id,
+        challengerId: userId
+      });
+    }
+
+    return {
+      success: true,
+      refundAmount: participant.wagerAmount
+    };
+  }
+
+  /**
    * Counter-offer with new wager amount
    * 
    * @param {string} challengeId - Match UUID
@@ -861,6 +911,32 @@ class LobbyService {
     }
 
     return match;
+  }
+
+  /**
+   * Find an active match for a user (for sync/recovery)
+   * 
+   * @param {number} userId - User ID
+   * @returns {Promise<Object|null>} - Optimized match data for client autostart
+   */
+  async getActiveMatchForUser(userId) {
+    const { Op } = require('sequelize');
+    
+    // Find most recent active match where user is a participant
+    const match = await QuizMatch.findOne({
+      where: {
+        status: 'active',
+        participants: {
+          [Op.contains]: [{ userId }]
+        }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+
+    if (!match) return null;
+
+    // Build the data the frontend needs to start the game
+    return await this.buildChallengeAcceptPayload(match);
   }
 
   /**

@@ -200,6 +200,20 @@ router.post('/lobby/challenge/:id/decline', authMiddleware, quizLobbyController.
 router.post('/lobby/challenge/:id/counter', authMiddleware, quizLobbyController.counterOffer);
 
 /**
+ * @route   POST /api/quiz/lobby/challenge/:id/cancel
+ * @desc    Cancel a challenge (by the creator)
+ * @access  Private
+ */
+router.post('/lobby/challenge/:id/cancel', authMiddleware, quizLobbyController.cancelChallenge);
+
+/**
+ * @route   GET /api/quiz/lobby/active-match
+ * @desc    Get active match for current user (recovery)
+ * @access  Private
+ */
+router.get('/lobby/active-match', authMiddleware, quizLobbyController.getActiveMatch);
+
+/**
  * @route   GET /api/quiz/lobby/match/:id
  * @desc    Get match details
  * @access  Private

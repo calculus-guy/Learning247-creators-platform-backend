@@ -182,4 +182,47 @@ exports.forfeitMatch = async (req, res) => {
   }
 };
 
+/**
+ * Cancel a challenge
+ * POST /api/quiz/lobby/challenge/:id/cancel
+ */
+exports.cancelChallenge = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id: challengeId } = req.params;
+
+    const result = await lobbyService.cancelChallenge(challengeId, userId);
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[Quiz Lobby Controller] Cancel challenge error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to cancel challenge'
+    });
+  }
+};
+
+/**
+ * Get active match for current user (sync/recovery)
+ * GET /api/quiz/lobby/active-match
+ */
+exports.getActiveMatch = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await lobbyService.getActiveMatchForUser(userId);
+
+    return res.status(200).json({
+      success: true,
+      match: result
+    });
+  } catch (error) {
+    console.error('[Quiz Lobby Controller] Get active match error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to get active match'
+    });
+  }
+};
+
 module.exports = exports;
