@@ -116,16 +116,16 @@ const buildEmailHtml = (firstname) => `
         <p style="color: #555; margin: 0; font-style: italic;">The more you know, the more you earn!</p>
       </div>
 
-      // <div style="text-align: center; margin: 35px 0;">
-      //   <a href="https://quiz.hallos.net" style="background: linear-gradient(135deg, #e94560, #c62a47); color: white; padding: 18px 45px; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; font-size: 18px; letter-spacing: 1px;">
-      //     🎮 Play Now at quiz.hallos.net
-      //   </a>
-      // </div>
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="https://www.hallos.net/dashboard/games" style="background: linear-gradient(135deg, #e94560, #c62a47); color: white; padding: 18px 45px; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; font-size: 18px; letter-spacing: 1px;">
+          🎮 Play Now — hallos.net/dashboard/games
+        </a>
+      </div>
 
       <hr style="margin: 30px 0; border: none; border-top: 2px solid #f0f0f0;"/>
 
-      <h2 style="color: #333; text-align: center;">📚 Also Coming Soon on hallos</h2>
-      <p style="color: #555; text-align: center; margin-bottom: 20px;">While you wait for the quiz launch, check out these upcoming live series:</p>
+      <h2 style="color: #333; text-align: center;">📚 Also on hallos Right Now</h2>
+      <p style="color: #555; text-align: center; margin-bottom: 20px;">Check out these live series you can enroll in today:</p>
 
       <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #667eea;">
         <h3 style="color: #333; margin-top: 0;">🤖 Artificial Intelligence Masterclass</h3>
@@ -136,13 +136,18 @@ const buildEmailHtml = (firstname) => `
         <p style="color: #667eea; margin: 0; font-weight: bold;">Coming Soon — Register your interest now!</p>
       </div>
 
-      <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
+      <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 15px 0; border-left: 4px solid #28a745;">
         <h3 style="color: #333; margin-top: 0;">📝 WAEC/GCE Preparation Classes</h3>
         <p style="color: #555; margin: 5px 0;">
           Intensive live preparation sessions covering all major WAEC/GCE subjects. 
           Expert tutors, past questions, and exam strategies to help students score their best.
         </p>
-        <p style="color: #28a745; margin: 0; font-weight: bold;">Enrollments opening soon — Don't miss it!</p>
+        <p style="color: #28a745; margin: 5px 0; font-weight: bold;">✅ Enrollment is OPEN now!</p>
+        <div style="text-align: center; margin-top: 15px;">
+          <a href="https://www.hallos.net/series/a6651361-4441-47a0-882b-0d6a0c686afd" style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; font-size: 15px;">
+            Enroll Now →
+          </a>
+        </div>
       </div>
 
       <div style="text-align: center; margin: 30px 0;">
