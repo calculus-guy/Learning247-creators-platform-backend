@@ -164,6 +164,38 @@ const buildEmailHtml = (firstname) => `
         </p>
       </div>
 
+      <div style="background: linear-gradient(135deg, #1a1a2e, #0f3460); padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
+        <h3 style="color: #ffc107; margin-top: 0;">💳 Fund Your Wallet — Play More, Win More!</h3>
+        <p style="color: #ffffff; margin: 10px 0; line-height: 1.8;">
+          Your 100 free Chuta points are waiting for you — but the real fun starts when you top up your wallet 
+          and raise the stakes. The bigger the wager, the bigger the win!
+        </p>
+        // <p style="color: #e94560; font-weight: bold; margin: 10px 0;">
+        //   1 USD = 100 Chuta Points &nbsp;|&nbsp; ₦1,400 = 100 Chuta Points
+        // </p>
+        <a href="https://www.hallos.net/dashboard/games" style="background: linear-gradient(135deg, #ffc107, #ff9800); color: #1a1a2e; padding: 12px 30px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; font-size: 15px; margin-top: 10px;">
+          💰 Fund Wallet & Play
+        </a>
+      </div>
+
+      <div style="background-color: #f0f7ff; padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center; border: 2px dashed #667eea;">
+        <h3 style="color: #333; margin-top: 0;">👥 Invite Your Friends — Challenge Them!</h3>
+        <p style="color: #555; margin: 10px 0; line-height: 1.8;">
+          The quiz is more fun with people you know! Invite your friends to join hallos, 
+          then challenge them to a 1v1 quiz battle. Prove who's smarter — and take their Morgan points!
+        </p>
+        <p style="color: #555; margin: 10px 0;">
+          Share this link with your friends:
+        </p>
+        <div style="background-color: #e8f0fe; padding: 10px 20px; border-radius: 8px; display: inline-block; margin: 10px 0;">
+          <strong style="color: #667eea; font-size: 16px;">www.hallos.net</strong>
+        </div>
+        <br/>
+        <a href="https://www.hallos.net/dashboard/games" style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; font-size: 15px; margin-top: 15px;">
+          🎮 Challenge a Friend Now
+        </a>
+      </div>
+
       <p style="font-size: 16px; line-height: 1.8; color: #555; margin-top: 30px;">
         We're building something special for Africa's learners and creators, and you're part of this journey. 
         Thank you for being with us. 🌍
