@@ -7,6 +7,7 @@ const Purchase = require('../models/Purchase');
 const Payout = require('../models/Payout');
 const Wallet = require('../models/Wallet');
 const Transaction = require('../models/Transaction');
+const sequelize = require('../config/db');
 const { sendPurchaseConfirmationEmail, sendSaleNotificationEmail } = require('../utils/email');
 const User = require('../models/User');
 const Video = require('../models/Video');
