@@ -92,7 +92,7 @@ const buildEmailHtml = (firstname) => `
         <h2 style="color: #e94560; margin: 0 0 15px 0; font-size: 24px;">⚡ Challenge. Compete. Win Real Money.</h2>
         <p style="color: #ffffff; margin: 0; font-size: 16px; line-height: 1.8;">
           Pick a subject. Challenge another player. Answer 10 questions. 
-          The winner takes the Chuta points — and converts them to real cash!
+          The winner takes the Morgan points — and converts them to real cash!
         </p>
       </div>
 
@@ -100,9 +100,9 @@ const buildEmailHtml = (firstname) => `
         <h3 style="color: #333; margin-top: 0;">🎯 How It Works:</h3>
         <ul style="color: #555; line-height: 2.2; margin: 0; padding-left: 20px;">
           <li>Create your <strong>quiz nickname</strong> and pick your avatar</li>
-          <li>Get <strong>100 free Chuta points</strong> just for signing up</li>
+          <li>Get <strong>1 Free Morgan or 100 free Chuta points</strong> just for signing up</li>
           <li>Challenge any online player to a 1v1 quiz battle</li>
-          <li>Both players wager Chuta points — winner takes all</li>
+          <li>Both players wager Morgan points — winner takes all</li>
           <li>Answer 10 questions in 10 seconds each</li>
           <li>Faster correct answers = <strong>more bonus points</strong></li>
           <li>Withdraw your winnings directly to your bank account 💰</li>
@@ -111,14 +111,14 @@ const buildEmailHtml = (firstname) => `
 
       <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
         <h3 style="color: #333; margin-top: 0;">💡 Currency System:</h3>
-        <p style="color: #555; margin: 5px 0;">1 USD = 100 Chuta Points</p>
-        <p style="color: #555; margin: 5px 0;">Win matches → Accumulate Chuta → Convert to real money</p>
+        <p style="color: #555; margin: 5px 0;">Convert your morgan coins to real cash</p>
+        <p style="color: #555; margin: 5px 0;">Win matches → Accumulate Morgan → Convert to real money</p>
         <p style="color: #555; margin: 0; font-style: italic;">The more you know, the more you earn!</p>
       </div>
 
       <div style="text-align: center; margin: 35px 0;">
         <a href="https://www.hallos.net/dashboard/games" style="background: linear-gradient(135deg, #e94560, #c62a47); color: white; padding: 18px 45px; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; font-size: 18px; letter-spacing: 1px;">
-          🎮 Play Now — hallos.net/dashboard/games
+          🎮 Play Now
         </a>
       </div>
 
