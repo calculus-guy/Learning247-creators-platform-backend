@@ -91,7 +91,7 @@ const buildEmailHtml = (firstname) => `
       <div style="background: linear-gradient(135deg, #1a1a2e, #0f3460); padding: 25px; border-radius: 12px; margin: 25px 0; text-align: center;">
         <h2 style="color: #e94560; margin: 0 0 15px 0; font-size: 24px;">⚡ Challenge. Compete. Win Real Money.</h2>
         <p style="color: #ffffff; margin: 0; font-size: 16px; line-height: 1.8;">
-          Pick a subject. Challenge another player. Answer 10 questions. 
+          Pick a subject. Challenge another player. Answer questions. 
           The winner takes the Morgan points — and converts them to real cash!
         </p>
       </div>
@@ -103,7 +103,7 @@ const buildEmailHtml = (firstname) => `
           <li>Get <strong>1 Free Morgan or 100 free Chuta points</strong> just for signing up</li>
           <li>Challenge any online player to a 1v1 quiz battle</li>
           <li>Both players wager Morgan points — winner takes all</li>
-          <li>Answer 10 questions in 10 seconds each</li>
+          <li>Answer questions</li>
           <li>Faster correct answers = <strong>more bonus points</strong></li>
           <li>Withdraw your winnings directly to your bank account 💰</li>
         </ul>

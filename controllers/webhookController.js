@@ -58,6 +58,35 @@ exports.handlePaystackWebhook = async (req, res) => {
       const contentType = metadata.contentType;
       const contentId = metadata.contentId;
 
+      // ── WALLET TOP-UP: handle separately, no Purchase record needed ──
+      if (metadata.type === 'wallet_topup') {
+        console.log('[Paystack Webhook] Processing wallet top-up:', reference);
+        const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
+        const walletService = new MultiCurrencyWalletService();
+
+        // Idempotency: check WalletTransaction
+        const WalletTransaction = sequelize.models.WalletTransaction;
+        if (WalletTransaction) {
+          const existing = await WalletTransaction.findOne({ where: { reference } });
+          if (existing) {
+            console.log('[Paystack Webhook] Top-up already processed:', reference);
+            return res.status(200).send('Already processed');
+          }
+        }
+
+        await walletService.creditWallet({
+          userId: parseInt(userId),
+          currency: currency.toUpperCase(),
+          amount: amount / 100,
+          reference,
+          description: 'Wallet top-up via Paystack',
+          metadata: { gateway: 'paystack', type: 'topup', externalReference: reference }
+        });
+
+        console.log('[Paystack Webhook] Wallet top-up credited:', reference);
+        return res.status(200).send('Webhook processed');
+      }
+
       // Check if already processed
       const existingPurchase = await Purchase.findOne({
         where: { paymentReference: reference }
@@ -458,6 +487,34 @@ exports.handleStripeWebhook = async (req, res) => {
       const contentType = session.metadata.contentType;
       const contentId = session.metadata.contentId === 'null' ? null : session.metadata.contentId;  // Handle string 'null'
       const email = session.metadata.email;
+
+      // ── WALLET TOP-UP: handle separately, no Purchase record needed ──
+      if (session.metadata.type === 'wallet_topup') {
+        console.log('[Stripe Webhook] Processing wallet top-up:', session.id);
+        const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
+        const walletService = new MultiCurrencyWalletService();
+
+        const WalletTransaction = sequelize.models.WalletTransaction;
+        if (WalletTransaction) {
+          const existing = await WalletTransaction.findOne({ where: { reference: session.id } });
+          if (existing) {
+            console.log('[Stripe Webhook] Top-up already processed:', session.id);
+            return res.status(200).json({ received: true });
+          }
+        }
+
+        await walletService.creditWallet({
+          userId,
+          currency: 'USD',
+          amount: session.amount_total / 100,
+          reference: session.id,
+          description: 'Wallet top-up via Stripe',
+          metadata: { gateway: 'stripe', type: 'topup', externalReference: session.id }
+        });
+
+        console.log('[Stripe Webhook] Wallet top-up credited:', session.id);
+        return res.status(200).json({ received: true });
+      }
 
       // Check if already processed
       const existingPurchase = await Purchase.findOne({
