@@ -116,11 +116,11 @@ const buildEmailHtml = (firstname) => `
         <p style="color: #555; margin: 0; font-style: italic;">The more you know, the more you earn!</p>
       </div>
 
-      <div style="text-align: center; margin: 35px 0;">
-        <a href="https://quiz.hallos.net" style="background: linear-gradient(135deg, #e94560, #c62a47); color: white; padding: 18px 45px; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; font-size: 18px; letter-spacing: 1px;">
-          🎮 Play Now at quiz.hallos.net
-        </a>
-      </div>
+      // <div style="text-align: center; margin: 35px 0;">
+      //   <a href="https://quiz.hallos.net" style="background: linear-gradient(135deg, #e94560, #c62a47); color: white; padding: 18px 45px; text-decoration: none; border-radius: 30px; font-weight: bold; display: inline-block; font-size: 18px; letter-spacing: 1px;">
+      //     🎮 Play Now at quiz.hallos.net
+      //   </a>
+      // </div>
 
       <hr style="margin: 30px 0; border: none; border-top: 2px solid #f0f0f0;"/>
 
