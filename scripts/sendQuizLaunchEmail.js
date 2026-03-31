@@ -170,9 +170,6 @@ const buildEmailHtml = (firstname) => `
           Your 100 free Chuta points are waiting for you — but the real fun starts when you top up your wallet 
           and raise the stakes. The bigger the wager, the bigger the win!
         </p>
-        // <p style="color: #e94560; font-weight: bold; margin: 10px 0;">
-        //   1 USD = 100 Chuta Points &nbsp;|&nbsp; ₦1,400 = 100 Chuta Points
-        // </p>
         <a href="https://www.hallos.net/dashboard/games" style="background: linear-gradient(135deg, #ffc107, #ff9800); color: #1a1a2e; padding: 12px 30px; text-decoration: none; border-radius: 20px; font-weight: bold; display: inline-block; font-size: 15px; margin-top: 10px;">
           💰 Fund Wallet & Play
         </a>
