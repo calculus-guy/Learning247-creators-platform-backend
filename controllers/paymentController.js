@@ -127,6 +127,80 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
+     // ── WALLET TOP-UP: reference starts with 'topup_' ──
+    if (reference && reference.startsWith('topup_')) {
+      console.log(`[Payment Verification] Detected wallet top-up reference: ${reference}`);
+
+      const MultiCurrencyWalletService = require('../services/multiCurrencyWalletService');
+      const { paystackClient } = require('../config/paystack');
+      const { stripeClient } = require('../config/stripe');
+      const sequelize = require('../config/db');
+      const walletService = new MultiCurrencyWalletService();
+
+      // Idempotency — check if already credited
+      const WalletTransaction = sequelize.models.WalletTransaction;
+      if (WalletTransaction) {
+        const existing = await WalletTransaction.findOne({ where: { reference } });
+        if (existing) {
+          return res.status(200).json({
+            success: true,
+            message: 'Top-up already processed',
+            alreadyProcessed: true,
+            currency: currency.toUpperCase()
+          });
+        }
+      }
+
+      let amount;
+      let userId;
+      const currencyUpper = currency.toUpperCase();
+
+      if (currencyUpper === 'NGN') {
+        // Verify with Paystack
+        const response = await paystackClient.get(`/transaction/verify/${reference}`);
+        if (!response.data.status || response.data.data.status !== 'success') {
+          return res.status(400).json({ success: false, message: 'Payment not successful' });
+        }
+        amount = response.data.data.amount / 100;
+        userId = parseInt(response.data.data.metadata.userId);
+      } else if (currencyUpper === 'USD') {
+        // For Stripe top-ups the reference is the session_id passed via query
+        const sessionId = req.query.session_id;
+        if (!sessionId) {
+          return res.status(400).json({ success: false, message: 'session_id is required for USD top-up verification' });
+        }
+        const session = await stripeClient.checkout.sessions.retrieve(sessionId);
+        if (session.payment_status !== 'paid') {
+          return res.status(400).json({ success: false, message: `Payment status: ${session.payment_status}` });
+        }
+        amount = session.amount_total / 100;
+        userId = parseInt(session.metadata.userId);
+      } else {
+        return res.status(400).json({ success: false, message: 'Unsupported currency for top-up' });
+      }
+
+      // Credit the wallet
+      await walletService.creditWallet({
+        userId,
+        currency: currencyUpper,
+        amount,
+        reference,
+        description: `Wallet top-up via ${currencyUpper === 'NGN' ? 'Paystack' : 'Stripe'}`,
+        metadata: { gateway: currencyUpper === 'NGN' ? 'paystack' : 'stripe', type: 'topup' }
+      });
+
+      console.log(`[Payment Verification] Wallet top-up credited: ${amount} ${currencyUpper} to user ${userId}`);
+
+      return res.status(200).json({
+        success: true,
+        message: `Wallet topped up successfully with ${amount} ${currencyUpper}`,
+        currency: currencyUpper,
+        amount
+      });
+    }
+
+    // ── REGULAR CONTENT PURCHASE ──
+
     if (!idempotencyKey) {
       return res.status(400).json({
         success: false,
