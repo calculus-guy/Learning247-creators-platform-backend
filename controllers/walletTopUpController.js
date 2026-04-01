@@ -84,8 +84,8 @@ exports.initializeTopUp = async (req, res) => {
           type: 'wallet_topup',
           reference
         },
-        success_url: `${process.env.CLIENT_URL}/wallet/topup/verify?reference=${reference}&gateway=stripe&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.CLIENT_URL}/wallet/topup/cancelled`
+        success_url: `${process.env.CLIENT_URL}/payments/verify?reference=${reference}&gateway=stripe&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${process.env.CLIENT_URL}/payments/verify?cancelled=true`
       });
 
       return res.status(200).json({
@@ -118,7 +118,7 @@ exports.initializeTopUp = async (req, res) => {
             }
           ]
         },
-        callback_url: `${process.env.CLIENT_URL}/wallet/topup/verify?reference=${reference}`
+        callback_url: `${process.env.CLIENT_URL}/payments/verify?reference=${reference}&gateway=paystack`
       });
 
       if (!response.data.status) {
