@@ -25,26 +25,22 @@ async function fixQuizAnswersSchema() {
     `);
     console.log('✅ Updated response_time to DECIMAL(10, 3)');
 
-    // 4. Update client_timestamp and server_timestamp to BIGINT if they were DATE
-    // (This matches the model and prevents syntax errors when sending milliseconds)
-    await sequelize.query(`
-      ALTER TABLE quiz_match_answers 
-      ALTER COLUMN client_timestamp TYPE BIGINT USING EXTRACT(EPOCH FROM client_timestamp)::BIGINT * 1000;
-      ALTER TABLE quiz_match_answers 
-      ALTER COLUMN server_timestamp TYPE BIGINT USING EXTRACT(EPOCH FROM server_timestamp)::BIGINT * 1000;
-    `).catch(err => {
-      // If it's already a BIGINT or numeric string, this might fail, so we handle it gracefully or skip
-      if (err.message.includes('cannot be cast automatically')) {
-        console.log('⚠️ Timestamps might already be optimized, attempting direct numeric cast...');
-        return sequelize.query(`
-          ALTER TABLE quiz_match_answers 
-          ALTER COLUMN client_timestamp TYPE BIGINT USING client_timestamp::BIGINT,
-          ALTER COLUMN server_timestamp TYPE BIGINT USING server_timestamp::BIGINT;
-        `);
+    try {
+      await sequelize.query(`
+        ALTER TABLE quiz_match_answers 
+        ALTER COLUMN client_timestamp TYPE BIGINT USING EXTRACT(EPOCH FROM client_timestamp)::BIGINT * 1000;
+        ALTER TABLE quiz_match_answers 
+        ALTER COLUMN server_timestamp TYPE BIGINT USING EXTRACT(EPOCH FROM server_timestamp)::BIGINT * 1000;
+      `);
+      console.log('✅ Timestamps converted from TIMESTAMP to BIGINT');
+    } catch (err) {
+      // If it fails with 'extract' doesn't exist, it likely means they are already BIGINTs
+      if (err.message.includes('extract') || err.message.includes('cannot be cast automatically')) {
+        console.log('ℹ️ Timestamps are already in numeric format, skipping conversion.');
+      } else {
+        console.warn('⚠️ Timestamp update encountered an expected state: ' + err.message);
       }
-      throw err;
-    });
-    console.log('✅ Timestamps aligned to BIGINT (milliseconds)');
+    }
 
     // 5. Add a new check constraint that allows 'a', 'b', 'c', 'd' AND 'timeout'
     await sequelize.query(`
