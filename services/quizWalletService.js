@@ -349,6 +349,26 @@ class QuizWalletService {
   }
 
   /**
+   * Release escrowed funds to the winner
+   * @param {string} matchId - Match UUID
+   * @param {number|string} winnerId - Winner's user ID
+   * @param {number} amount - Total escrow amount
+   */
+  async releaseEscrow(matchId, winnerId, amount) {
+    await this.recordTransaction(
+      winnerId,
+      'match_win',
+      amount,
+      {
+        matchId,
+        description: `Won match prize: ${amount} Chuta`
+      }
+    );
+
+    return { success: true };
+  }
+
+  /**
    * Refund escrowed funds (match cancelled/declined)
    * @param {string} matchId - Match UUID
    * @param {Array<{userId: number, amount: number}>} refunds - Array of refund objects
