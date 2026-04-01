@@ -538,7 +538,8 @@ class LobbyService {
       }
 
       // Calculate latency and adjusted response time
-      const latency = serverTime - clientTimestamp;
+      const clientTimeInt = Math.floor(Number(clientTimestamp));
+      const latency = serverTime - clientTimeInt;
       const adjustedTime = Math.max(elapsed - (latency / 1000), 0);
 
       // Check if answer is correct
@@ -556,9 +557,9 @@ class LobbyService {
         selectedAnswer: answerId.toLowerCase(),
         isCorrect,
         responseTime: adjustedTime,
-        clientTimestamp: parseInt(clientTimestamp) || serverTime,
+        clientTimestamp: clientTimeInt || serverTime,
         serverTimestamp: serverTime,
-        latency
+        latency: Math.floor(latency)
       }, { transaction: t });
 
       // Update participant's answers array and score with actual points
