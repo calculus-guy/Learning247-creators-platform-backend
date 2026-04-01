@@ -478,130 +478,144 @@ class LobbyService {
    * @returns {Promise<{success: boolean, correct: boolean, responseTime: number}>}
    */
   async submitAnswer(matchId, userId, questionId, answerId, clientTimestamp) {
-    const match = await QuizMatch.findByPk(matchId);
-
-    if (!match) {
-      throw new Error('Match not found');
-    }
-
-    if (match.status !== 'active') {
-      throw new Error('Match is not active');
-    }
-
-    // Verify question belongs to match
-    if (!match.questions.includes(questionId)) {
-      throw new Error('Invalid question for this match');
-    }
-
-    // Verify user is a participant
-    const participant = match.participants.find(p => p.userId === userId);
-    if (!participant) {
-      throw new Error('User is not a participant in this match');
-    }
-
-    // Check if already answered this question
-    const existingAnswer = await QuizMatchAnswer.findOne({
-      where: { matchId, userId, questionId }
-    });
-
-    if (existingAnswer) {
-      throw new Error('Question already answered');
-    }
-
-    // Get question to check correct answer
-    const question = await questionService.getQuestionById(questionId, true);
-
-    // Validate timing (10s limit + 2s latency buffer)
-    const serverTime = Date.now();
-    const questionStartTime = match.questionStartTimes[questionId];
+    const { sequelize } = require('../models'); // Assumes models/index.js exports sequelize instance. If not, we'll try something else. Wait, let's use QuizMatch.sequelize
     
-    if (!questionStartTime) {
-      // First time this question is being answered, set start time
-      match.questionStartTimes[questionId] = serverTime;
-      await match.save();
-    }
+    return await QuizMatch.sequelize.transaction(async (t) => {
+      // 1. Fetch match with row-level lock to prevent concurrent JSONB overwrites
+      const match = await QuizMatch.findByPk(matchId, { lock: t.LOCK.UPDATE, transaction: t });
 
-    const elapsed = (serverTime - (questionStartTime || serverTime)) / 1000;
-    
-    if (elapsed > 12) {
-      throw new Error('Answer timeout - exceeded 10 second limit');
-    }
-
-    // Calculate latency and adjusted response time
-    const latency = serverTime - clientTimestamp;
-    const adjustedTime = Math.max(elapsed - (latency / 1000), 0);
-
-    // Check if answer is correct
-    const isCorrect = question.correctAnswer === answerId.toLowerCase();
-    console.log(`[submitAnswer] correctAnswer: "${question.correctAnswer}" | answerId: "${answerId.toLowerCase()}" | isCorrect: ${isCorrect}`);
-
-    // Calculate points earned (dynamic scoring)
-    const pointsEarned = isCorrect ? this.calculatePoints(question.difficulty, adjustedTime) : 0;
-
-    // Record answer
-    const answer = await QuizMatchAnswer.create({
-      matchId,
-      userId,
-      questionId,
-      selectedAnswer: answerId.toLowerCase(),
-      isCorrect,
-      responseTime: adjustedTime,
-      clientTimestamp: parseInt(clientTimestamp),
-      serverTimestamp: serverTime,
-      latency
-    });
-
-    // Update participant's answers array and score with actual points
-    participant.answers.push(answer.id);
-    participant.score = (participant.score || 0) + pointsEarned;
-    match.changed('participants', true); // Force Sequelize to detect JSONB mutation
-    await match.save();
-
-    // Re-fetch fresh match from DB to get latest state from both players
-    const freshMatch = await QuizMatch.findByPk(matchId);
-    const allAnswered = freshMatch.participants.every(
-      p => p.answers.length === freshMatch.questions.length
-    );
-
-    // Broadcast opponent progress with current points-based score
-    try {
-      const websocketManager = require('./websocketManager');
-      if (websocketManager.io) {
-        const progressPayload = {
-          userId,
-          questionId,
-          score: participant.score,       // cumulative points (not count)
-          pointsEarned,                   // points from this answer
-          answersCount: participant.answers.length,
-          totalQuestions: match.questions.length
-        };
-
-        // Emit to match room
-        websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', progressPayload);
-
-        // Also emit directly to opponent's socket as fallback
-        const freshParticipants = freshMatch.participants;
-        for (const p of freshParticipants) {
-          if (p.userId !== userId) {
-            websocketManager.sendOrQueue(p.userId, 'opponent_progress', progressPayload);
-          }
-        }
+      if (!match) {
+        throw new Error('Match not found');
       }
-    } catch (e) {
-      console.error('[LobbyService] Failed to emit opponent_progress:', e.message);
-    }
 
-    if (allAnswered) {
-      await this.endMatch(matchId);
-    }
+      if (match.status !== 'active') {
+        throw new Error('Match is not active');
+      }
 
-    return {
-      success: true,
-      correct: isCorrect,
-      correctAnswer: question.correctAnswer,
-      pointsEarned,
-      responseTime: adjustedTime
-    };
+      // Verify question belongs to match
+      if (!match.questions.includes(questionId)) {
+        throw new Error('Invalid question for this match');
+      }
+
+      // Verify user is a participant
+      const participant = match.participants.find(p => p.userId === userId);
+      if (!participant) {
+        throw new Error('User is not a participant in this match');
+      }
+
+      // Check if already answered this question
+      const QuizMatchAnswer = require('../models/QuizMatchAnswer');
+      const existingAnswer = await QuizMatchAnswer.findOne({
+        where: { matchId, userId, questionId },
+        transaction: t
+      });
+
+      if (existingAnswer) {
+        throw new Error('Question already answered');
+      }
+
+      // Get question to check correct answer
+      const questionService = require('./questionService');
+      const question = await questionService.getQuestionById(questionId, true);
+
+      // Validate timing (10s limit + 2s latency buffer)
+      const serverTime = Date.now();
+      const questionStartTime = match.questionStartTimes[questionId];
+      
+      if (!questionStartTime) {
+        // First time this question is being answered, set start time
+        match.questionStartTimes[questionId] = serverTime;
+        match.changed('questionStartTimes', true); // Force Sequelize JSONB
+        await match.save({ transaction: t });
+      }
+
+      const elapsed = (serverTime - (questionStartTime || serverTime)) / 1000;
+      
+      if (elapsed > 12 && answerId.toLowerCase() !== 'timeout') {
+         // Even if timeout, we must record the answer as timeout so the game can end
+         // If elapsed > 12 but answerId != 'timeout', it's a late submission
+         // The client automatically sends 'timeout' after 12 seconds anyway
+         console.warn(`[submitAnswer] Late answer from ${userId} for ${questionId}. Treating as incorrect.`);
+         answerId = 'timeout'; // Force incorrect
+      }
+
+      // Calculate latency and adjusted response time
+      const latency = serverTime - clientTimestamp;
+      const adjustedTime = Math.max(elapsed - (latency / 1000), 0);
+
+      // Check if answer is correct
+      const isCorrect = (answerId.toLowerCase() !== 'timeout') && (question.correctAnswer === answerId.toLowerCase());
+      console.log(`[submitAnswer] correctAnswer: "${question.correctAnswer}" | answerId: "${answerId.toLowerCase()}" | isCorrect: ${isCorrect}`);
+
+      // Calculate points earned (dynamic scoring)
+      const pointsEarned = isCorrect ? this.calculatePoints(question.difficulty, adjustedTime) : 0;
+
+      // Record answer
+      const answer = await QuizMatchAnswer.create({
+        matchId,
+        userId,
+        questionId,
+        selectedAnswer: answerId.toLowerCase(),
+        isCorrect,
+        responseTime: adjustedTime,
+        clientTimestamp: parseInt(clientTimestamp) || serverTime,
+        serverTimestamp: serverTime,
+        latency
+      }, { transaction: t });
+
+      // Update participant's answers array and score with actual points
+      participant.answers.push(answer.id);
+      participant.score = (participant.score || 0) + pointsEarned;
+      match.changed('participants', true); // Force Sequelize to detect JSONB mutation
+      await match.save({ transaction: t });
+
+      // Check if match should end inside transaction context
+      const allAnswered = match.participants.every(
+        p => p.answers.length === match.questions.length
+      );
+
+      // Defer side-effects (socket emissions and endMatch) until after transaction commits
+      setTimeout(async () => {
+        try {
+          const websocketManager = require('./websocketManager');
+          if (websocketManager.io) {
+            const progressPayload = {
+              userId,
+              questionId,
+              score: participant.score,       // cumulative points (not count)
+              pointsEarned,                   // points from this answer
+              answersCount: participant.answers.length,
+              totalQuestions: match.questions.length
+            };
+
+            // Emit to match room
+            websocketManager.io.to(`match:${matchId}`).emit('opponent_progress', progressPayload);
+
+            // Also emit directly to opponent's socket as fallback
+            const freshParticipants = match.participants;
+            for (const p of freshParticipants) {
+              if (p.userId !== userId) {
+                websocketManager.sendOrQueue(p.userId, 'opponent_progress', progressPayload);
+              }
+            }
+          }
+
+          if (allAnswered) {
+            await this.endMatch(matchId);
+          }
+        } catch (e) {
+          console.error('[LobbyService] Post-transaction side effect failed:', e.message);
+        }
+      }, 0);
+
+      return {
+        success: true,
+        correct: isCorrect,
+        correctAnswer: question.correctAnswer,
+        pointsEarned,
+        responseTime: adjustedTime
+      };
+    });
   }
 
   /**
@@ -936,7 +950,56 @@ class LobbyService {
     if (!match) return null;
 
     // Build the data the frontend needs to start the game
-    return await this.buildChallengeAcceptPayload(match);
+    return await this.buildChallengeAcceptPayload(match, userId);
+  }
+
+  /**
+   * Helper to build the match payload for the frontend
+   */
+  async buildChallengeAcceptPayload(match, userId) {
+    const questionService = require('./questionService');
+    const UserQuizStats = require('../models/UserQuizStats');
+
+    // Return questions without correct answers
+    const questionsForClient = [];
+    if (match.questions && match.questions.length > 0) {
+      for (const qId of match.questions) {
+        try {
+          const q = await questionService.getQuestionById(qId);
+          if (q) {
+            questionsForClient.push({
+              id: q.id,
+              questionText: q.questionText,
+              options: q.options,
+              difficulty: q.difficulty
+            });
+          }
+        } catch (e) { console.error('Error fetching question:', e.message); }
+      }
+    }
+
+    // Determine the opponent (the participant who is NOT the current user)
+    const opponentId = match.participants.find(p => p.userId !== userId)?.userId;
+    let opponentStats = null;
+    if (opponentId) {
+      opponentStats = await UserQuizStats.findOne({
+        where: { userId: opponentId },
+        attributes: ['userId', 'nickname', 'avatarUrl']
+      });
+    }
+
+    return {
+      matchId: match.id,
+      challengeId: match.id,
+      challengerId: match.challengerId, // <-- CRITICAL FIX: Frontend needs this to assign scores!
+      startTime: match.startedAt || new Date(),
+      questions: questionsForClient,
+      opponent: opponentStats ? {
+        userId: opponentStats.userId,
+        nickname: opponentStats.nickname,
+        avatarUrl: opponentStats.avatarUrl
+      } : { userId: 0, nickname: 'Opponent', avatarUrl: null }
+    };
   }
 
   /**
