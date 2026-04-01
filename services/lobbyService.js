@@ -478,8 +478,6 @@ class LobbyService {
    * @returns {Promise<{success: boolean, correct: boolean, responseTime: number}>}
    */
   async submitAnswer(matchId, userId, questionId, answerId, clientTimestamp) {
-    const { sequelize } = require('../models'); // Assumes models/index.js exports sequelize instance. If not, we'll try something else. Wait, let's use QuizMatch.sequelize
-    
     return await QuizMatch.sequelize.transaction(async (t) => {
       // 1. Fetch match with row-level lock to prevent concurrent JSONB overwrites
       const match = await QuizMatch.findByPk(matchId, { lock: t.LOCK.UPDATE, transaction: t });
