@@ -275,7 +275,7 @@ class WebSocketManager {
 
         // Normalize timestamp — frontend sends 'timeInSeconds', backend uses 'clientTimestamp' (ms)
         const clientTimestamp = data.clientTimestamp ||
-          (data.timeInSeconds !== undefined ? Date.now() - (data.timeInSeconds * 1000) : Date.now());
+          Math.floor(data.timeInSeconds !== undefined ? Date.now() - (data.timeInSeconds * 1000) : Date.now());
 
         // Submit answer via service
         const result = await lobbyService.submitAnswer(

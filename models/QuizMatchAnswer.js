@@ -42,11 +42,11 @@ const QuizMatchAnswer = sequelize.define('QuizMatchAnswer', {
     }
   },
   selectedAnswer: {
-    type: DataTypes.STRING(1),
+    type: DataTypes.STRING(7),
     allowNull: false,
     field: 'selected_answer',
     validate: {
-      isIn: [['a', 'b', 'c', 'd']]
+      isIn: [['a', 'b', 'c', 'd', 'timeout']]
     }
   },
   isCorrect: {

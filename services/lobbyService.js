@@ -935,10 +935,14 @@ class LobbyService {
   async getActiveMatchForUser(userId) {
     const { Op } = require('sequelize');
     
+    // Only consider matches started within the last 30 minutes
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000);
+    
     // Find most recent active match where user is a participant
     const match = await QuizMatch.findOne({
       where: {
         status: 'active',
+        createdAt: { [Op.gte]: cutoff },
         participants: {
           [Op.contains]: [{ userId }]
         }
