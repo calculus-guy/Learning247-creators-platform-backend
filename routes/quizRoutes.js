@@ -227,6 +227,13 @@ router.get('/lobby/match/:id', authMiddleware, quizLobbyController.getMatch);
  */
 router.post('/lobby/match/:id/forfeit', authMiddleware, quizLobbyController.forfeitMatch);
 
+/**
+ * @route   POST /api/quiz/lobby/match/:id/answer
+ * @desc    Submit answer via REST (fallback when socket is down)
+ * @access  Private
+ */
+router.post('/lobby/match/:id/answer', authMiddleware, quizLobbyController.submitAnswer);
+
 // ==================== TOURNAMENT ROUTES ====================
 
 /**

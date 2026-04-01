@@ -26,7 +26,7 @@ class WebSocketManager {
     this.disconnectedUsers = new Map(); // userId -> { disconnectedAt, matchId, tournamentId }
     this.reconnectionTimers = new Map(); // userId -> timeoutId
     this.pendingEvents = new Map(); // userId -> Array of { event, payload } to emit on reconnect
-    this.RECONNECTION_GRACE_PERIOD = 30000; // 30 seconds
+    this.RECONNECTION_GRACE_PERIOD = 60000; // 60 seconds — generous for mobile users
   }
 
   /**

@@ -225,4 +225,39 @@ exports.getActiveMatch = async (req, res) => {
   }
 };
 
+/**
+ * Submit answer via REST (fallback when socket is down)
+ * POST /api/quiz/lobby/match/:id/answer
+ */
+exports.submitAnswer = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id: matchId } = req.params;
+    const { questionId, answerId, clientTimestamp } = req.body;
+
+    if (!questionId || !answerId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields: questionId, answerId'
+      });
+    }
+
+    const result = await lobbyService.submitAnswer(
+      matchId,
+      userId,
+      questionId,
+      answerId,
+      clientTimestamp || Date.now()
+    );
+
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[Quiz Lobby Controller] Submit answer (REST) error:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to submit answer'
+    });
+  }
+};
+
 module.exports = exports;
