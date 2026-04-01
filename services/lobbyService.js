@@ -624,102 +624,133 @@ class LobbyService {
    * @returns {Promise<{success: boolean, winnerId: number, scores: Object, earnings: Object}>}
    */
   async endMatch(matchId) {
-    const match = await QuizMatch.findByPk(matchId);
+    return await QuizMatch.sequelize.transaction(async (t) => {
+      // Use LOCK.UPDATE to serialize concurrent incoming requests to end the match
+      const match = await QuizMatch.findByPk(matchId, { lock: t.LOCK.UPDATE, transaction: t });
 
-    if (!match) {
-      throw new Error('Match not found');
-    }
+      if (!match) {
+        throw new Error('Match not found');
+      }
 
-    if (match.status !== 'active') {
-      throw new Error('Match is not active');
-    }
+      // Idempotency: If already completed, just return quietly
+      if (match.status === 'completed') {
+        return { success: true, winnerId: match.winnerId, alreadyCompleted: true };
+      }
 
-    // Calculate completion times for each participant
-    for (const participant of match.participants) {
-      const answers = await QuizMatchAnswer.findAll({
-        where: {
-          matchId,
-          userId: participant.userId
-        },
-        order: [['createdAt', 'ASC']]
+      if (match.status !== 'active') {
+        throw new Error('Match is not active');
+      }
+
+      // Calculate completion times for each participant
+      for (const participant of match.participants) {
+        const answers = await QuizMatchAnswer.findAll({
+          where: {
+            matchId,
+            userId: participant.userId
+          },
+          order: [['createdAt', 'ASC']],
+          transaction: t
+        });
+
+        if (answers.length > 0) {
+          const firstAnswer = answers[0];
+          const lastAnswer = answers[answers.length - 1];
+          participant.completionTime = new Date(lastAnswer.createdAt) - new Date(firstAnswer.createdAt);
+        } else {
+          participant.completionTime = Infinity;
+        }
+      }
+
+      // Determine winner (highest score, then fastest time)
+      const [p1, p2] = match.participants;
+      let winnerId;
+
+      if (p1.score > p2.score) {
+        winnerId = p1.userId;
+      } else if (p2.score > p1.score) {
+        winnerId = p2.userId;
+      } else {
+        // Tie on score, use completion time
+        const p1Time = p1.completionTime === Infinity ? Infinity : (p1.completionTime || 0);
+        const p2Time = p2.completionTime === Infinity ? Infinity : (p2.completionTime || 0);
+        winnerId = p1Time <= p2Time ? p1.userId : p2.userId;
+      }
+
+      // Release escrowed funds to winner safely
+      try {
+        await quizWalletService.releaseEscrow(matchId, winnerId, match.escrowAmount);
+      } catch (escrowError) {
+        console.error('[LobbyService] Failed to release escrow in endMatch:', escrowError.message);
+      }
+
+      // Update match
+      match.changed('participants', true);
+      await match.update({
+        winnerId,
+        status: 'completed',
+        completedAt: new Date()
+      }, { transaction: t });
+
+      // Update user stats
+      try {
+        await this.updateUserStats(match);
+      } catch (statsError) {
+        console.error('[LobbyService] Failed to update user stats in endMatch:', statsError.message);
+      }
+
+      const scores = {};
+      const earnings = {};
+      
+      match.participants.forEach(p => {
+        scores[p.userId] = {
+          correct: p.score,
+          totalTime: p.completionTime === Infinity ? 0 : p.completionTime,
+          score: p.score
+        };
+        earnings[p.userId] = p.userId === winnerId ? match.escrowAmount : 0;
       });
 
-      if (answers.length > 0) {
-        const firstAnswer = answers[0];
-        const lastAnswer = answers[answers.length - 1];
-        participant.completionTime = new Date(lastAnswer.createdAt) - new Date(firstAnswer.createdAt);
+      // Emit match_ended to both players
+      try {
+        const websocketManager = require('./websocketManager');
+        if (websocketManager.io) {
+          const participant1 = match.participants.find(p => p.userId === match.challengerId) || match.participants[0];
+          const participant2 = match.participants.find(p => p.userId !== match.challengerId) || match.participants[1];
+          
+          const payload = {
+            winnerId,
+            player1Score: participant1?.score ?? 0,
+            player2Score: participant2?.score ?? 0,
+            player1UserId: participant1?.userId,
+            player2UserId: participant2?.userId,
+            scores,
+            earnings,
+            totalTime: Math.max(
+              participant1?.completionTime === Infinity ? 0 : (participant1?.completionTime || 0),
+              participant2?.completionTime === Infinity ? 0 : (participant2?.completionTime || 0)
+            ),
+            reason: 'completed'
+          };
+
+          websocketManager.io.to(`match:${matchId}`).emit('match_ended', payload);
+          
+          // Also send via sendOrQueue for robust delivery to disconnected players returning to game
+          websocketManager.sendOrQueue(participant1.userId, 'match_ended', payload);
+          if (participant2?.userId) {
+            websocketManager.sendOrQueue(participant2.userId, 'match_ended', payload);
+          }
+        }
+      } catch (wsError) {
+        console.error('[LobbyService] Failed to emit match_ended:', wsError.message);
       }
-    }
 
-    // Determine winner (highest score, then fastest time)
-    const [p1, p2] = match.participants;
-    let winnerId;
-
-    if (p1.score > p2.score) {
-      winnerId = p1.userId;
-    } else if (p2.score > p1.score) {
-      winnerId = p2.userId;
-    } else {
-      // Tie on score, use completion time
-      winnerId = p1.completionTime < p2.completionTime ? p1.userId : p2.userId;
-    }
-
-    // Release escrowed funds to winner
-    await quizWalletService.releaseEscrow(matchId, winnerId, match.escrowAmount);
-
-    // Update match
-    await match.update({
-      winnerId,
-      status: 'completed',
-      completedAt: new Date()
-    });
-
-    // Update user stats
-    await this.updateUserStats(match);
-
-    const scores = {};
-    const earnings = {};
-    
-    match.participants.forEach(p => {
-      scores[p.userId] = {
-        correct: p.score,
-        totalTime: p.completionTime,
-        score: p.score
+      return {
+        success: true,
+        winnerId,
+        scores,
+        earnings
       };
-      earnings[p.userId] = p.userId === winnerId ? match.escrowAmount : 0;
     });
-
-    // Emit match_ended to both players
-    try {
-      const websocketManager = require('./websocketManager');
-      if (websocketManager.io) {
-        const p1 = match.participants.find(p => p.userId === match.challengerId) || match.participants[0];
-        const p2 = match.participants.find(p => p.userId !== match.challengerId) || match.participants[1];
-        websocketManager.io.to(`match:${matchId}`).emit('match_ended', {
-          winnerId,
-          player1Score: p1?.score ?? 0,
-          player2Score: p2?.score ?? 0,
-          player1UserId: p1?.userId,
-          player2UserId: p2?.userId,
-          scores,
-          earnings,
-          totalTime: Math.max(
-            match.participants[0]?.completionTime || 0,
-            match.participants[1]?.completionTime || 0
-          ),
-          reason: 'completed'
-        });
-      }
-    } catch (wsError) {
-      console.error('[LobbyService] Failed to emit match_ended:', wsError.message);
-    }
-
-    return {
-      success: true,
-      winnerId,
-      scores,
-      earnings
-    };
   }
 
   /**
