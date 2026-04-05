@@ -294,16 +294,17 @@ function setupQuizScheduledTasks() {
     }
   });
   
-  // 🕐 Every hour: Expire old challenges
-  cron.schedule('0 * * * *', async () => {
+  // 🕐 Every minute: Expire old challenges (60s timeout)
+  cron.schedule('* * * * *', async () => {
     try {
       console.log('🧹 [Cron] Expiring old challenges...');
       
+      const lobbyService = require('./services/lobbyService');
       const expiredChallenges = await QuizMatch.findAll({
         where: {
           status: 'pending',
-          createdAt: {
-            [require('sequelize').Op.lt]: new Date(Date.now() - 24 * 60 * 60 * 1000) // 24 hours ago
+          expiresAt: {
+            [require('sequelize').Op.lt]: new Date()
           }
         }
       });
@@ -311,13 +312,7 @@ function setupQuizScheduledTasks() {
       let expiredCount = 0;
       for (const challenge of expiredChallenges) {
         try {
-          // Update status to cancelled
-          challenge.status = 'cancelled';
-          await challenge.save();
-          
-          // Refund escrowed funds would be handled by wallet service
-          // This is a placeholder - actual refund logic should be in lobbyService
-          
+          await lobbyService.expireChallenge(challenge.id);
           expiredCount++;
         } catch (error) {
           console.error(`❌ [Cron] Failed to expire challenge ${challenge.id}:`, error.message);

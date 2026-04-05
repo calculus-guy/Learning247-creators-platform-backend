@@ -108,7 +108,7 @@ class LobbyService {
       escrowAmount: wagerAmount,
       challengerId: userId,
       opponentId: opponentId,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      expiresAt: new Date(Date.now() + 60 * 1000) // 60 seconds timeout
     });
 
     // Update match ID in escrow metadata
@@ -875,9 +875,17 @@ class LobbyService {
       where.expiresAt = { [Op.gt]: new Date() };
     }
 
-    // Exclude the requesting user's own challenges
+    // Exclude the requesting user's own challenges AND filter by opponent
     if (excludeUserId) {
       where.challengerId = { [Op.ne]: excludeUserId };
+      
+      // Board should only show:
+      // 1. Public challenges (opponentId is null)
+      // 2. Private challenges directed specifically to this user
+      where[Op.or] = [
+        { opponentId: null },
+        { opponentId: excludeUserId }
+      ];
     }
 
     const { count, rows } = await QuizMatch.findAndCountAll({
