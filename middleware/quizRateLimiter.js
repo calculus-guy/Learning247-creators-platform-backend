@@ -4,8 +4,8 @@ const { createRedisClient } = require('../config/redis');
  * Quiz Rate Limiter Middleware
  * 
  * Redis-based rate limiting for quiz platform:
- * - Answer submissions: 15 per 10 seconds
- * - Challenge creation: 10 per hour
+ * - Answer submissions: 60 per 10 seconds
+ * - Challenge creation: 100 per hour
  * - All API endpoints: General rate limiting
  */
 
@@ -116,10 +116,10 @@ class QuizRateLimiter {
       }
 
       const key = `quiz:ratelimit:answer:${userId}`;
-      const result = await this.checkLimit(key, 15, 10);
+      const result = await this.checkLimit(key, 30, 10);
 
       // Set rate limit headers
-      res.setHeader('X-RateLimit-Limit', '15');
+      res.setHeader('X-RateLimit-Limit', '30');
       res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
       res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
 
@@ -153,9 +153,9 @@ class QuizRateLimiter {
       }
 
       const key = `quiz:ratelimit:challenge:${userId}`;
-      const result = await this.checkLimit(key, 10, 3600); // 1 hour
+      const result = await this.checkLimit(key, 20, 3600); // 1 hour
 
-      res.setHeader('X-RateLimit-Limit', '10');
+      res.setHeader('X-RateLimit-Limit', '20');
       res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
       res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
 
@@ -182,12 +182,13 @@ class QuizRateLimiter {
       const userId = req.user?.id;
 
       if (!userId) {
-        // For unauthenticated requests, use IP address
-        const ip = req.ip || req.connection.remoteAddress;
+        // For unauthenticated requests, use IP address (robust detection)
+        const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.ip || req.connection.remoteAddress;
+        console.log(`[QuizLimit] API IP Access: ${ip}`);
         const key = `quiz:ratelimit:api:ip:${ip}`;
-        const result = await this.checkLimit(key, 50, 60); // 50 per minute for IP
+        const result = await this.checkLimit(key, 100, 60); // 100 per minute for IP
 
-        res.setHeader('X-RateLimit-Limit', '50');
+        res.setHeader('X-RateLimit-Limit', '100');
         res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
         res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
 
@@ -205,9 +206,9 @@ class QuizRateLimiter {
       }
 
       const key = `quiz:ratelimit:api:user:${userId}`;
-      const result = await this.checkLimit(key, 100, 60); // 100 per minute
+      const result = await this.checkLimit(key, 200, 60); // 200 per minute
 
-      res.setHeader('X-RateLimit-Limit', '100');
+      res.setHeader('X-RateLimit-Limit', '200');
       res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
       res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
 
@@ -241,9 +242,9 @@ class QuizRateLimiter {
       }
 
       const key = `quiz:ratelimit:tournament:${userId}`;
-      const result = await this.checkLimit(key, 5, 3600); // 5 per hour
+      const result = await this.checkLimit(key, 10, 3600); // 10 per hour
 
-      res.setHeader('X-RateLimit-Limit', '5');
+      res.setHeader('X-RateLimit-Limit', '10');
       res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
       res.setHeader('X-RateLimit-Reset', result.resetAt.toString());
 
@@ -270,10 +271,10 @@ class QuizRateLimiter {
    */
   async getStatus(userId, type) {
     const configs = {
-      answer: { limit: 15, window: 10 },
-      challenge: { limit: 10, window: 3600 },
-      api: { limit: 100, window: 60 },
-      tournament: { limit: 5, window: 3600 }
+      answer: { limit: 30, window: 10 },
+      challenge: { limit: 20, window: 3600 },
+      api: { limit: 200, window: 60 },
+      tournament: { limit: 10, window: 3600 }
     };
 
     const config = configs[type];

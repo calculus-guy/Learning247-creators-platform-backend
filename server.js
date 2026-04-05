@@ -82,21 +82,32 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Generous enough for normal use, tight enough to block abuse
-app.use(rateLimit({
+const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 2000,                  // 300 requests per IP per window
+  max: 1000,                 // 1000 requests per IP per window (Restored to realistic limit)
   standardHeaders: true,     // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later.' }
-}));
+  message: { success: false, message: 'Too many requests, please try again later.' },
+  keyGenerator: (req) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log(`[RateLimit] Global Access IP: ${ip}`);
+    return ip;
+  }
+});
+app.use(globalRateLimit);
 
-// Auth endpoints - 200 attempts per 15 min per real IP
+// Auth endpoints - 100 attempts per 15 min per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 2000,
+  max: 100,                  // 100 attempts per IP per window (Restored to realistic limit)
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many authentication attempts, please try again later.' }
+  message: { success: false, message: 'Too many authentication attempts, please try again later.' },
+  keyGenerator: (req) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+    console.log(`[RateLimit] Auth Attempt IP: ${ip}`);
+    return ip;
+  }
 });
 
 // Financial endpoints - 60 requests per 15 min per IP

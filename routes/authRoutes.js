@@ -19,13 +19,13 @@ router.post('/signup', [
   body('email').isEmail().withMessage('Invalid email address'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('confirmPassword').custom((value, { req }) => value === req.body.password).withMessage('Passwords must match')
-], rateLimiter, signup);
+], signup);
 
 // Local Login Route
 router.post('/login', [
   body('email').isEmail().withMessage('Invalid email address'),
   body('password').not().isEmpty().withMessage('Password is required')
-], rateLimiter, login);
+], login);
 
 // Get Current User Profile
 router.get('/me', authMiddleware, getMe);

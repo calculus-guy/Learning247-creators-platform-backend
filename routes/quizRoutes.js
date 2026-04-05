@@ -232,7 +232,7 @@ router.post('/lobby/match/:id/forfeit', authMiddleware, quizLobbyController.forf
  * @desc    Submit answer via REST (fallback when socket is down)
  * @access  Private
  */
-router.post('/lobby/match/:id/answer', authMiddleware, quizLobbyController.submitAnswer);
+router.post('/lobby/match/:id/answer', authMiddleware, quizRateLimiter.answerSubmission(), quizLobbyController.submitAnswer);
 
 // ==================== TOURNAMENT ROUTES ====================
 

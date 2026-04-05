@@ -2,6 +2,7 @@ const socketIO = require('socket.io');
 const jwt = require('jsonwebtoken');
 const lobbyService = require('./lobbyService');
 const activeUserTracker = require('./activeUserTracker');
+const quizRateLimiter = require('../middleware/quizRateLimiter');
 
 /**
  * WebSocket Manager
@@ -277,6 +278,18 @@ class WebSocketManager {
         const clientTimestamp = data.clientTimestamp ||
           Math.floor(data.timeInSeconds !== undefined ? Date.now() - (data.timeInSeconds * 1000) : Date.now());
 
+        // Rate limiting check
+        const limitRes = await quizRateLimiter.checkLimit(`quiz:ratelimit:answer:${userId}`, 30, 10);
+        console.log(`[QuizWS] Answer Submission - User: ${userId}, Allowed: ${limitRes.allowed}`);
+        if (!limitRes.allowed) {
+          socket.emit('error', {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Too many answer submissions. Please slow down.',
+            retryAfter: limitRes.retryAfter
+          });
+          return;
+        }
+
         // Submit answer via service
         const result = await lobbyService.submitAnswer(
           matchId,
@@ -357,6 +370,18 @@ class WebSocketManager {
     socket.on('submit_tournament_answer', async (data) => {
       try {
         const { tournamentId, roundNumber, questionId, answerId, clientTimestamp } = data;
+
+        // Rate limiting check
+        const limitRes = await quizRateLimiter.checkLimit(`quiz:ratelimit:answer:${userId}`, 30, 10);
+        console.log(`[QuizWS] Tournament Answer - User: ${userId}, Allowed: ${limitRes.allowed}`);
+        if (!limitRes.allowed) {
+          socket.emit('error', {
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Too many answer submissions. Please slow down.',
+            retryAfter: limitRes.retryAfter
+          });
+          return;
+        }
 
         // TODO: Implement tournament answer submission
         // This would be similar to match answer submission but for tournaments
