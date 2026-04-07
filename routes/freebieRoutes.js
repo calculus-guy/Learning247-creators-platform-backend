@@ -43,6 +43,9 @@ const uploadFields = upload.fields([
 router.get('/', freebieController.listFreebies);
 router.get('/my', authMiddleware, freebieController.getMyFreebies);
 
+// ── Creator: delete own freebie ──────────────────────────────────────────────
+router.delete('/my/:id', authMiddleware, freebieController.deleteMyFreebie);
+
 // ── Admin analytics (must be before /:id to avoid route conflict) ────────────
 router.get('/admin/analytics', authMiddleware, adminMiddleware, freebieController.getAnalytics);
 router.get('/admin/items/:itemId/downloads', authMiddleware, adminMiddleware, freebieController.getItemDownloadLog);

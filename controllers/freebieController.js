@@ -357,7 +357,54 @@ exports.getMyFreebies = async (req, res) => {
   }
 };
 
-// ─── Admin: Delete Freebie ───────────────────────────────────────────────────
+// ─── Creator: Delete Own Freebie ────────────────────────────────────────────
+
+/**
+ * DELETE /api/freebies/my/:id
+ * Creator can only delete their own freebies
+ */
+exports.deleteMyFreebie = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const freebie = await Freebie.findByPk(req.params.id, {
+      include: [{ model: FreebieItem, as: 'items' }]
+    });
+
+    if (!freebie) return res.status(404).json({ success: false, message: 'Freebie not found' });
+
+    // Ownership check — only the creator can delete their own freebie
+    if (freebie.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only delete your own freebies' });
+    }
+
+    // Delete all S3 files (non-fatal per file)
+    for (const item of freebie.items) {
+      if (item.itemType === 'file' && item.s3Key) {
+        try {
+          await s3.deleteObject({ Bucket: process.env.AWS_S3_BUCKET, Key: item.s3Key }).promise();
+        } catch (e) {
+          console.error('[Freebies] S3 delete failed for item:', item.id, e.message);
+        }
+      }
+    }
+
+    // Delete thumbnail
+    if (freebie.thumbnailUrl) {
+      try { await deleteFileFromS3(freebie.thumbnailUrl); } catch (e) {
+        console.error('[Freebies] S3 thumbnail delete failed:', e.message);
+      }
+    }
+
+    // DB cascade deletes items + downloads
+    await freebie.destroy();
+
+    return res.status(200).json({ success: true, message: 'Freebie deleted successfully' });
+  } catch (error) {
+    console.error('[Freebies] Delete my freebie error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to delete freebie' });
+  }
+};
 
 /**
  * DELETE /api/freebies/:id
