@@ -3,6 +3,7 @@ const { stripeClient } = require('../config/stripe');
 const MultiCurrencyWalletService = require('./multiCurrencyWalletService');
 const CurrencyConversionService = require('./currencyConversionService');
 const { idempotencyService } = require('./idempotencyService');
+const CouponService = require('./couponService');
 const Purchase = require('../models/Purchase');
 const Video = require('../models/Video');
 const LiveClass = require('../models/liveClass');
@@ -26,6 +27,7 @@ class PaymentRoutingService {
     this.walletService = new MultiCurrencyWalletService();
     this.conversionService = new CurrencyConversionService();
     this.idempotencyService = idempotencyService;
+    this.couponService = new CouponService();
     
     // Gateway routing configuration
     this.gatewayRouting = {
@@ -113,7 +115,7 @@ class PaymentRoutingService {
       }
 
       // Determine currency and price for courses
-      let currency, amount;
+      let currency, amount, couponValidation = null;
       if (contentType === 'course') {
         // ✅ For courses, use forced currency and price from metadata
         // Pricing is now managed by CoursePricingService via .env
@@ -130,12 +132,34 @@ class PaymentRoutingService {
         const baseCurrency = contentDetails.currency || 'NGN';
         let baseAmount = parseFloat(contentDetails.price);
         
-        // Apply coupon discount for live series
-        if (contentType === 'live_series' && couponCode) {
-          const discountResult = this.applyCouponDiscount(contentId, baseAmount, couponCode);
-          if (discountResult.applied) {
-            baseAmount = discountResult.finalPrice;
-            console.log(`[Payment Routing] Coupon ${couponCode} applied: ${contentDetails.price} → ${baseAmount} ${baseCurrency}`);
+        // Apply coupon discount using new database-driven system
+        if (couponCode) {
+          try {
+            couponValidation = await this.couponService.validateCoupon(
+              couponCode,
+              contentType,
+              contentId,
+              userId
+            );
+            
+            if (couponValidation.valid) {
+              // Use the final price from coupon validation
+              baseAmount = couponValidation.finalPrice;
+              console.log(`[Payment Routing] Coupon ${couponCode} applied: ${contentDetails.price} → ${baseAmount} ${baseCurrency}`);
+              
+              // Store coupon data for later use
+              metadata.couponId = couponValidation.coupon.id;
+              metadata.couponCode = couponValidation.coupon.code;
+              metadata.originalPrice = couponValidation.originalPrice;
+              metadata.discountAmount = couponValidation.discountAmount;
+              metadata.partnerCommission = couponValidation.partnerCommission;
+            } else {
+              console.log(`[Payment Routing] Invalid coupon ${couponCode}: ${couponValidation.error}`);
+              throw new Error(couponValidation.error);
+            }
+          } catch (couponError) {
+            console.error('[Payment Routing] Coupon validation error:', couponError);
+            throw couponError;
           }
         }
         
@@ -174,8 +198,27 @@ class PaymentRoutingService {
             currency,
             paymentGateway: gatewayForCurrency,
             paymentReference: `COUPON-${couponCode || 'FREE'}-${Date.now()}`,
-            paymentStatus: 'completed'
+            paymentStatus: 'completed',
+            couponId: metadata.couponId || null
           }, { transaction });
+
+          // Record coupon usage if coupon was applied
+          if (couponValidation && couponValidation.valid) {
+            await this.couponService.recordCouponUsage({
+              couponId: metadata.couponId,
+              userId,
+              purchaseId: purchase.id,
+              originalPrice: metadata.originalPrice,
+              discountAmount: metadata.discountAmount,
+              finalPrice: 0,
+              partnerCommissionAmount: metadata.partnerCommission,
+              contentType,
+              contentId,
+              currency
+            });
+            
+            console.log(`[Payment Routing] Recorded coupon usage for ${couponCode}`);
+          }
 
           await transaction.commit();
 
@@ -230,7 +273,11 @@ class PaymentRoutingService {
         metadata: {
           referralCode: metadata.referralCode || null,
           referrerUserId: metadata.referrerUserId || null,
-          couponCode: couponCode || null
+          couponCode: metadata.couponCode || null,
+          couponId: metadata.couponId || null,
+          originalPrice: metadata.originalPrice || null,
+          discountAmount: metadata.discountAmount || null,
+          partnerCommission: metadata.partnerCommission || null
         }
       });
 
@@ -262,50 +309,6 @@ class PaymentRoutingService {
       
       throw error;
     }
-  }
-
-  /**
-   * Apply coupon discount for live series
-   * @param {string} seriesId - Live series ID
-   * @param {number} originalPrice - Original price in NGN
-   * @param {string} couponCode - Coupon code
-   * @returns {Object} Discount result
-   */
-  applyCouponDiscount(seriesId, originalPrice, couponCode) {
-    // Get promo configuration from environment
-    const promoSeriesId = process.env.LIVE_SERIES_PROMO_SERIES_ID;
-    
-    // Check if this series is eligible for promo
-    if (!promoSeriesId || seriesId !== promoSeriesId) {
-      return { applied: false, finalPrice: originalPrice };
-    }
-    
-    // Normalize coupon code
-    const code = couponCode.trim().toUpperCase();
-    
-    // Check coupon codes
-    if (code === 'FLASHDISCOUNT') {
-      // 100% off
-      return {
-        applied: true,
-        finalPrice: 0,
-        discount: originalPrice,
-        couponCode: code
-      };
-    } else if (code === 'SAVEBIG10' || code === 'KINGSLEYEXCLUSIVE') {
-      // 10,000 NGN off
-      const discount = 10000;
-      const finalPrice = Math.max(0, originalPrice - discount);
-      return {
-        applied: true,
-        finalPrice,
-        discount,
-        couponCode: code
-      };
-    }
-    
-    // Invalid coupon
-    return { applied: false, finalPrice: originalPrice };
   }
 
   /**
@@ -465,6 +468,10 @@ class PaymentRoutingService {
           referralCode: metadata.referralCode || null,
           referrerUserId: metadata.referrerUserId ? metadata.referrerUserId.toString() : null,
           couponCode: metadata.couponCode || null,
+          couponId: metadata.couponId ? metadata.couponId.toString() : null,
+          originalPrice: metadata.originalPrice ? metadata.originalPrice.toString() : null,
+          discountAmount: metadata.discountAmount ? metadata.discountAmount.toString() : null,
+          partnerCommission: metadata.partnerCommission ? metadata.partnerCommission.toString() : null,
           custom_fields: customFields
         },
         callback_url: `${process.env.CLIENT_URL}/payments/verify`
@@ -516,7 +523,11 @@ class PaymentRoutingService {
           contentTitle,
           referralCode: metadata.referralCode || '',
           referrerUserId: metadata.referrerUserId ? metadata.referrerUserId.toString() : '',
-          couponCode: metadata.couponCode || ''
+          couponCode: metadata.couponCode || '',
+          couponId: metadata.couponId ? metadata.couponId.toString() : '',
+          originalPrice: metadata.originalPrice ? metadata.originalPrice.toString() : '',
+          discountAmount: metadata.discountAmount ? metadata.discountAmount.toString() : '',
+          partnerCommission: metadata.partnerCommission ? metadata.partnerCommission.toString() : ''
         }
       });
 
@@ -623,6 +634,20 @@ class PaymentRoutingService {
 
       console.log(`[Payment Routing] Processing ${currency} payment for user ${userId}, ${contentType} ${contentId}`);
 
+      // Extract coupon data from payment metadata
+      let couponId = null, originalPrice = null, discountAmount = null, partnerCommission = null;
+      if (gateway === 'paystack') {
+        couponId = paymentData.metadata.couponId ? paymentData.metadata.couponId : null;
+        originalPrice = paymentData.metadata.originalPrice ? parseFloat(paymentData.metadata.originalPrice) : null;
+        discountAmount = paymentData.metadata.discountAmount ? parseFloat(paymentData.metadata.discountAmount) : null;
+        partnerCommission = paymentData.metadata.partnerCommission ? parseFloat(paymentData.metadata.partnerCommission) : null;
+      } else if (gateway === 'stripe') {
+        couponId = paymentData.metadata.couponId || null;
+        originalPrice = paymentData.metadata.originalPrice ? parseFloat(paymentData.metadata.originalPrice) : null;
+        discountAmount = paymentData.metadata.discountAmount ? parseFloat(paymentData.metadata.discountAmount) : null;
+        partnerCommission = paymentData.metadata.partnerCommission ? parseFloat(paymentData.metadata.partnerCommission) : null;
+      }
+
       // Create purchase record
       const purchase = await Purchase.create({
         userId,
@@ -632,8 +657,32 @@ class PaymentRoutingService {
         currency,
         paymentGateway: gateway,
         paymentReference: reference,
-        paymentStatus: 'completed'
+        paymentStatus: 'completed',
+        couponId: couponId
       }, { transaction });
+
+      // Record coupon usage if coupon was applied
+      if (couponId) {
+        try {
+          await this.couponService.recordCouponUsage({
+            couponId,
+            userId,
+            purchaseId: purchase.id,
+            originalPrice: originalPrice || amount,
+            discountAmount: discountAmount || 0,
+            finalPrice: amount,
+            partnerCommissionAmount: partnerCommission,
+            contentType,
+            contentId,
+            currency
+          });
+          
+          console.log(`[Payment Routing] Recorded coupon usage for purchase ${purchase.id}`);
+        } catch (couponError) {
+          console.error(`[Payment Routing] Failed to record coupon usage:`, couponError.message);
+          // Don't throw - purchase should succeed even if coupon recording fails
+        }
+      }
 
       // Get content creator and credit their multi-currency wallet (skip for courses)
       if (contentType !== 'special_course') {
@@ -641,11 +690,20 @@ class PaymentRoutingService {
         
         if (creatorId) {
           try {
+            // Determine creator earnings based on coupon type
+            let creatorEarnings = amount;
+            
+            // If partner coupon was used, creator gets 80% of original price
+            if (partnerCommission) {
+              creatorEarnings = originalPrice * 0.80;
+              console.log(`[Payment Routing] Partner coupon applied: Creator earnings = 80% of ${originalPrice} = ${creatorEarnings} ${currency}`);
+            }
+            
             // Credit creator's wallet in the appropriate currency
             await this.walletService.creditWallet({
               userId: creatorId,
               currency,
-              amount,
+              amount: creatorEarnings,
               reference,
               description: `Earnings from ${contentType} purchase`,
               metadata: {
@@ -653,11 +711,44 @@ class PaymentRoutingService {
                 buyerUserId: userId,
                 contentType,
                 contentId,
-                gateway
+                gateway,
+                couponApplied: couponId ? true : false
               }
             });
 
-            console.log(`[Payment Routing] Credited ${amount} ${currency} to creator ${creatorId}'s wallet`);
+            console.log(`[Payment Routing] Credited ${creatorEarnings} ${currency} to creator ${creatorId}'s wallet`);
+            
+            // Credit partner commission if applicable
+            if (partnerCommission) {
+              const partnerUserId = process.env.PARTNER_NIGERIAN_TEACHERS_USER_ID;
+              
+              if (partnerUserId) {
+                try {
+                  await this.walletService.creditWallet({
+                    userId: parseInt(partnerUserId),
+                    currency,
+                    amount: partnerCommission,
+                    reference: `PARTNER-${reference}`,
+                    description: `Partner commission from ${contentType} purchase`,
+                    metadata: {
+                      purchaseId: purchase.id,
+                      buyerUserId: userId,
+                      contentType,
+                      contentId,
+                      gateway,
+                      creatorId
+                    }
+                  });
+                  
+                  console.log(`[Payment Routing] Credited ${partnerCommission} ${currency} partner commission to user ${partnerUserId}`);
+                } catch (partnerError) {
+                  console.error(`[Payment Routing] Failed to credit partner commission:`, partnerError.message);
+                  // Don't throw - purchase should succeed even if partner credit fails
+                }
+              } else {
+                console.warn(`[Payment Routing] PARTNER_NIGERIAN_TEACHERS_USER_ID not set, skipping partner commission`);
+              }
+            }
           } catch (walletError) {
             console.error(`[Payment Routing] Failed to credit wallet for creator ${creatorId}:`, walletError.message);
             
@@ -669,11 +760,17 @@ class PaymentRoutingService {
                 const { getOrCreateWallet } = require('./walletService');
                 await getOrCreateWallet(creatorId, currency);
                 
+                // Determine creator earnings based on coupon type
+                let creatorEarnings = amount;
+                if (partnerCommission) {
+                  creatorEarnings = originalPrice * 0.80;
+                }
+                
                 // Retry crediting wallet
                 await this.walletService.creditWallet({
                   userId: creatorId,
                   currency,
-                  amount,
+                  amount: creatorEarnings,
                   reference,
                   description: `Earnings from ${contentType} purchase`,
                   metadata: {
@@ -681,11 +778,12 @@ class PaymentRoutingService {
                     buyerUserId: userId,
                     contentType,
                     contentId,
-                    gateway
+                    gateway,
+                    couponApplied: couponId ? true : false
                   }
                 });
                 
-                console.log(`[Payment Routing] ✅ Wallet created and credited ${amount} ${currency} to creator ${creatorId}`);
+                console.log(`[Payment Routing] ✅ Wallet created and credited ${creatorEarnings} ${currency} to creator ${creatorId}`);
               } catch (retryError) {
                 console.error(`[Payment Routing] ❌ Failed to create wallet and credit creator ${creatorId}:`, retryError.message);
                 // Don't throw - purchase should succeed even if wallet credit fails
