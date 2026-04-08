@@ -426,13 +426,13 @@ class CouponService {
         include: [
           {
             model: CouponUsage,
-            as: 'usages',
+            as: 'usageRecords',
             attributes: []
           }
         ],
         attributes: {
           include: [
-            [sequelize.fn('COUNT', sequelize.col('usages.id')), 'totalUsages']
+            [sequelize.fn('COUNT', sequelize.col('usageRecords.id')), 'totalUsages']
           ]
         },
         group: ['Coupon.id']
@@ -478,13 +478,13 @@ class CouponService {
         include: [
           {
             model: CouponUsage,
-            as: 'usages',
+            as: 'usageRecords',
             attributes: []
           }
         ],
         attributes: {
           include: [
-            [sequelize.fn('COUNT', sequelize.col('usages.id')), 'totalUsages']
+            [sequelize.fn('COUNT', sequelize.col('usageRecords.id')), 'totalUsages']
           ]
         },
         group: ['Coupon.id']
