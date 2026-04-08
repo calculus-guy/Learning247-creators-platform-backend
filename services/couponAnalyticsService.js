@@ -74,7 +74,7 @@ class CouponAnalyticsService {
         include: [
           {
             model: CouponUsage,
-            as: 'usages',
+            as: 'usageRecords',
             attributes: []
           }
         ],
@@ -86,12 +86,12 @@ class CouponAnalyticsService {
           'discountType',
           'discountValue',
           'usageCount',
-          [sequelize.fn('COUNT', sequelize.col('usages.id')), 'totalRedemptions'],
-          [sequelize.fn('SUM', sequelize.col('usages.discount_amount')), 'totalDiscounts'],
-          [sequelize.fn('SUM', sequelize.col('usages.final_price')), 'totalRevenue']
+          [sequelize.fn('COUNT', sequelize.col('usageRecords.id')), 'totalRedemptions'],
+          [sequelize.fn('SUM', sequelize.col('usageRecords.discount_amount')), 'totalDiscounts'],
+          [sequelize.fn('SUM', sequelize.col('usageRecords.final_price')), 'totalRevenue']
         ],
         group: ['Coupon.id'],
-        order: [[sequelize.literal('totalRedemptions'), 'DESC']],
+        order: [[sequelize.literal('"totalRedemptions"'), 'DESC']],
         limit,
         subQuery: false
       });
@@ -125,7 +125,7 @@ class CouponAnalyticsService {
       
       const { count, rows } = await CouponUsage.findAndCountAll({
         where: { couponId },
-        order: [['createdAt', 'DESC']],
+        order: [['created_at', 'DESC']],
         limit,
         offset,
         attributes: [
@@ -168,12 +168,12 @@ class CouponAnalyticsService {
       
       // Apply date range filter
       if (filters.startDate || filters.endDate) {
-        where.createdAt = {};
+        where.created_at = {};
         if (filters.startDate) {
-          where.createdAt[Op.gte] = new Date(filters.startDate);
+          where.created_at[Op.gte] = new Date(filters.startDate);
         }
         if (filters.endDate) {
-          where.createdAt[Op.lte] = new Date(filters.endDate);
+          where.created_at[Op.lte] = new Date(filters.endDate);
         }
       }
       
