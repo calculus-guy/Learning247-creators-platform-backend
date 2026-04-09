@@ -100,7 +100,7 @@ app.use(globalRateLimit);
 // Auth endpoints - 100 attempts per 15 min per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
