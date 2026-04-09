@@ -133,7 +133,8 @@ class CouponService {
           code: coupon.code,
           type: coupon.type,
           discountType: coupon.discountType,
-          discountValue: coupon.discountValue
+          discountValue: coupon.discountValue,
+          partnerUserId: coupon.partnerUserId || null
         },
         originalPrice: contentPrice.price,
         currency: contentPrice.currency,
@@ -156,9 +157,8 @@ class CouponService {
     let partnerCommission = null;
     
     if (coupon.type === 'partner') {
-      // Partner coupon: 3% student discount, 17% partner commission
-      const studentDiscountPercent = 3;
-      discountAmount = (originalPrice * studentDiscountPercent) / 100;
+      // Partner coupon: use discountValue for student discount, partnerCommissionPercent for commission
+      discountAmount = (originalPrice * coupon.discountValue) / 100;
       partnerCommission = (originalPrice * coupon.partnerCommissionPercent) / 100;
       
     } else if (coupon.type === 'creator') {

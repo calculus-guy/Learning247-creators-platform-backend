@@ -153,6 +153,7 @@ class PaymentRoutingService {
               metadata.originalPrice = couponValidation.originalPrice;
               metadata.discountAmount = couponValidation.discountAmount;
               metadata.partnerCommission = couponValidation.partnerCommission;
+              metadata.couponPartnerUserId = couponValidation.coupon.partnerUserId || null;
             } else {
               console.log(`[Payment Routing] Invalid coupon ${couponCode}: ${couponValidation.error}`);
               throw new Error(couponValidation.error);
@@ -472,6 +473,7 @@ class PaymentRoutingService {
           originalPrice: metadata.originalPrice ? metadata.originalPrice.toString() : null,
           discountAmount: metadata.discountAmount ? metadata.discountAmount.toString() : null,
           partnerCommission: metadata.partnerCommission ? metadata.partnerCommission.toString() : null,
+          couponPartnerUserId: metadata.couponPartnerUserId ? metadata.couponPartnerUserId.toString() : null,
           custom_fields: customFields
         },
         callback_url: `${process.env.CLIENT_URL}/payments/verify`
@@ -527,7 +529,8 @@ class PaymentRoutingService {
           couponId: metadata.couponId ? metadata.couponId.toString() : '',
           originalPrice: metadata.originalPrice ? metadata.originalPrice.toString() : '',
           discountAmount: metadata.discountAmount ? metadata.discountAmount.toString() : '',
-          partnerCommission: metadata.partnerCommission ? metadata.partnerCommission.toString() : ''
+          partnerCommission: metadata.partnerCommission ? metadata.partnerCommission.toString() : '',
+          couponPartnerUserId: metadata.couponPartnerUserId ? metadata.couponPartnerUserId.toString() : ''
         }
       });
 
@@ -635,17 +638,19 @@ class PaymentRoutingService {
       console.log(`[Payment Routing] Processing ${currency} payment for user ${userId}, ${contentType} ${contentId}`);
 
       // Extract coupon data from payment metadata
-      let couponId = null, originalPrice = null, discountAmount = null, partnerCommission = null;
+      let couponId = null, originalPrice = null, discountAmount = null, partnerCommission = null, couponPartnerUserId = null;
       if (gateway === 'paystack') {
         couponId = paymentData.metadata.couponId ? paymentData.metadata.couponId : null;
         originalPrice = paymentData.metadata.originalPrice ? parseFloat(paymentData.metadata.originalPrice) : null;
         discountAmount = paymentData.metadata.discountAmount ? parseFloat(paymentData.metadata.discountAmount) : null;
         partnerCommission = paymentData.metadata.partnerCommission ? parseFloat(paymentData.metadata.partnerCommission) : null;
+        couponPartnerUserId = paymentData.metadata.couponPartnerUserId ? parseInt(paymentData.metadata.couponPartnerUserId) : null;
       } else if (gateway === 'stripe') {
         couponId = paymentData.metadata.couponId || null;
         originalPrice = paymentData.metadata.originalPrice ? parseFloat(paymentData.metadata.originalPrice) : null;
         discountAmount = paymentData.metadata.discountAmount ? parseFloat(paymentData.metadata.discountAmount) : null;
         partnerCommission = paymentData.metadata.partnerCommission ? parseFloat(paymentData.metadata.partnerCommission) : null;
+        couponPartnerUserId = paymentData.metadata.couponPartnerUserId ? parseInt(paymentData.metadata.couponPartnerUserId) : null;
       }
 
       // Create purchase record
@@ -719,34 +724,28 @@ class PaymentRoutingService {
             console.log(`[Payment Routing] Credited ${creatorEarnings} ${currency} to creator ${creatorId}'s wallet`);
             
             // Credit partner commission if applicable
-            if (partnerCommission) {
-              const partnerUserId = process.env.PARTNER_NIGERIAN_TEACHERS_USER_ID;
-              
-              if (partnerUserId) {
-                try {
-                  await this.walletService.creditWallet({
-                    userId: parseInt(partnerUserId),
-                    currency,
-                    amount: partnerCommission,
-                    reference: `PARTNER-${reference}`,
-                    description: `Partner commission from ${contentType} purchase`,
-                    metadata: {
-                      purchaseId: purchase.id,
-                      buyerUserId: userId,
-                      contentType,
-                      contentId,
-                      gateway,
-                      creatorId
-                    }
-                  });
-                  
-                  console.log(`[Payment Routing] Credited ${partnerCommission} ${currency} partner commission to user ${partnerUserId}`);
-                } catch (partnerError) {
-                  console.error(`[Payment Routing] Failed to credit partner commission:`, partnerError.message);
-                  // Don't throw - purchase should succeed even if partner credit fails
-                }
-              } else {
-                console.warn(`[Payment Routing] PARTNER_NIGERIAN_TEACHERS_USER_ID not set, skipping partner commission`);
+            if (partnerCommission && couponPartnerUserId) {
+              try {
+                await this.walletService.creditWallet({
+                  userId: couponPartnerUserId,
+                  currency,
+                  amount: partnerCommission,
+                  reference: `PARTNER-${reference}`,
+                  description: `Partner commission from ${contentType} purchase`,
+                  metadata: {
+                    purchaseId: purchase.id,
+                    buyerUserId: userId,
+                    contentType,
+                    contentId,
+                    gateway,
+                    creatorId
+                  }
+                });
+                
+                console.log(`[Payment Routing] Credited ${partnerCommission} ${currency} partner commission to user ${couponPartnerUserId}`);
+              } catch (partnerError) {
+                console.error(`[Payment Routing] Failed to credit partner commission:`, partnerError.message);
+                // Don't throw - purchase should succeed even if partner credit fails
               }
             }
           } catch (walletError) {
