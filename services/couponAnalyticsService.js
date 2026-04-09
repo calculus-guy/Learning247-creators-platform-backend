@@ -138,8 +138,7 @@ class CouponAnalyticsService {
           'partnerCommissionAmount',
           'contentType',
           'contentId',
-          'currency',
-          'createdAt'
+          'currency'
         ]
       });
       
