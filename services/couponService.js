@@ -193,8 +193,9 @@ class CouponService {
   /**
    * Record coupon usage after successful payment
    */
-  async recordCouponUsage(usageData) {
-    const transaction = await sequelize.transaction();
+  async recordCouponUsage(usageData, externalTransaction = null) {
+    const transaction = externalTransaction || await sequelize.transaction();
+    const isOwnTransaction = !externalTransaction;
     
     try {
       const { couponId, userId, purchaseId, originalPrice, discountAmount, 
@@ -228,13 +229,13 @@ class CouponService {
         currency
       }, { transaction });
       
-      await transaction.commit();
+      if (isOwnTransaction) await transaction.commit();
       
       console.log(`[CouponService] Recorded coupon usage: ${coupon.code} by user ${userId}`);
       return usageRecord;
       
     } catch (error) {
-      await transaction.rollback();
+      if (isOwnTransaction) await transaction.rollback();
       console.error('[CouponService] Record usage error:', error);
       throw error;
     }
