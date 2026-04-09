@@ -32,8 +32,8 @@ class CouponService {
         throw new Error(`Coupon code '${couponData.code}' already exists`);
       }
       
-      // Validate creator ownership if specific content IDs provided
-      if (couponData.specificContentIds && couponData.specificContentIds.length > 0) {
+      // Validate creator ownership if specific content IDs provided (skip for admins)
+      if (!isAdmin && couponData.specificContentIds && couponData.specificContentIds.length > 0) {
         for (const contentType of couponData.applicableContentTypes) {
           await this.validationService.validateCreatorOwnership(
             couponData.creatorId || creatorUserId,

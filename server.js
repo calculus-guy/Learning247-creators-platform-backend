@@ -92,9 +92,7 @@ const globalRateLimit = rateLimit({
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
   keyGenerator: (req) => {
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    console.log(`[RateLimit] Global Access IP: ${ip}`);
-    return ip;
+    return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   }
 });
 app.use(globalRateLimit);
@@ -102,14 +100,12 @@ app.use(globalRateLimit);
 // Auth endpoints - 100 attempts per 15 min per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,                  // 100 attempts per IP per window (Restored to realistic limit)
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
   keyGenerator: (req) => {
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-    console.log(`[RateLimit] Auth Attempt IP: ${ip}`);
-    return ip;
+    return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
   }
 });
 
