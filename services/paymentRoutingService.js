@@ -653,6 +653,20 @@ class PaymentRoutingService {
         couponPartnerUserId = paymentData.metadata.couponPartnerUserId ? parseInt(paymentData.metadata.couponPartnerUserId) : null;
       }
 
+      // Fallback: if couponId exists but partnerUserId missing from metadata, fetch from DB
+      if (couponId && !couponPartnerUserId) {
+        try {
+          const Coupon = require('../models/Coupon');
+          const coupon = await Coupon.findByPk(couponId, { attributes: ['partnerUserId', 'partnerCommissionPercent'] });
+          if (coupon && coupon.partnerUserId) {
+            couponPartnerUserId = coupon.partnerUserId;
+            console.log(`[Payment Routing] Fetched partnerUserId ${couponPartnerUserId} from DB for coupon ${couponId}`);
+          }
+        } catch (err) {
+          console.error(`[Payment Routing] Failed to fetch coupon partnerUserId from DB:`, err.message);
+        }
+      }
+
       // Create purchase record
       const purchase = await Purchase.create({
         userId,
@@ -695,13 +709,13 @@ class PaymentRoutingService {
         
         if (creatorId) {
           try {
-            // Determine creator earnings based on coupon type
+            // Determine creator earnings based on coupon
             let creatorEarnings = amount;
             
-            // If partner coupon was used, creator gets 80% of original price
+            // If partner coupon was used, creator gets: finalPrice - partnerCommission
             if (partnerCommission) {
-              creatorEarnings = originalPrice * 0.80;
-              console.log(`[Payment Routing] Partner coupon applied: Creator earnings = 80% of ${originalPrice} = ${creatorEarnings} ${currency}`);
+              creatorEarnings = amount - partnerCommission;
+              console.log(`[Payment Routing] Partner coupon applied: Creator earnings = ${amount} - ${partnerCommission} = ${creatorEarnings} ${currency}`);
             }
             
             // Credit creator's wallet in the appropriate currency
