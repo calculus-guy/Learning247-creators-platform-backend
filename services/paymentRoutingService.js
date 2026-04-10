@@ -170,7 +170,8 @@ class PaymentRoutingService {
         this.walletService.validateCurrency(currency);
         
         // Convert price if user selected different currency than content's base currency
-        if (currency !== baseCurrency) {
+        // Skip conversion if coupon already returned price in target currency
+        if (currency !== baseCurrency && !couponValidation) {
           amount = this.conversionService.convert(baseAmount, baseCurrency, currency);
           console.log(`[Payment Routing] Currency conversion: ${baseAmount} ${baseCurrency} → ${amount} ${currency}`);
         } else {
