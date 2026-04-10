@@ -84,38 +84,45 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Generous enough for normal use, tight enough to block abuse
+// Normalize IPv4-mapped IPv6 addresses (e.g. ::ffff:1.2.3.4 → 1.2.3.4)
+// This fixes CVE-2026-30827 where all IPv4 users share one rate limit bucket
+const normalizeIp = (req) => {
+  const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0].trim() || req.connection.remoteAddress;
+  return ip ? ip.replace(/^::ffff:/, '') : 'unknown';
+};
+
+// Global rate limit - per real IP
 const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 3000,                 // 1000 requests per IP per window (Restored to realistic limit)
-  standardHeaders: true,     // Return rate limit info in RateLimit-* headers
+  max: 100,
+  standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
-  keyGenerator: (req) => {
-    return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  }
+  keyGenerator: normalizeIp,
+  validate: { xForwardedForHeader: false } // We handle this ourselves
 });
 app.use(globalRateLimit);
 
-// Auth endpoints - 100 attempts per 15 min per real IP
+// Auth endpoints - per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
-  keyGenerator: (req) => {
-    return req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
-  }
+  keyGenerator: normalizeIp,
+  validate: { xForwardedForHeader: false }
 });
 
-// Financial endpoints - 60 requests per 15 min per IP
+// Financial endpoints - per real IP
 const financialRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { success: false, message: 'Too many financial requests, please try again later.' }
+  message: { success: false, message: 'Too many financial requests, please try again later.' },
+  keyGenerator: normalizeIp,
+  validate: { xForwardedForHeader: false }
 });
 
 app.use(
