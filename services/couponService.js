@@ -84,7 +84,7 @@ class CouponService {
   /**
    * Validate coupon for a specific purchase
    */
-  async validateCoupon(code, contentType, contentId, userId) {
+  async validateCoupon(code, contentType, contentId, userId, targetCurrency = null) {
     try {
       // Normalize code
       const normalizedCode = code.trim().toUpperCase();
@@ -123,8 +123,24 @@ class CouponService {
         };
       }
       
+      // Calculate discount in the target currency (what the student is actually paying in)
+      // If targetCurrency differs from content's base currency, convert first
+      const CurrencyConversionService = require('./currencyConversionService');
+      const conversionService = new CurrencyConversionService();
+      
+      const effectiveCurrency = targetCurrency || contentPrice.currency;
+      let priceForCalculation = contentPrice.price;
+      
+      if (effectiveCurrency !== contentPrice.currency) {
+        priceForCalculation = conversionService.convert(
+          contentPrice.price,
+          contentPrice.currency,
+          effectiveCurrency
+        );
+      }
+      
       // Calculate discount
-      const discountResult = this.calculateDiscount(coupon, contentPrice.price);
+      const discountResult = this.calculateDiscount(coupon, priceForCalculation);
       
       return {
         valid: true,
@@ -136,8 +152,8 @@ class CouponService {
           discountValue: coupon.discountValue,
           partnerUserId: coupon.partnerUserId || null
         },
-        originalPrice: contentPrice.price,
-        currency: contentPrice.currency,
+        originalPrice: priceForCalculation,
+        currency: effectiveCurrency,
         discountAmount: discountResult.discountAmount,
         finalPrice: discountResult.finalPrice,
         partnerCommission: discountResult.partnerCommission

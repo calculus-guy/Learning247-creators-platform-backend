@@ -139,7 +139,8 @@ class PaymentRoutingService {
               couponCode,
               contentType,
               contentId,
-              userId
+              userId,
+              forceCurrency || baseCurrency  // pass the target currency
             );
             
             if (couponValidation.valid) {
