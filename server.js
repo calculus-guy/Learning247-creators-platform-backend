@@ -87,7 +87,7 @@ app.use(cors(corsOptions));
 // Generous enough for normal use, tight enough to block abuse
 const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,                 // 1000 requests per IP per window (Restored to realistic limit)
+  max: 2000,                 // 1000 requests per IP per window (Restored to realistic limit)
   standardHeaders: true,     // Return rate limit info in RateLimit-* headers
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
@@ -100,7 +100,7 @@ app.use(globalRateLimit);
 // Auth endpoints - 100 attempts per 15 min per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
@@ -112,7 +112,7 @@ const authRateLimiter = rateLimit({
 // Financial endpoints - 60 requests per 15 min per IP
 const financialRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  max: 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many financial requests, please try again later.' }
