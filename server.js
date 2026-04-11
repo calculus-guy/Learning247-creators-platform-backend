@@ -94,7 +94,7 @@ const normalizeIp = (req) => {
 // Global rate limit - per real IP
 const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
@@ -106,7 +106,7 @@ app.use(globalRateLimit);
 // Auth endpoints - per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
@@ -117,7 +117,7 @@ const authRateLimiter = rateLimit({
 // Financial endpoints - per real IP
 const financialRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60,
+  max: 600,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many financial requests, please try again later.' },
