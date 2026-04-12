@@ -18,7 +18,7 @@ class CurrencyWithdrawalService {
     this.config = {
       // Platform commission (applied to all withdrawals)
       platform: {
-        commission: 0.20, // 20% platform fee
+        commission: parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0.10,
         description: 'Platform operational fee'
       },
       
