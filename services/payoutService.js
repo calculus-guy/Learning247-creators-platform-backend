@@ -3,7 +3,7 @@ const { stripeClient } = require('../config/stripe');
 const Payout = require('../models/Payout');
 const { lockAmountForWithdrawal } = require('../services/walletService');
 
-const PLATFORM_FEE_PERCENTAGE = parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0.20;
+const PLATFORM_FEE_PERCENTAGE = parseFloat(process.env.PLATFORM_FEE_PERCENTAGE) || 0.10;
 
 /**
  * Calculate payout fees
