@@ -463,7 +463,7 @@ async function lockAmountForWithdrawal(userId, amount, currency = 'NGN') {
               balance_after: wallet.balance_available,
               currency: currency,
               reference: `lock_withdrawal_${userId}_${Date.now()}`,
-              idempotency_key: `lock_${userId}_${currency}_${Date.now()}`,
+              idempotency_key: require('crypto').randomUUID(),
               description: 'Amount locked for withdrawal',
               metadata: { currency, operation: 'lock_for_withdrawal' }
             }, { transaction });
