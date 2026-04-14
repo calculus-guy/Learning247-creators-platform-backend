@@ -15,7 +15,6 @@ exports.initiatePurchase = async (req, res) => {
   try {
     const freebieId = req.params.id;
     const userId = req.user.id;
-    const userEmail = req.user.email;
     const { currency, couponCode } = req.body;
 
     if (!currency) {
@@ -25,10 +24,17 @@ exports.initiatePurchase = async (req, res) => {
       });
     }
 
+    // Fetch user email from DB since JWT may not include it
+    const User = require('../models/User');
+    const user = await User.findByPk(userId, { attributes: ['email'] });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     const result = await freebiePaymentService.initiatePurchase({
       freebieId,
       userId,
-      userEmail,
+      userEmail: user.email,
       currency: currency.toUpperCase(),
       couponCode
     });
