@@ -705,9 +705,52 @@ class PaymentRoutingService {
         }
       }
 
+      // For freebies: create FreebieAccess record in addition to Purchase record
+      if (contentType === 'freebie') {
+        const { FreebieAccess } = require('../models/freebieIndex');
+        const { sendFreebieSaleNotificationEmail } = require('../utils/email');
+        const User = require('../models/User');
+        const Freebie = require('../models/Freebie');
+
+        // Idempotency — skip if already exists
+        const existingAccess = await FreebieAccess.findOne({ where: { userId, freebieId: contentId } });
+        if (!existingAccess) {
+          await FreebieAccess.create({
+            userId,
+            freebieId: contentId,
+            purchaseReference: reference,
+            amountPaid: amount,
+            currency,
+            couponId: couponId || null
+          }, { transaction });
+        }
+
+        // Fire-and-forget sale email to creator after commit
+        transaction.afterCommit(async () => {
+          try {
+            const freebie = await Freebie.findByPk(contentId, {
+              include: [{ model: User, as: 'creator', attributes: ['email', 'firstname', 'lastname'] }]
+            });
+            const buyer = await User.findByPk(userId, { attributes: ['firstname', 'lastname'] });
+            if (freebie && buyer) {
+              await sendFreebieSaleNotificationEmail(
+                freebie.creator.email,
+                `${freebie.creator.firstname} ${freebie.creator.lastname}`,
+                freebie.title,
+                `${buyer.firstname} ${buyer.lastname}`,
+                amount,
+                currency,
+                new Date()
+              );
+            }
+          } catch (emailErr) {
+            console.error('[Payment Routing] Freebie sale email failed:', emailErr.message);
+          }
+        });
+      }
+
       // Get content creator and credit their multi-currency wallet (skip for courses)
-      if (contentType !== 'special_course') {
-        const creatorId = await this.getContentCreatorId(contentType, contentId);
+      if (contentType !== 'special_course') {        const creatorId = await this.getContentCreatorId(contentType, contentId);
         
         if (creatorId) {
           try {
@@ -882,8 +925,12 @@ class PaymentRoutingService {
         return await LiveSeries.findByPk(contentId, {
           attributes: ['id', 'title', 'price', 'currency', 'userId']
         });
-      } else if (contentType === 'course') {
-        // ✅ For monthly/yearly access, contentId is null (all courses)
+      } else if (contentType === 'freebie') {
+        const Freebie = require('../models/Freebie');
+        return await Freebie.findByPk(contentId, {
+          attributes: ['id', 'title', 'price', 'currency', 'userId']
+        });
+      } else if (contentType === 'course') {        // ✅ For monthly/yearly access, contentId is null (all courses)
         if (!contentId) {
           // Monthly or yearly all-access pass
           return {

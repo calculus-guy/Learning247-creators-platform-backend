@@ -113,13 +113,17 @@ class FreebiePaymentService {
     const response = await paystackClient.post('/transaction/initialize', {
       email: userEmail,
       amount: Math.round(finalPrice * 100), // kobo
-      reference,
+      currency: currency.toUpperCase(),
       metadata: {
-        freebieId,
-        userId,
-        couponId,
-        contentType: 'freebie'
-      }
+        userId: userId.toString(),
+        contentType: 'freebie',
+        contentId: freebieId,
+        couponId: couponId ? couponId.toString() : null,
+        originalPrice: originalPrice ? originalPrice.toString() : null,
+        discountAmount: couponApplied ? (originalPrice - finalPrice).toString() : null,
+        contentType_label: 'freebie'
+      },
+      callback_url: `${process.env.CLIENT_URL}/payments/verify`
     });
 
     if (!response.data.status) {
@@ -155,13 +159,15 @@ class FreebiePaymentService {
         quantity: 1
       }],
       metadata: {
-        freebieId,
-        userId: String(userId),
-        couponId: couponId || '',
-        contentType: 'freebie'
+        userId: userId.toString(),
+        contentType: 'freebie',
+        contentId: freebieId,
+        couponId: couponId ? couponId.toString() : '',
+        originalPrice: originalPrice ? originalPrice.toString() : '',
+        discountAmount: couponApplied ? (originalPrice - finalPrice).toString() : ''
       },
-      success_url: `${process.env.FRONTEND_URL}/freebies/${freebieId}?payment=success`,
-      cancel_url: `${process.env.FRONTEND_URL}/freebies/${freebieId}?payment=cancelled`
+      success_url: `${process.env.CLIENT_URL}/payments/verify?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.CLIENT_URL}/payments/verify?cancelled=true`
     });
 
     return {

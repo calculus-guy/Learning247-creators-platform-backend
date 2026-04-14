@@ -26,10 +26,10 @@ exports.initializeCheckout = async (req, res) => {
       });
     }
 
-    if (!['video', 'live_class', 'live_series'].includes(contentType)) {
+    if (!['video', 'live_class', 'live_series', 'freebie'].includes(contentType)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid content type. Must be "video", "live_class", or "live_series"'
+        message: 'Invalid content type. Must be "video", "live_class", "live_series", or "freebie"'
       });
     }
 

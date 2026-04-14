@@ -47,44 +47,8 @@ exports.initiatePurchase = async (req, res) => {
 };
 
 /**
- * Verify payment and grant access
- * POST /api/freebies/:id/verify-purchase
- */
-exports.verifyPurchase = async (req, res) => {
-  try {
-    const freebieId = req.params.id;
-    const userId = req.user.id;
-    const { paymentReference, currency } = req.body;
-
-    if (!paymentReference || !currency) {
-      return res.status(400).json({
-        success: false,
-        message: 'paymentReference and currency are required'
-      });
-    }
-
-    const result = await freebiePaymentService.verifyPurchase({
-      freebieId,
-      userId,
-      paymentReference,
-      currency: currency.toUpperCase()
-    });
-
-    return res.status(200).json(result);
-  } catch (error) {
-    console.error('[FreebiePaymentController] verifyPurchase error:', error);
-
-    const status = error.statusCode || 500;
-    return res.status(status).json({
-      success: false,
-      message: error.message || 'Failed to verify purchase'
-    });
-  }
-};
-
-/**
  * Revoke access (admin — manual refund support)
- * DELETE /api/freebies/access/:accessId
+ * DELETE /api/freebies/access/revoke
  */
 exports.revokeAccess = async (req, res) => {
   try {

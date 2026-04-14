@@ -65,7 +65,6 @@ router.post('/items/:itemId/download', authMiddleware, freebieController.downloa
 
 // ── Purchase & access ────────────────────────────────────────────────────────
 router.post('/:id/purchase', authMiddleware, idempotencyMiddleware({ required: true, operationType: 'freebie_purchase' }), freebiePaymentController.initiatePurchase);
-router.post('/:id/verify-purchase', authMiddleware, idempotencyMiddleware({ required: true, operationType: 'freebie_verify_purchase' }), freebiePaymentController.verifyPurchase);
 
 // ── Creator: update price ────────────────────────────────────────────────────
 router.patch('/:id/price', authMiddleware, freebieController.updateFreebiePrice);
