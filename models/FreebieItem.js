@@ -75,6 +75,12 @@ const FreebieItem = sequelize.define('FreebieItem', {
     defaultValue: 0,
     allowNull: false,
     field: 'download_count'
+  },
+  isFreePreview: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    field: 'is_free_preview'
   }
 }, {
   tableName: 'freebie_items',

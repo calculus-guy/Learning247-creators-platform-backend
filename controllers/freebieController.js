@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/db');
-const { Freebie, FreebieItem, FreebieDownload } = require('../models/freebieIndex');
+const { Freebie, FreebieItem, FreebieDownload, FreebieAccess } = require('../models/freebieIndex');
 const User = require('../models/User');
 const { uploadFileToS3, deleteFileFromS3, getSignedUrl, s3 } = require('../services/s3Service');
+const { sendFreebieNewContentEmail } = require('../utils/email');
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -38,7 +39,7 @@ exports.createFreebie = async (req, res) => {
 
   try {
     const userId = req.user.id;
-    const { title, description, estimatedReadingTime, links } = req.body;
+    const { title, description, estimatedReadingTime, links, price, currency } = req.body;
 
     // ── Validate required fields ──
     if (!title || !description || !estimatedReadingTime) {
@@ -122,7 +123,9 @@ exports.createFreebie = async (req, res) => {
       description: description.trim(),
       thumbnailUrl,
       estimatedReadingTime: readingTime,
-      downloadCount: 0
+      downloadCount: 0,
+      price: price !== undefined ? parseFloat(price) : 0,
+      currency: currency ? currency.toUpperCase() : 'NGN'
     }, { transaction: t });
 
     // ── Upload files to S3 and create FreebieItem records ──
@@ -140,7 +143,8 @@ exports.createFreebie = async (req, res) => {
         fileSize: file.size,
         s3Key: result.key,
         fileUrl: result.url,
-        downloadCount: 0
+        downloadCount: 0,
+        isFreePreview: false
       });
     }
 
@@ -151,7 +155,8 @@ exports.createFreebie = async (req, res) => {
         itemType: 'link',
         linkUrl: link.url.trim(),
         linkTitle: link.title.trim(),
-        downloadCount: 0
+        downloadCount: 0,
+        isFreePreview: false
       });
     }
 
@@ -211,6 +216,8 @@ exports.listFreebies = async (req, res) => {
       thumbnailUrl: f.thumbnailUrl,
       estimatedReadingTime: f.estimatedReadingTime,
       downloadCount: f.downloadCount,
+      price: parseFloat(f.price),
+      currency: f.currency,
       creatorName: `${f.creator.firstname} ${f.creator.lastname}`,
       creatorId: f.creator.id,
       createdAt: f.createdAt
@@ -245,7 +252,7 @@ exports.getFreebieById = async (req, res) => {
         {
           model: FreebieItem,
           as: 'items',
-          attributes: ['id', 'itemType', 'fileName', 'fileType', 'fileSize', 'linkUrl', 'linkTitle', 'downloadCount']
+          attributes: ['id', 'itemType', 'fileName', 'fileType', 'fileSize', 'linkUrl', 'linkTitle', 'downloadCount', 'isFreePreview']
         }
       ]
     });
@@ -261,6 +268,8 @@ exports.getFreebieById = async (req, res) => {
         thumbnailUrl: freebie.thumbnailUrl,
         estimatedReadingTime: freebie.estimatedReadingTime,
         downloadCount: freebie.downloadCount,
+        price: parseFloat(freebie.price),
+        currency: freebie.currency,
         creatorName: `${freebie.creator.firstname} ${freebie.creator.lastname}`,
         creatorId: freebie.creator.id,
         createdAt: freebie.createdAt,
@@ -283,9 +292,33 @@ exports.getFreebieById = async (req, res) => {
 exports.downloadItem = async (req, res) => {
   try {
     const userId = req.user.id;
-    const item = await FreebieItem.findByPk(req.params.itemId);
+    const item = await FreebieItem.findByPk(req.params.itemId, {
+      include: [{ model: Freebie, as: 'freebie' }]
+    });
 
     if (!item) return res.status(404).json({ success: false, message: 'Item not found' });
+
+    const freebie = item.freebie;
+    const isPaidFreebie = parseFloat(freebie.price) > 0;
+
+    // ── Download Gate ────────────────────────────────────────────────────────
+    if (isPaidFreebie && !item.isFreePreview && freebie.userId !== userId) {
+      // Check FreebieAccess
+      const access = await FreebieAccess.findOne({
+        where: { userId, freebieId: freebie.id }
+      });
+
+      if (!access) {
+        return res.status(403).json({
+          success: false,
+          message: 'Payment required to download this item',
+          freebieId: freebie.id,
+          price: parseFloat(freebie.price),
+          currency: freebie.currency
+        });
+      }
+    }
+    // ── End Gate ─────────────────────────────────────────────────────────────
 
     // Record download and increment counters atomically
     await sequelize.transaction(async (t) => {
@@ -522,3 +555,83 @@ exports.getItemDownloadLog = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to fetch download log' });
   }
 };
+
+// ─── Creator: Update Freebie Price ──────────────────────────────────────────
+
+/**
+ * PATCH /api/freebies/:id/price
+ * Creator can update the price and currency of their own freebie at any time.
+ */
+exports.updateFreebiePrice = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { price, currency } = req.body;
+
+    const freebie = await Freebie.findByPk(req.params.id);
+    if (!freebie) return res.status(404).json({ success: false, message: 'Freebie not found' });
+
+    // Ownership check
+    if (freebie.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'You can only update your own freebies' });
+    }
+
+    // Validate price
+    if (price === undefined || parseFloat(price) < 0 || isNaN(parseFloat(price))) {
+      return res.status(400).json({ success: false, message: 'price must be a non-negative number' });
+    }
+
+    // Validate currency
+    if (currency && !['NGN', 'USD'].includes(currency.toUpperCase())) {
+      return res.status(400).json({ success: false, message: 'currency must be NGN or USD' });
+    }
+
+    await freebie.update({
+      price: parseFloat(price),
+      ...(currency && { currency: currency.toUpperCase() })
+    });
+
+    return res.status(200).json({
+      success: true,
+      freebie: {
+        id: freebie.id,
+        price: parseFloat(freebie.price),
+        currency: freebie.currency
+      }
+    });
+  } catch (error) {
+    console.error('[Freebies] Update price error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to update freebie price' });
+  }
+};
+
+// ─── Internal: Notify buyers of new content ──────────────────────────────────
+
+/**
+ * Fire-and-forget: notify all buyers when new items are added to a paid freebie.
+ * Called after items are committed to DB.
+ */
+async function notifyBuyersOfNewContent(freebieId, freebieTitle, newItemCount) {
+  try {
+    const accessRecords = await FreebieAccess.findAll({
+      where: { freebieId },
+      include: [{ model: User, as: 'buyer', attributes: ['email', 'firstname'] }]
+    });
+
+    for (const access of accessRecords) {
+      try {
+        await sendFreebieNewContentEmail(
+          access.buyer.email,
+          access.buyer.firstname,
+          freebieTitle,
+          newItemCount
+        );
+      } catch (emailErr) {
+        console.error(`[Freebies] New-content email failed for user ${access.userId}:`, emailErr.message);
+      }
+    }
+  } catch (err) {
+    console.error('[Freebies] notifyBuyersOfNewContent error:', err.message);
+  }
+}
+
+exports.notifyBuyersOfNewContent = notifyBuyersOfNewContent;

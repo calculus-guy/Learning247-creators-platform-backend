@@ -2,8 +2,10 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const freebieController = require('../controllers/freebieController');
+const freebiePaymentController = require('../controllers/freebiePaymentController');
 const authMiddleware = require('../middleware/authMiddleware');
 const adminMiddleware = require('../middleware/adminMiddleware');
+const { idempotencyMiddleware } = require('../middleware/idempotencyMiddleware');
 
 const ALLOWED_MIME_TYPES = [
   'application/pdf',
@@ -60,5 +62,15 @@ router.get('/:id', freebieController.getFreebieById);
 // ── Auth required ────────────────────────────────────────────────────────────
 router.post('/', authMiddleware, uploadFields, freebieController.createFreebie);
 router.post('/items/:itemId/download', authMiddleware, freebieController.downloadItem);
+
+// ── Purchase & access ────────────────────────────────────────────────────────
+router.post('/:id/purchase', authMiddleware, idempotencyMiddleware({ required: true, operationType: 'freebie_purchase' }), freebiePaymentController.initiatePurchase);
+router.post('/:id/verify-purchase', authMiddleware, idempotencyMiddleware({ required: true, operationType: 'freebie_verify_purchase' }), freebiePaymentController.verifyPurchase);
+
+// ── Creator: update price ────────────────────────────────────────────────────
+router.patch('/:id/price', authMiddleware, freebieController.updateFreebiePrice);
+
+// ── Admin: revoke access (manual refund) ─────────────────────────────────────
+router.delete('/access/revoke', authMiddleware, adminMiddleware, freebiePaymentController.revokeAccess);
 
 module.exports = router;

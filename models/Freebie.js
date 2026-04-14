@@ -40,6 +40,17 @@ const Freebie = sequelize.define('Freebie', {
     defaultValue: 0,
     allowNull: false,
     field: 'download_count'
+  },
+  price: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0.00,
+    validate: { min: 0 }
+  },
+  currency: {
+    type: DataTypes.ENUM('NGN', 'USD'),
+    allowNull: false,
+    defaultValue: 'NGN'
   }
 }, {
   tableName: 'freebies',

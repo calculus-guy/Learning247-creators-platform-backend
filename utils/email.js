@@ -947,3 +947,106 @@ exports.sendSessionRecordingEmail = async (to, firstname, recordingData) => {
     html,
   });
 };
+
+/**
+ * FREEBIE SALE NOTIFICATION EMAIL (to creator)
+ * Sent when a buyer successfully purchases a creator's paid freebie
+ */
+exports.sendFreebieSaleNotificationEmail = async (to, creatorName, freebieTitle, buyerName, amountPaid, currency, purchaseTimestamp) => {
+  const currencySymbol = currency === 'USD' ? '$' : '₦';
+  const formattedAmount = currency === 'USD' ? parseFloat(amountPaid).toFixed(2) : parseFloat(amountPaid).toLocaleString();
+  const formattedDate = new Date(purchaseTimestamp).toLocaleString('en-NG', {
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>🎉 You Made a Sale!</h2>
+
+      <p>Hi ${creatorName},</p>
+
+      <p>Great news — someone just purchased your content on hallos!</p>
+
+      <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <h3 style="color: #333; margin-top: 0;">Sale Details</h3>
+        <p style="margin: 5px 0;"><strong>Content:</strong> ${freebieTitle}</p>
+        <p style="margin: 5px 0;"><strong>Buyer:</strong> ${buyerName}</p>
+        <p style="margin: 5px 0;"><strong>Amount:</strong> ${currencySymbol}${formattedAmount} ${currency}</p>
+        <p style="margin: 5px 0;"><strong>Date:</strong> ${formattedDate}</p>
+      </div>
+
+      <div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+        <p style="margin: 0;"><strong>💰 Earnings Info:</strong></p>
+        <p style="margin: 10px 0 0 0;">
+          The full amount of ${currencySymbol}${formattedAmount} has been credited to your hallos wallet. 
+          The platform fee will be deducted when you withdraw your earnings.
+        </p>
+      </div>
+
+      <p>Keep creating great content — your audience is growing!</p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `💰 New Sale: ${freebieTitle}`,
+    html,
+  });
+};
+
+/**
+ * FREEBIE NEW CONTENT NOTIFICATION EMAIL (to buyer)
+ * Sent when a creator adds new items to a paid freebie the buyer has already purchased
+ */
+exports.sendFreebieNewContentEmail = async (to, buyerFirstname, freebieTitle, newItemCount) => {
+  const itemWord = newItemCount === 1 ? 'item' : 'items';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>📦 New Content Added to Your Purchase!</h2>
+
+      <p>Hi ${buyerFirstname},</p>
+
+      <p>
+        The creator has just added <strong>${newItemCount} new ${itemWord}</strong> to a resource you already own — 
+        and since you've already paid, you get access automatically!
+      </p>
+
+      <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <h3 style="color: #333; margin-top: 0;">📚 ${freebieTitle}</h3>
+        <p style="margin: 5px 0;">
+          <strong>${newItemCount} new ${itemWord}</strong> added — log in to your hallos account to download them now.
+        </p>
+      </div>
+
+      <div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+        <p style="margin: 0;"><strong>💡 How to access:</strong></p>
+        <ol style="margin: 10px 0 0 0;">
+          <li>Log in to your hallos account</li>
+          <li>Navigate to the resource hub</li>
+          <li>Find <strong>${freebieTitle}</strong></li>
+          <li>Download the new ${itemWord}</li>
+        </ol>
+      </div>
+
+      <p>Enjoy the new content!</p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `📦 New content added to: ${freebieTitle}`,
+    html,
+  });
+};

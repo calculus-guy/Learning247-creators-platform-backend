@@ -291,6 +291,11 @@ class CouponService {
         content = await LiveSeries.findByPk(contentId, {
           attributes: ['price', 'currency']
         });
+      } else if (contentType === 'freebie') {
+        const Freebie = require('../models/Freebie');
+        content = await Freebie.findByPk(contentId, {
+          attributes: ['price', 'currency']
+        });
       }
       
       if (!content) {
