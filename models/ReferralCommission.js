@@ -1,13 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db');
 
-/**
- * ReferralCommission Model
- * 
- * Tracks commissions earned from referrals
- * Requires admin approval before payment
- */
-
 const ReferralCommission = sequelize.define('ReferralCommission', {
   id: {
     type: DataTypes.UUID,
@@ -24,77 +17,55 @@ const ReferralCommission = sequelize.define('ReferralCommission', {
     type: DataTypes.INTEGER,
     allowNull: false,
     field: 'referrer_user_id',
-    references: {
-      model: 'Users',
-      key: 'id'
-    }
+    references: { model: 'Users', key: 'id' }
   },
   refereeUserId: {
     type: DataTypes.INTEGER,
     allowNull: false,
     field: 'referee_user_id',
-    references: {
-      model: 'Users',
-      key: 'id'
-    }
+    references: { model: 'Users', key: 'id' }
   },
   purchaseId: {
     type: DataTypes.UUID,
     allowNull: false,
+    unique: true,
     field: 'purchase_id',
-    references: {
-      model: 'purchases',
-      key: 'id'
-    }
-  },
-  seriesId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    field: 'series_id'
-  },
-  couponCode: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    field: 'coupon_code'
+    references: { model: 'purchases', key: 'id' }
   },
   commissionAmount: {
     type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
     field: 'commission_amount'
   },
-  status: {
-    type: DataTypes.ENUM('pending', 'approved', 'rejected', 'paid'),
-    defaultValue: 'pending',
+  commissionPercent: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false,
+    field: 'commission_percent',
+    comment: 'Rate at time of commission'
+  },
+  purchaseAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    field: 'purchase_amount'
+  },
+  currency: {
+    type: DataTypes.STRING(3),
     allowNull: false
+  },
+  contentType: {
+    type: DataTypes.STRING(50),
+    allowNull: false,
+    field: 'content_type'
+  },
+  contentId: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    field: 'content_id'
   },
   purchasedAt: {
     type: DataTypes.DATE,
     allowNull: false,
     field: 'purchased_at'
-  },
-  approvedBy: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    field: 'approved_by',
-    references: {
-      model: 'Users',
-      key: 'id'
-    }
-  },
-  approvedAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'approved_at'
-  },
-  paidAt: {
-    type: DataTypes.DATE,
-    allowNull: true,
-    field: 'paid_at'
-  },
-  rejectionReason: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    field: 'rejection_reason'
   },
   createdAt: {
     type: DataTypes.DATE,
@@ -115,29 +86,10 @@ const ReferralCommission = sequelize.define('ReferralCommission', {
   updatedAt: 'updated_at'
 });
 
-/**
- * Associations
- */
 ReferralCommission.associate = (models) => {
-  ReferralCommission.belongsTo(models.User, {
-    foreignKey: 'referrerUserId',
-    as: 'referrer'
-  });
-
-  ReferralCommission.belongsTo(models.User, {
-    foreignKey: 'refereeUserId',
-    as: 'referee'
-  });
-
-  ReferralCommission.belongsTo(models.User, {
-    foreignKey: 'approvedBy',
-    as: 'approver'
-  });
-
-  ReferralCommission.belongsTo(models.Purchase, {
-    foreignKey: 'purchaseId',
-    as: 'purchase'
-  });
+  ReferralCommission.belongsTo(models.User, { foreignKey: 'referrerUserId', as: 'referrer' });
+  ReferralCommission.belongsTo(models.User, { foreignKey: 'refereeUserId', as: 'referee' });
+  ReferralCommission.belongsTo(models.Purchase, { foreignKey: 'purchaseId', as: 'purchase' });
 };
 
 module.exports = ReferralCommission;

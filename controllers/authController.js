@@ -25,6 +25,15 @@ exports.signup = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await User.create({ firstname, lastname, email, password: hashedPassword });
 
+    // Fire-and-forget referral linking (never blocks signup)
+    const refCode = req.body.ref || req.query.ref;
+    if (refCode) {
+      const referralService = require('../services/referralService');
+      referralService.linkCreatorAtSignup(newUser.id, refCode).catch(err => {
+        console.error('[Auth] Referral linking failed (non-critical):', err.message);
+      });
+    }
+
     const token = jwt.sign({ id: newUser.id, role: newUser.role }, SECRET_KEY, { expiresIn: '1d' });
 
     res.status(201).json({ message: 'User created successfully', token });

@@ -862,37 +862,17 @@ class PaymentRoutingService {
         console.log(`[Payment Routing] Course purchase - no individual creator to credit`);
       }
 
-      // Create referral commission if applicable
-      if (contentType === 'live_series' && paymentData.metadata.referralCode) {
-        try {
-          const referralService = require('./referralService');
-          const referralCode = paymentData.metadata.referralCode;
-          const referrerUserId = parseInt(paymentData.metadata.referrerUserId);
-
-          // Extract coupon code from payment metadata
-          let couponCode = null;
-          if (gateway === 'paystack') {
-            couponCode = paymentData.metadata.couponCode;
-          } else if (gateway === 'stripe') {
-            couponCode = paymentData.metadata.couponCode;
-          }
-
-          if (couponCode === 'SAVEBIG10') {
-            await referralService.createPendingCommission({
-              referralCode,
-              referrerUserId,
-              refereeUserId: userId,
-              purchaseId: purchase.id,
-              seriesId: contentId,
-              couponCode
-            });
-
-            console.log(`[Payment Routing] ✅ Created pending referral commission for referrer ${referrerUserId}`);
-          }
-        } catch (referralError) {
-          console.error(`[Payment Routing] ❌ Failed to create referral commission:`, referralError.message);
-          // Don't throw - purchase should succeed even if referral tracking fails
-        }
+      // Create referral commission if applicable (new partner referral system)
+      // Priority rule: skip if a partner coupon was applied on this purchase
+      if (!couponPartnerUserId) {
+        await this._processReferralCommission({
+          buyerUserId: userId,
+          purchaseId: purchase.id,
+          amount,
+          currency,
+          contentType,
+          contentId
+        });
       }
 
       await transaction.commit();
@@ -1059,6 +1039,77 @@ class PaymentRoutingService {
    */
   validateCurrencyGatewayPairing(currency, gateway) {
     return this.walletService.validateCurrencyGatewayPairing(currency, gateway);
+  }
+
+  /**
+   * Process referral commission for a successful purchase.
+   * Never throws — errors are caught and logged so the purchase is never rolled back.
+   */
+  async _processReferralCommission({ buyerUserId, purchaseId, amount, currency, contentType, contentId }) {
+    try {
+      const UserReferral = require('../models/UserReferral');
+      const ReferralCode = require('../models/ReferralCode');
+      const ReferralCommission = require('../models/ReferralCommission');
+      const User = require('../models/User');
+
+      // Step 1: Idempotency — skip if commission already recorded for this purchase
+      const existing = await ReferralCommission.findOne({ where: { purchaseId } });
+      if (existing) return;
+
+      // Step 2: Load UserReferral for the buyer
+      const userReferral = await UserReferral.findOne({
+        where: { creatorUserId: buyerUserId, commissionActive: true }
+      });
+      if (!userReferral) return;
+
+      // Step 3: Check code expiry
+      const referralCode = await ReferralCode.findByPk(userReferral.referralCodeId);
+      if (!referralCode || new Date(referralCode.expiresAt) <= new Date()) return;
+
+      // Step 4: Calculate commission
+      const commissionPercent = parseFloat(referralCode.commissionPercent);
+      const commissionAmount = Math.round((commissionPercent / 100) * amount * 100) / 100;
+
+      // Step 5: Credit partner wallet
+      const creator = await User.findByPk(buyerUserId, { attributes: ['firstname', 'lastname'] });
+      await this.walletService.creditWallet({
+        userId: userReferral.partnerUserId,
+        currency,
+        amount: commissionAmount,
+        reference: `REFERRAL-${purchaseId}`,
+        description: `Referral commission - ${creator.firstname} ${creator.lastname}`,
+        metadata: { purchaseId, creatorUserId: buyerUserId, contentType, contentId }
+      });
+
+      // Step 5b: Debit commission from creator wallet
+      await this.walletService.debitWallet({
+        userId: buyerUserId,
+        currency,
+        amount: commissionAmount,
+        reference: `REFERRAL-DEBIT-${purchaseId}`,
+        description: `Referral commission deducted - ${referralCode.label}`,
+        metadata: { purchaseId, partnerUserId: userReferral.partnerUserId }
+      });
+
+      // Step 6: Create commission record
+      await ReferralCommission.create({
+        referralCode: userReferral.referralCode,
+        referrerUserId: userReferral.partnerUserId,
+        refereeUserId: buyerUserId,
+        purchaseId,
+        commissionAmount,
+        commissionPercent,
+        purchaseAmount: amount,
+        currency,
+        contentType,
+        contentId: contentId || null,
+        purchasedAt: new Date()
+      });
+
+      console.log(`[PaymentRouting] Referral commission: ${commissionAmount} ${currency} credited to partner ${userReferral.partnerUserId}`);
+    } catch (err) {
+      console.error('[PaymentRouting] Referral commission error (non-critical):', err.message);
+    }
   }
 }
 

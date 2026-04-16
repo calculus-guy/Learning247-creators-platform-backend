@@ -1,366 +1,319 @@
+const crypto = require('crypto');
+const { Op, fn, col, literal } = require('sequelize');
+const sequelize = require('../config/db');
 const ReferralCode = require('../models/ReferralCode');
+const UserReferral = require('../models/UserReferral');
 const ReferralCommission = require('../models/ReferralCommission');
 const User = require('../models/User');
-const Purchase = require('../models/Purchase');
-const sequelize = require('../config/db');
-const { Op, fn, col } = require('sequelize');
-const crypto = require('crypto');
-
-/**
- * Referral Service
- * 
- * Handles referral link generation, tracking, and commission management
- * MVP Version: Hardcoded for Video Editing class + SaveBig10
- */
 
 class ReferralService {
-  constructor() {
-    // MVP: Hardcoded configuration
-    this.DIGITAL_MARKETING_SERIES_ID = 'f0e13348-6550-46df-88a0-66905d72a913';
-    this.VALID_COUPON_CODE = 'SAVEBIG10';
-    this.COMMISSION_AMOUNT = 2500; // NGN
-    this.FRONTEND_BASE_URL = process.env.CLIENT_URL || 'https://www.hallos.net';
-  }
-
   /**
-   * Generate unique referral code
-   * Format: 3 letters + 6 numbers (e.g., ABC123456)
+   * Generate a random uppercase alphanumeric string 8–12 chars using crypto.
+   * @returns {string}
    */
   generateUniqueCode() {
-    const letters = crypto.randomBytes(2).toString('hex').toUpperCase().substring(0, 3);
-    const numbers = Math.floor(100000 + Math.random() * 900000);
-    return `${letters}${numbers}`;
-  }
-
-  /**
-   * Generate referral link for user
-   * @param {number} userId - User ID
-   * @param {string} seriesId - Live series ID (optional, defaults to Video Editing)
-   * @returns {Promise<Object>} Referral link details
-   */
-  async generateReferralLink(userId, seriesId = null) {
-    try {
-      // MVP: Only allow Video Editing series
-      const targetSeriesId = seriesId || this.DIGITAL_MARKETING_SERIES_ID;
-      
-      if (targetSeriesId !== this.DIGITAL_MARKETING_SERIES_ID) {
-        throw new Error('Referral program only available for Video Editing class');
-      }
-
-      // Check if user already has a referral code for this series
-      let referralCode = await ReferralCode.findOne({
-        where: {
-          userId,
-          seriesId: targetSeriesId
-        }
-      });
-
-      // If not, create new one
-      if (!referralCode) {
-        let uniqueCode;
-        let attempts = 0;
-        const maxAttempts = 10;
-
-        // Generate unique code (retry if collision)
-        while (attempts < maxAttempts) {
-          uniqueCode = this.generateUniqueCode();
-          
-          const existing = await ReferralCode.findOne({
-            where: { referralCode: uniqueCode }
-          });
-
-          if (!existing) break;
-          attempts++;
-        }
-
-        if (attempts >= maxAttempts) {
-          throw new Error('Failed to generate unique referral code');
-        }
-
-        referralCode = await ReferralCode.create({
-          referralCode: uniqueCode,
-          userId,
-          seriesId: targetSeriesId
-        });
-      }
-
-      // Build referral link
-      const referralLink = `${this.FRONTEND_BASE_URL}/series/${targetSeriesId}?ref=${referralCode.referralCode}`;
-
-      // Build share message
-      const shareMessage = this.buildShareMessage(referralLink, referralCode.referralCode);
-
-      return {
-        success: true,
-        referralCode: referralCode.referralCode,
-        referralLink,
-        shareMessage,
-        commissionAmount: this.COMMISSION_AMOUNT,
-        couponCode: this.VALID_COUPON_CODE,
-        seriesId: targetSeriesId
-      };
-    } catch (error) {
-      console.error('[Referral Service] Generate link error:', error);
-      throw error;
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const length = 8 + (crypto.randomInt(5)); // 8–12
+    let code = '';
+    for (let i = 0; i < length; i++) {
+      code += chars[crypto.randomInt(chars.length)];
     }
+    return code;
   }
 
   /**
-   * Build shareable message
+   * Generate a unique code that doesn't collide with existing DB records.
+   * Retries up to 10 times.
+   * @returns {Promise<string>}
    */
-  buildShareMessage(referralLink, referralCode) {
-    return `🎓 Join me on Hallos for the Video Editing Masterclass!
-
-Learn from industry experts and transform your career.
-
-💰 Special Offer: Get ₦10,000 OFF!
-Regular Price: ₦15,000
-Your Price: ₦5,000
-
-Use code: ${this.VALID_COUPON_CODE} at checkout
-
-👉 Click here to enroll: ${referralLink}
-
-See you in class! 🚀`;
-  }
-
-  /**
-   * Track referral link click (optional analytics)
-   * @param {string} referralCode - Referral code from URL
-   */
-  async trackClick(referralCode) {
-    try {
-      const referral = await ReferralCode.findOne({
-        where: { referralCode }
-      });
-
-      if (referral) {
-        await referral.increment('clicksCount');
-        await referral.update({ lastUsedAt: new Date() });
-      }
-
-      return { success: true };
-    } catch (error) {
-      console.error('[Referral Service] Track click error:', error);
-      // Don't throw - tracking is optional
-      return { success: false };
+  async _generateUniqueCodeWithRetry() {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const code = this.generateUniqueCode();
+      const existing = await ReferralCode.findOne({ where: { referralCode: code } });
+      if (!existing) return code;
     }
+    throw new Error('Failed to generate a unique referral code after 10 attempts');
   }
 
   /**
-   * Validate referral code before purchase
-   * @param {string} referralCode - Referral code
-   * @param {number} buyerUserId - User making purchase
-   * @param {string} seriesId - Series being purchased
-   * @param {string} couponCode - Coupon code being used
-   * @returns {Promise<Object>} Validation result
+   * Create a new referral code for a partner.
    */
-  async validateReferral(referralCode, buyerUserId, seriesId, couponCode) {
-    try {
-      // Find referral code
-      const referral = await ReferralCode.findOne({
-        where: { referralCode }
-      });
-
-      if (!referral) {
-        return {
-          valid: false,
-          reason: 'Invalid referral code'
-        };
-      }
-
-      // Check series matches
-      if (referral.seriesId !== seriesId) {
-        return {
-          valid: false,
-          reason: 'Referral code not valid for this series'
-        };
-      }
-
-      // Check not self-referral
-      if (referral.userId === buyerUserId) {
-        return {
-          valid: false,
-          reason: 'Cannot use your own referral code'
-        };
-      }
-
-      // Check coupon code matches
-      if (couponCode !== this.VALID_COUPON_CODE) {
-        return {
-          valid: false,
-          reason: `Referral only valid with ${this.VALID_COUPON_CODE} coupon code`
-        };
-      }
-
-      return {
-        valid: true,
-        referral,
-        referrerUserId: referral.userId
-      };
-    } catch (error) {
-      console.error('[Referral Service] Validate referral error:', error);
-      return {
-        valid: false,
-        reason: 'Validation error'
-      };
+  async createReferralCode({ partnerUserId, commissionPercent, label, expiresAt, createdBy }) {
+    // Validate required fields
+    if (!partnerUserId || commissionPercent == null || !label) {
+      const err = new Error('partnerUserId, commissionPercent, and label are required');
+      err.statusCode = 400;
+      throw err;
     }
+
+    const percent = parseFloat(commissionPercent);
+    if (isNaN(percent) || percent < 0.01 || percent > 99.99) {
+      const err = new Error('commissionPercent must be between 0.01 and 99.99');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    // Default expiresAt to 3 months from now
+    const resolvedExpiresAt = expiresAt
+      ? new Date(expiresAt)
+      : new Date(Date.now() + 3 * 30 * 24 * 60 * 60 * 1000);
+
+    const code = await this._generateUniqueCodeWithRetry();
+
+    const record = await ReferralCode.create({
+      referralCode: code,
+      label,
+      partnerUserId,
+      commissionPercent: percent,
+      expiresAt: resolvedExpiresAt,
+      status: 'active',
+      createdBy
+    });
+
+    const signupLink = `${process.env.CLIENT_URL}/signup?ref=${code}`;
+    return { ...record.toJSON(), signupLink };
   }
 
   /**
-   * Create pending commission after successful purchase
-   * @param {Object} params - Commission parameters
-   * @returns {Promise<Object>} Created commission
+   * Update a referral code. Handles cascade side-effects.
    */
-  async createPendingCommission({ referralCode, referrerUserId, refereeUserId, purchaseId, seriesId, couponCode }) {
-    try {
-      const commission = await ReferralCommission.create({
-        referralCode,
-        referrerUserId,
-        refereeUserId,
-        purchaseId,
-        seriesId,
-        couponCode,
-        commissionAmount: this.COMMISSION_AMOUNT,
-        status: 'pending',
-        purchasedAt: new Date()
-      });
+  async updateReferralCode(codeId, updates, adminUserId) {
+    const record = await ReferralCode.findByPk(codeId);
+    if (!record) {
+      const err = new Error('Referral code not found');
+      err.statusCode = 404;
+      throw err;
+    }
 
-      // Update referral code stats
-      await ReferralCode.increment('successfulReferrals', {
-        by: 1,
-        where: { referralCode }
-      });
-      
-      await ReferralCode.update(
-        { lastUsedAt: new Date() },
-        { where: { referralCode } }
+    const allowedFields = ['label', 'commissionPercent', 'expiresAt', 'status'];
+    const patch = {};
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) patch[field] = updates[field];
+    }
+
+    if (patch.commissionPercent !== undefined) {
+      const percent = parseFloat(patch.commissionPercent);
+      if (isNaN(percent) || percent < 0.01 || percent > 99.99) {
+        const err = new Error('commissionPercent must be between 0.01 and 99.99');
+        err.statusCode = 400;
+        throw err;
+      }
+      patch.commissionPercent = percent;
+    }
+
+    const wasExpired = record.status === 'expired';
+    const newStatus = patch.status;
+    const newExpiresAt = patch.expiresAt ? new Date(patch.expiresAt) : null;
+
+    await record.update(patch);
+
+    // Side effect: deactivate → set commission_active = false on all linked UserReferrals
+    if (newStatus === 'inactive') {
+      await UserReferral.update(
+        { commissionActive: false },
+        { where: { referralCodeId: codeId } }
       );
-
-      console.log(`[Referral Service] Created pending commission ${commission.id} for referrer ${referrerUserId}`);
-
-      return {
-        success: true,
-        commission
-      };
-    } catch (error) {
-      console.error('[Referral Service] Create commission error:', error);
-      throw error;
     }
+
+    // Side effect: expiresAt extended past now on an expired code → reactivate
+    if (wasExpired && newExpiresAt && newExpiresAt > new Date()) {
+      await record.update({ status: 'active' });
+      await UserReferral.update(
+        { commissionActive: true },
+        { where: { referralCodeId: codeId } }
+      );
+    }
+
+    return record.reload();
   }
 
   /**
-   * Get user's referral statistics
-   * @param {number} userId - User ID
-   * @returns {Promise<Object>} Referral stats
+   * List all referral codes with optional status filter and aggregates.
    */
-  async getUserStats(userId) {
+  async listReferralCodes({ status, limit = 50, offset = 0 } = {}) {
+    const where = {};
+    if (status) where.status = status;
+
+    const { count, rows } = await ReferralCode.findAndCountAll({
+      where,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      order: [['createdAt', 'DESC']],
+      attributes: {
+        include: [
+          [
+            literal(`(SELECT COUNT(*) FROM user_referrals WHERE user_referrals.referral_code_id = "ReferralCode"."id")`),
+            'totalLinkedCreators'
+          ],
+          [
+            literal(`(SELECT COALESCE(SUM(rc.commission_amount), 0) FROM referral_commissions rc WHERE rc.referral_code = "ReferralCode"."referral_code")`),
+            'totalCommissionsPaid'
+          ]
+        ]
+      }
+    });
+
+    const data = rows.map(r => {
+      const json = r.toJSON();
+      json.signupLink = `${process.env.CLIENT_URL}/signup?ref=${r.referralCode}`;
+      return json;
+    });
+
+    return { total: count, data };
+  }
+
+  /**
+   * Get creators linked to a specific referral code.
+   */
+  async getCreatorsForCode(codeId, { limit = 20, offset = 0 } = {}) {
+    const { count, rows } = await UserReferral.findAndCountAll({
+      where: { referralCodeId: codeId },
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      include: [
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'firstname', 'lastname', 'email']
+        }
+      ]
+    });
+
+    const data = rows.map(r => ({
+      creatorUserId: r.creatorUserId,
+      firstname: r.creator ? r.creator.firstname : null,
+      lastname: r.creator ? r.creator.lastname : null,
+      email: r.creator ? r.creator.email : null,
+      signedUpAt: r.signedUpAt,
+      commissionActive: r.commissionActive
+    }));
+
+    return { total: count, data };
+  }
+
+  /**
+   * Get commission history for a partner with optional filters.
+   */
+  async getPartnerCommissions(partnerUserId, { currency, startDate, endDate, limit = 20, offset = 0 } = {}) {
+    const where = { referrerUserId: partnerUserId };
+    if (currency) where.currency = currency;
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt[Op.gte] = new Date(startDate);
+      if (endDate) where.createdAt[Op.lte] = new Date(endDate);
+    }
+
+    const { count, rows } = await ReferralCommission.findAndCountAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    return { total: count, commissions: rows };
+  }
+
+  /**
+   * Link a creator to a referral code at signup. Never throws.
+   */
+  async linkCreatorAtSignup(creatorUserId, refCode) {
     try {
-      const referralCode = await ReferralCode.findOne({
+      const now = new Date();
+      const code = await ReferralCode.findOne({
         where: {
-          userId,
-          seriesId: this.DIGITAL_MARKETING_SERIES_ID
+          referralCode: refCode,
+          status: 'active',
+          expiresAt: { [Op.gt]: now }
         }
       });
 
-      if (!referralCode) {
-        return {
-          hasReferralCode: false,
-          referralCode: null,
-          referralLink: null,
-          stats: {
-            totalClicks: 0,
-            totalReferrals: 0,
-            pendingCommissions: 0,
-            approvedCommissions: 0,
-            totalEarnings: 0
-          }
-        };
-      }
+      if (!code) return;
 
-      // Get commission stats
-      const commissions = await ReferralCommission.findAll({
-        where: { referrerUserId: userId },
-        attributes: [
-          'status',
-          [fn('COUNT', col('id')), 'count'],
-          [fn('SUM', col('commission_amount')), 'total']
-        ],
-        group: ['status'],
-        raw: true
+      await UserReferral.create({
+        creatorUserId,
+        referralCodeId: code.id,
+        referralCode: code.referralCode,
+        partnerUserId: code.partnerUserId,
+        signedUpAt: now,
+        commissionActive: true
       });
-
-      const stats = {
-        totalClicks: referralCode.clicksCount,
-        totalReferrals: referralCode.successfulReferrals,
-        pendingCommissions: 0,
-        approvedCommissions: 0,
-        paidCommissions: 0,
-        totalEarnings: parseFloat(referralCode.totalEarnings) || 0
-      };
-
-      commissions.forEach(c => {
-        if (c.status === 'pending') stats.pendingCommissions = parseInt(c.count);
-        if (c.status === 'approved') stats.approvedCommissions = parseInt(c.count);
-        if (c.status === 'paid') stats.paidCommissions = parseInt(c.count);
-      });
-
-      const referralLink = `${this.FRONTEND_BASE_URL}/series/${this.DIGITAL_MARKETING_SERIES_ID}?ref=${referralCode.referralCode}`;
-
-      return {
-        hasReferralCode: true,
-        referralCode: referralCode.referralCode,
-        referralLink,
-        commissionAmount: this.COMMISSION_AMOUNT,
-        couponCode: this.VALID_COUPON_CODE,
-        stats
-      };
-    } catch (error) {
-      console.error('[Referral Service] Get user stats error:', error);
-      throw error;
+    } catch (err) {
+      // Unique constraint violation (creator already linked) — silent
+      if (err.name === 'SequelizeUniqueConstraintError') return;
+      console.error('[ReferralService] linkCreatorAtSignup error (non-critical):', err.message);
     }
   }
 
   /**
-   * Get user's commission history
-   * @param {number} userId - User ID
-   * @param {Object} options - Query options
-   * @returns {Promise<Object>} Commission history
+   * Get a partner's referral code with signup link.
    */
-  async getUserCommissions(userId, { status = null, limit = 20, offset = 0 } = {}) {
-    try {
-      const where = { referrerUserId: userId };
-      if (status) where.status = status;
+  async getPartnerReferralCode(partnerUserId) {
+    const record = await ReferralCode.findOne({ where: { partnerUserId } });
+    if (!record) return null;
+    return {
+      ...record.toJSON(),
+      signupLink: `${process.env.CLIENT_URL}/signup?ref=${record.referralCode}`
+    };
+  }
 
-      const { count, rows: commissions } = await ReferralCommission.findAndCountAll({
-        where,
-        include: [
-          {
-            model: User,
-            as: 'referee',
-            attributes: ['id', 'firstname', 'lastname', 'email']
-          },
-          {
-            model: User,
-            as: 'approver',
-            attributes: ['id', 'firstname', 'lastname'],
-            required: false
-          }
-        ],
+  /**
+   * Get partner stats: creators referred, commissions earned, history.
+   */
+  async getPartnerStats(partnerUserId, { limit = 20, offset = 0 } = {}) {
+    const [totalCreatorsResult, totalCommissionsResult, { count, rows }] = await Promise.all([
+      UserReferral.count({ where: { partnerUserId } }),
+      ReferralCommission.findOne({
+        where: { referrerUserId: partnerUserId },
+        attributes: [[fn('SUM', col('commission_amount')), 'total']],
+        raw: true
+      }),
+      ReferralCommission.findAndCountAll({
+        where: { referrerUserId: partnerUserId },
         order: [['createdAt', 'DESC']],
         limit: parseInt(limit),
         offset: parseInt(offset)
-      });
+      })
+    ]);
 
-      return {
-        success: true,
-        total: count,
-        commissions
-      };
-    } catch (error) {
-      console.error('[Referral Service] Get user commissions error:', error);
-      throw error;
+    return {
+      totalCreatorsReferred: totalCreatorsResult,
+      totalCommissionsEarned: totalCommissionsResult ? (totalCommissionsResult.total || '0.00') : '0.00',
+      commissionHistory: { total: count, items: rows }
+    };
+  }
+
+  /**
+   * Expire all active codes whose expiresAt has passed.
+   */
+  async processExpiredCodes() {
+    const now = new Date();
+    const expiredCodes = await ReferralCode.findAll({
+      where: {
+        status: 'active',
+        expiresAt: { [Op.lte]: now }
+      }
+    });
+
+    let expiredCount = 0;
+    const errors = [];
+
+    for (const code of expiredCodes) {
+      try {
+        await sequelize.transaction(async (t) => {
+          await code.update({ status: 'expired' }, { transaction: t });
+          await UserReferral.update(
+            { commissionActive: false },
+            { where: { referralCodeId: code.id }, transaction: t }
+          );
+        });
+        expiredCount++;
+      } catch (err) {
+        console.error(`[ReferralService] processExpiredCodes error for code ${code.id}:`, err.message);
+        errors.push({ codeId: code.id, error: err.message });
+      }
     }
+
+    return { expiredCount, errors };
   }
 }
 
