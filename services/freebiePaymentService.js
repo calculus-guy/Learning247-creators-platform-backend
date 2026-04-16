@@ -63,9 +63,20 @@ class FreebiePaymentService {
     }
 
     const originalPrice = parseFloat(freebie.price);
+    const baseCurrency = freebie.currency || 'NGN';
     let finalPrice = originalPrice;
     let couponId = null;
     let couponApplied = false;
+
+    // Convert price if buyer's currency differs from freebie's base currency
+    const CurrencyConversionService = require('./currencyConversionService');
+    const conversionService = new CurrencyConversionService();
+    let convertedPrice = originalPrice;
+    if (currency !== baseCurrency) {
+      convertedPrice = conversionService.convert(originalPrice, baseCurrency, currency);
+      console.log(`[FreebiePayment] Currency conversion: ${originalPrice} ${baseCurrency} → ${convertedPrice} ${currency}`);
+    }
+    finalPrice = convertedPrice;
 
     // Apply coupon if provided
     if (couponCode) {
@@ -74,7 +85,7 @@ class FreebiePaymentService {
         'freebie',
         freebieId,
         userId,
-        currency
+        currency  // pass buyer's currency so coupon calculates discount in correct currency
       );
 
       if (!validation.valid) {
@@ -90,16 +101,16 @@ class FreebiePaymentService {
         throw err;
       }
 
-      finalPrice = validation.finalPrice;
+      finalPrice = validation.finalPrice; // already in buyer's currency from couponService
       couponId = validation.coupon.id;
       couponApplied = true;
     }
 
     // Route to correct gateway
     if (currency === 'NGN') {
-      return await this._initiatePaystack({ freebieId, userId, userEmail, originalPrice, finalPrice, currency, couponId, couponApplied });
+      return await this._initiatePaystack({ freebieId, userId, userEmail, originalPrice: convertedPrice, finalPrice, currency, couponId, couponApplied });
     } else if (currency === 'USD') {
-      return await this._initiateStripe({ freebieId, userId, userEmail, originalPrice, finalPrice, currency, couponId, couponApplied });
+      return await this._initiateStripe({ freebieId, userId, userEmail, originalPrice: convertedPrice, finalPrice, currency, couponId, couponApplied });
     } else {
       const err = new Error('Unsupported currency. Use NGN or USD');
       err.statusCode = 400;
