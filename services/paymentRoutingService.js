@@ -114,6 +114,11 @@ class PaymentRoutingService {
         throw new Error(`${contentType} not found`);
       }
 
+      // For freebies: prevent creator from buying their own content
+      if (contentType === 'freebie' && contentDetails.userId === userId) {
+        throw new Error('You cannot purchase your own freebie');
+      }
+
       // Determine currency and price for courses
       let currency, amount, couponValidation = null;
       if (contentType === 'course') {
@@ -1008,6 +1013,18 @@ class PaymentRoutingService {
    * Validate no duplicate purchase exists
    */
   async validateNoDuplicatePurchase(userId, contentType, contentId) {
+    // For freebies, check FreebieAccess table
+    if (contentType === 'freebie') {
+      const { FreebieAccess } = require('../models/freebieIndex');
+      const existingAccess = await FreebieAccess.findOne({
+        where: { userId, freebieId: contentId }
+      });
+      if (existingAccess) {
+        throw new Error('You have already purchased this content');
+      }
+      return;
+    }
+
     const existingPurchase = await Purchase.findOne({
       where: {
         userId,
