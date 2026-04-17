@@ -142,11 +142,11 @@ class ReferralService {
       attributes: {
         include: [
           [
-            literal(`(SELECT COUNT(*) FROM user_referrals WHERE user_referrals.referral_code_id = "ReferralCode"."id")`),
+            literal(`(SELECT COUNT(*) FROM user_referrals WHERE user_referrals.referral_code_id = "referral_codes"."id")`),
             'totalLinkedCreators'
           ],
           [
-            literal(`(SELECT COALESCE(SUM(rc.commission_amount), 0) FROM referral_commissions rc WHERE rc.referral_code = "ReferralCode"."referral_code")`),
+            literal(`(SELECT COALESCE(SUM(rc.commission_amount), 0) FROM referral_commissions rc WHERE rc.referral_code = "referral_codes"."referral_code")`),
             'totalCommissionsPaid'
           ]
         ]
@@ -195,7 +195,9 @@ class ReferralService {
    * Get commission history for a partner with optional filters.
    */
   async getPartnerCommissions(partnerUserId, { currency, startDate, endDate, limit = 20, offset = 0 } = {}) {
-    const where = { referrerUserId: partnerUserId };
+    // partnerUserId is optional for admin — if not provided, return all commissions
+    const where = {};
+    if (partnerUserId) where.referrerUserId = parseInt(partnerUserId);
     if (currency) where.currency = currency;
     if (startDate || endDate) {
       where.createdAt = {};

@@ -37,9 +37,10 @@ const ReferralCode = sequelize.define('ReferralCode', {
     field: 'expires_at'
   },
   status: {
-    type: DataTypes.ENUM('active', 'inactive', 'expired'),
+    type: DataTypes.STRING(10),
     allowNull: false,
-    defaultValue: 'active'
+    defaultValue: 'active',
+    validate: { isIn: [['active', 'inactive', 'expired']] }
   },
   createdBy: {
     type: DataTypes.INTEGER,
