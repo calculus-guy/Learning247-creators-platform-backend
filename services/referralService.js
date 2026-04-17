@@ -142,11 +142,11 @@ class ReferralService {
       attributes: {
         include: [
           [
-            literal(`(SELECT COUNT(*) FROM user_referrals WHERE user_referrals.referral_code_id = "referral_codes"."id")`),
+            literal(`(SELECT COUNT(*) FROM user_referrals WHERE user_referrals.referral_code_id = "ReferralCode"."id")`),
             'totalLinkedCreators'
           ],
           [
-            literal(`(SELECT COALESCE(SUM(rc.commission_amount), 0) FROM referral_commissions rc WHERE rc.referral_code = "referral_codes"."referral_code")`),
+            literal(`(SELECT COALESCE(SUM(rc.commission_amount), 0) FROM referral_commissions rc WHERE rc.referral_code = "ReferralCode"."referral_code")`),
             'totalCommissionsPaid'
           ]
         ]
