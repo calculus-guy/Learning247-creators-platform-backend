@@ -83,8 +83,8 @@ const ReferralCode = sequelize.define('ReferralCode', {
 });
 
 ReferralCode.associate = (models) => {
-  ReferralCode.belongsTo(models.User, { foreignKey: 'partnerUserId', as: 'partner' });
-  ReferralCode.belongsTo(models.User, { foreignKey: 'createdBy', as: 'createdByUser' });
+  ReferralCode.belongsTo(models.User, { foreignKey: 'partnerUserId', as: 'partner', constraints: false });
+  ReferralCode.belongsTo(models.User, { foreignKey: 'createdBy', as: 'createdByUser', constraints: false });
   ReferralCode.hasMany(models.UserReferral, { foreignKey: 'referralCodeId', as: 'userReferrals' });
   ReferralCode.hasMany(models.ReferralCommission, {
     foreignKey: 'referralCode',
