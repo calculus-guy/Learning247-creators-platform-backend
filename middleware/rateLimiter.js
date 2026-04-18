@@ -3,7 +3,7 @@ const { ipKeyGenerator } = require('express-rate-limit');
 
 module.exports = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 100,
+  max: 1000,
   message: { success: false, message: 'Too many requests, please try again later.' },
   keyGenerator: (req) => {
     const ip = req.ip || req.headers['x-forwarded-for']?.split(',')[0].trim() || '127.0.0.1';
