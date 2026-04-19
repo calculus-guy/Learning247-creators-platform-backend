@@ -90,7 +90,7 @@ const { ipKeyGenerator } = require('express-rate-limit');
 // Global rate limit - per real IP
 const globalRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 2000,
+  max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
@@ -104,7 +104,7 @@ app.use(globalRateLimit);
 // Auth endpoints - per real IP
 const authRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 2000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many authentication attempts, please try again later.' },
@@ -117,7 +117,7 @@ const authRateLimiter = rateLimit({
 // Financial endpoints - per real IP
 const financialRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 600,
+  max: 6000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many financial requests, please try again later.' },
