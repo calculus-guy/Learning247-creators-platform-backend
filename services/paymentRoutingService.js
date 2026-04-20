@@ -754,21 +754,39 @@ class PaymentRoutingService {
         });
       }
 
+      // Resolve referral commission upfront (before crediting creator) so we can
+      // deduct it from creator earnings at source. Skip if a coupon partner already applies.
+      let referralInfo = null;
+      if (!couponPartnerUserId) {
+        referralInfo = await this._resolveReferralCommission({
+          buyerUserId: userId,
+          purchaseId: purchase.id,
+          amount
+        });
+      }
+
       // Get content creator and credit their multi-currency wallet (skip for courses)
-      if (contentType !== 'special_course') {        const creatorId = await this.getContentCreatorId(contentType, contentId);
+      if (contentType !== 'special_course') {
+        const creatorId = await this.getContentCreatorId(contentType, contentId);
         
         if (creatorId) {
           try {
-            // Determine creator earnings based on coupon
+            // Determine creator earnings:
+            // 1. Deduct coupon partner commission if applicable
+            // 2. Deduct referral commission if applicable (Option A: deducted at source)
             let creatorEarnings = amount;
-            
-            // If partner coupon was used, creator gets: finalPrice - partnerCommission
+
             if (partnerCommission) {
               creatorEarnings = amount - partnerCommission;
-              console.log(`[Payment Routing] Partner coupon applied: Creator earnings = ${amount} - ${partnerCommission} = ${creatorEarnings} ${currency}`);
+              console.log(`[Payment Routing] Coupon commission applied: Creator earnings = ${amount} - ${partnerCommission} = ${creatorEarnings} ${currency}`);
+            }
+
+            if (referralInfo) {
+              creatorEarnings = creatorEarnings - referralInfo.commissionAmount;
+              console.log(`[Payment Routing] Referral commission applied: Creator earnings reduced by ${referralInfo.commissionAmount} ${currency} → ${creatorEarnings} ${currency}`);
             }
             
-            // Credit creator's wallet in the appropriate currency
+            // Credit creator's wallet with earnings after all commissions
             await this.walletService.creditWallet({
               userId: creatorId,
               currency,
@@ -781,13 +799,14 @@ class PaymentRoutingService {
                 contentType,
                 contentId,
                 gateway,
-                couponApplied: couponId ? true : false
+                couponApplied: couponId ? true : false,
+                referralCommissionDeducted: referralInfo ? referralInfo.commissionAmount : 0
               }
             });
 
             console.log(`[Payment Routing] Credited ${creatorEarnings} ${currency} to creator ${creatorId}'s wallet`);
             
-            // Credit partner commission if applicable
+            // Credit coupon partner commission if applicable
             if (partnerCommission && couponPartnerUserId) {
               try {
                 await this.walletService.creditWallet({
@@ -805,11 +824,48 @@ class PaymentRoutingService {
                     creatorId
                   }
                 });
-                
-                console.log(`[Payment Routing] Credited ${partnerCommission} ${currency} partner commission to user ${couponPartnerUserId}`);
+                console.log(`[Payment Routing] Credited ${partnerCommission} ${currency} coupon partner commission to user ${couponPartnerUserId}`);
               } catch (partnerError) {
-                console.error(`[Payment Routing] Failed to credit partner commission:`, partnerError.message);
-                // Don't throw - purchase should succeed even if partner credit fails
+                console.error(`[Payment Routing] Failed to credit coupon partner commission:`, partnerError.message);
+              }
+            }
+
+            // Credit referral partner commission if applicable
+            if (referralInfo) {
+              try {
+                const User = require('../models/User');
+                const buyer = await User.findByPk(userId, { attributes: ['firstname', 'lastname'] });
+                await this.walletService.creditWallet({
+                  userId: referralInfo.partnerUserId,
+                  currency,
+                  amount: referralInfo.commissionAmount,
+                  reference: `REFERRAL-${purchase.id}`,
+                  description: `Referral commission - ${buyer ? buyer.firstname + ' ' + buyer.lastname : userId}`,
+                  metadata: {
+                    purchaseId: purchase.id,
+                    creatorUserId: userId,
+                    contentType,
+                    contentId,
+                    creatorId
+                  }
+                });
+                console.log(`[Payment Routing] Credited ${referralInfo.commissionAmount} ${currency} referral commission to partner ${referralInfo.partnerUserId}`);
+
+                // Record the commission
+                await this._recordReferralCommission({
+                  buyerUserId: userId,
+                  purchaseId: purchase.id,
+                  amount,
+                  currency,
+                  contentType,
+                  contentId,
+                  commissionAmount: referralInfo.commissionAmount,
+                  commissionPercent: referralInfo.commissionPercent,
+                  partnerUserId: referralInfo.partnerUserId,
+                  userReferral: referralInfo.userReferral
+                });
+              } catch (referralError) {
+                console.error(`[Payment Routing] Failed to credit referral commission:`, referralError.message);
               }
             }
           } catch (walletError) {
@@ -823,13 +879,10 @@ class PaymentRoutingService {
                 const { getOrCreateWallet } = require('./walletService');
                 await getOrCreateWallet(creatorId, currency);
                 
-                // Determine creator earnings based on coupon type
                 let creatorEarnings = amount;
-                if (partnerCommission) {
-                  creatorEarnings = originalPrice * 0.80;
-                }
+                if (partnerCommission) creatorEarnings = amount - partnerCommission;
+                if (referralInfo) creatorEarnings = creatorEarnings - referralInfo.commissionAmount;
                 
-                // Retry crediting wallet
                 await this.walletService.creditWallet({
                   userId: creatorId,
                   currency,
@@ -849,30 +902,14 @@ class PaymentRoutingService {
                 console.log(`[Payment Routing] ✅ Wallet created and credited ${creatorEarnings} ${currency} to creator ${creatorId}`);
               } catch (retryError) {
                 console.error(`[Payment Routing] ❌ Failed to create wallet and credit creator ${creatorId}:`, retryError.message);
-                // Don't throw - purchase should succeed even if wallet credit fails
-                // Creator can be manually credited later
               }
             } else {
-              // Other wallet errors - log but don't fail the purchase
               console.error(`[Payment Routing] ❌ Wallet credit error (non-critical):`, walletError);
             }
           }
         }
       } else {
         console.log(`[Payment Routing] Course purchase - no individual creator to credit`);
-      }
-
-      // Create referral commission if applicable (new partner referral system)
-      // Priority rule: skip if a partner coupon was applied on this purchase
-      if (!couponPartnerUserId) {
-        await this._processReferralCommission({
-          buyerUserId: userId,
-          purchaseId: purchase.id,
-          amount,
-          currency,
-          contentType,
-          contentId
-        });
       }
 
       await transaction.commit();
@@ -1045,56 +1082,57 @@ class PaymentRoutingService {
    * Process referral commission for a successful purchase.
    * Never throws — errors are caught and logged so the purchase is never rolled back.
    */
-  async _processReferralCommission({ buyerUserId, purchaseId, amount, currency, contentType, contentId }) {
+  /**
+   * Resolve referral commission details for a purchase WITHOUT doing any wallet ops.
+   * Returns { commissionAmount, commissionPercent, partnerUserId, userReferral } or null.
+   * Never throws.
+   */
+  async _resolveReferralCommission({ buyerUserId, purchaseId, amount }) {
     try {
       const UserReferral = require('../models/UserReferral');
       const ReferralCode = require('../models/ReferralCode');
       const ReferralCommission = require('../models/ReferralCommission');
-      const User = require('../models/User');
 
-      // Step 1: Idempotency — skip if commission already recorded for this purchase
+      // Idempotency — already recorded
       const existing = await ReferralCommission.findOne({ where: { purchaseId } });
-      if (existing) return;
+      if (existing) return null;
 
-      // Step 2: Load UserReferral for the buyer
+      // Load UserReferral for the buyer (the referred creator)
       const userReferral = await UserReferral.findOne({
         where: { creatorUserId: buyerUserId, commissionActive: true }
       });
-      if (!userReferral) return;
+      if (!userReferral) return null;
 
-      // Step 3: Check code expiry
+      // Check code is still active and not expired
       const referralCode = await ReferralCode.findByPk(userReferral.referralCodeId);
-      if (!referralCode || new Date(referralCode.expiresAt) <= new Date()) return;
+      if (!referralCode || new Date(referralCode.expiresAt) <= new Date()) return null;
 
-      // Step 4: Calculate commission
       const commissionPercent = parseFloat(referralCode.commissionPercent);
       const commissionAmount = Math.round((commissionPercent / 100) * amount * 100) / 100;
 
-      // Step 5: Credit partner wallet
-      const creator = await User.findByPk(buyerUserId, { attributes: ['firstname', 'lastname'] });
-      await this.walletService.creditWallet({
-        userId: userReferral.partnerUserId,
-        currency,
-        amount: commissionAmount,
-        reference: `REFERRAL-${purchaseId}`,
-        description: `Referral commission - ${creator.firstname} ${creator.lastname}`,
-        metadata: { purchaseId, creatorUserId: buyerUserId, contentType, contentId }
-      });
+      return {
+        commissionAmount,
+        commissionPercent,
+        partnerUserId: userReferral.partnerUserId,
+        userReferral,
+        referralCode
+      };
+    } catch (err) {
+      console.error('[PaymentRouting] _resolveReferralCommission error (non-critical):', err.message);
+      return null;
+    }
+  }
 
-      // Step 5b: Debit commission from creator wallet
-      await this.walletService.debitWallet({
-        userId: buyerUserId,
-        currency,
-        amount: commissionAmount,
-        reference: `REFERRAL-DEBIT-${purchaseId}`,
-        description: `Referral commission deducted - ${referralCode.label}`,
-        metadata: { purchaseId, partnerUserId: userReferral.partnerUserId }
-      });
-
-      // Step 6: Create commission record
+  /**
+   * Record the referral commission after wallets have been credited/debited.
+   * Never throws.
+   */
+  async _recordReferralCommission({ buyerUserId, purchaseId, amount, currency, contentType, contentId, commissionAmount, commissionPercent, partnerUserId, userReferral }) {
+    try {
+      const ReferralCommission = require('../models/ReferralCommission');
       await ReferralCommission.create({
         referralCode: userReferral.referralCode,
-        referrerUserId: userReferral.partnerUserId,
+        referrerUserId: partnerUserId,
         refereeUserId: buyerUserId,
         purchaseId,
         commissionAmount,
@@ -1105,10 +1143,9 @@ class PaymentRoutingService {
         contentId: contentId || null,
         purchasedAt: new Date()
       });
-
-      console.log(`[PaymentRouting] Referral commission: ${commissionAmount} ${currency} credited to partner ${userReferral.partnerUserId}`);
+      console.log(`[PaymentRouting] Referral commission recorded: ${commissionAmount} ${currency} to partner ${partnerUserId}`);
     } catch (err) {
-      console.error('[PaymentRouting] Referral commission error (non-critical):', err.message);
+      console.error('[PaymentRouting] _recordReferralCommission error (non-critical):', err.message);
     }
   }
 }
