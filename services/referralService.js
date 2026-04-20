@@ -239,6 +239,9 @@ class ReferralService {
         signedUpAt: now,
         commissionActive: true
       });
+
+      // Increment successful_referrals counter on the code
+      await code.increment('successfulReferrals');
     } catch (err) {
       // Unique constraint violation (creator already linked) — silent
       if (err.name === 'SequelizeUniqueConstraintError') return;

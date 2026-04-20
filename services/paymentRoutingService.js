@@ -1130,6 +1130,8 @@ class PaymentRoutingService {
   async _recordReferralCommission({ buyerUserId, purchaseId, amount, currency, contentType, contentId, commissionAmount, commissionPercent, partnerUserId, userReferral }) {
     try {
       const ReferralCommission = require('../models/ReferralCommission');
+      const ReferralCode = require('../models/ReferralCode');
+
       await ReferralCommission.create({
         referralCode: userReferral.referralCode,
         referrerUserId: partnerUserId,
@@ -1143,6 +1145,13 @@ class PaymentRoutingService {
         contentId: contentId || null,
         purchasedAt: new Date()
       });
+
+      // Keep total_earnings on the referral_codes row in sync
+      await ReferralCode.increment('totalEarnings', {
+        by: commissionAmount,
+        where: { id: userReferral.referralCodeId }
+      });
+
       console.log(`[PaymentRouting] Referral commission recorded: ${commissionAmount} ${currency} to partner ${partnerUserId}`);
     } catch (err) {
       console.error('[PaymentRouting] _recordReferralCommission error (non-critical):', err.message);
