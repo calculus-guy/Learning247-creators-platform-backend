@@ -13,7 +13,7 @@ const Purchase = sequelize.define('Purchase', {
     field: 'user_id'
   },
   contentType: {
-    type: DataTypes.ENUM('video', 'live_class', 'live_series', 'course'),
+    type: DataTypes.ENUM('video', 'live_class', 'live_series', 'course', 'freebie'),
     allowNull: false,
     field: 'content_type'
   },
