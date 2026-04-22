@@ -184,7 +184,7 @@ class FreebiePaymentService {
         originalPrice: originalPrice ? originalPrice.toString() : '',
         discountAmount: couponApplied ? (originalPrice - finalPrice).toString() : ''
       },
-      success_url: `${process.env.CLIENT_URL}/payments/verify?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${process.env.CLIENT_URL}/payments/verify?session_id={CHECKOUT_SESSION_ID}&contentType=freebie&contentId=${freebieId}`,
       cancel_url: `${process.env.CLIENT_URL}/payments/verify?cancelled=true`
     });
 

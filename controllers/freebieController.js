@@ -259,6 +259,14 @@ exports.getFreebieById = async (req, res) => {
 
     if (!freebie) return res.status(404).json({ success: false, message: 'Freebie not found' });
 
+    // Check if the authenticated user has already purchased this freebie
+    let purchased = false;
+    const userId = req.user?.id;
+    if (userId && parseFloat(freebie.price) > 0) {
+      const access = await FreebieAccess.findOne({ where: { userId, freebieId: freebie.id } });
+      purchased = !!access;
+    }
+
     return res.status(200).json({
       success: true,
       freebie: {
@@ -273,6 +281,7 @@ exports.getFreebieById = async (req, res) => {
         creatorName: `${freebie.creator.firstname} ${freebie.creator.lastname}`,
         creatorId: freebie.creator.id,
         createdAt: freebie.createdAt,
+        purchased,
         items: freebie.items
       }
     });
