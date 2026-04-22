@@ -85,28 +85,9 @@ class PaymentRoutingService {
         };
       }
 
-      // Validate referral code if provided
+      // Referral tracking — new system links referrals at signup, not at payment time
+      // referralCode in metadata is kept for traceability only
       let referralValidation = null;
-      if (referralCode && contentType === 'live_series' && couponCode) {
-        const referralService = require('./referralService');
-        referralValidation = await referralService.validateReferral(
-          referralCode,
-          userId,
-          contentId,
-          couponCode
-        );
-
-        if (!referralValidation.valid) {
-          console.log(`[Payment Routing] Invalid referral: ${referralValidation.reason}`);
-          // Don't throw error - just log and continue without referral
-          referralValidation = null;
-        } else {
-          console.log(`[Payment Routing] Valid referral code: ${referralCode}`);
-          // Store for later use after payment success
-          metadata.referralCode = referralCode;
-          metadata.referrerUserId = referralValidation.referrerUserId;
-        }
-      }
 
       // Get content details and determine currency
       const contentDetails = await this.getContentDetails(contentType, contentId);
