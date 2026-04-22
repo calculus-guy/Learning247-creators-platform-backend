@@ -110,6 +110,13 @@ class FreebiePaymentService {
     if (currency === 'NGN') {
       return await this._initiatePaystack({ freebieId, userId, userEmail, originalPrice: convertedPrice, finalPrice, currency, couponId, couponApplied });
     } else if (currency === 'USD') {
+      // Stripe minimum charge is $0.50 USD
+      const STRIPE_MIN_USD = 0.50;
+      if (finalPrice < STRIPE_MIN_USD) {
+        const err = new Error(`The minimum purchase amount for USD is $${STRIPE_MIN_USD}. This item's converted price ($${finalPrice.toFixed(2)}) is below the minimum. Please purchase in NGN instead.`);
+        err.statusCode = 400;
+        throw err;
+      }
       return await this._initiateStripe({ freebieId, userId, userEmail, originalPrice: convertedPrice, finalPrice, currency, couponId, couponApplied });
     } else {
       const err = new Error('Unsupported currency. Use NGN or USD');
