@@ -34,6 +34,8 @@ const quizRoutes = require('./routes/quizRoutes');
 const freebieRoutes = require('./routes/freebieRoutes');
 const couponRoutes = require('./routes/couponRoutes');
 const adminCouponRoutes = require('./routes/adminCouponRoutes');
+const communityRoutes = require('./routes/communityRoutes');
+const adminCommunityRoutes = require('./routes/adminCommunityRoutes');
 const rateLimiter = require('./middleware/rateLimiter');
 const sequelize = require('./config/db');
 const LiveClassCleanupService = require('./services/liveClassCleanupService');
@@ -53,6 +55,7 @@ require('./models/referralIndex');
 require('./models/quizIndex');
 require('./models/freebieIndex');
 require('./models/couponIndex');
+require('./models/communityIndex');
 
 const app = express();
 
@@ -167,6 +170,8 @@ app.use('/api/quiz', quizRoutes);
 app.use('/api/freebies', freebieRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/admin/coupons', adminCouponRoutes);
+app.use('/api/communities', communityRoutes);
+app.use('/api/admin/communities', adminCommunityRoutes);
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes); 

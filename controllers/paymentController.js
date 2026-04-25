@@ -58,7 +58,8 @@ exports.initializeCheckout = async (req, res) => {
       idempotencyKey,
       forceCurrency,
       couponCode,
-      referralCode
+      referralCode,
+      metadata: req.body.communityId ? { communityId: req.body.communityId } : {}
     });
 
     return res.status(200).json({

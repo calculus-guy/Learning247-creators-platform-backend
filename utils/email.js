@@ -1050,3 +1050,151 @@ exports.sendFreebieNewContentEmail = async (to, buyerFirstname, freebieTitle, ne
     html,
   });
 };
+
+
+/**
+ * COMMUNITY STATUS EMAIL (rejection / suspension)
+ */
+exports.sendCommunityStatusEmail = async (to, firstname, communityName, status) => {
+  const isRejected = status === 'rejected';
+  const subject = isRejected
+    ? `Your community "${communityName}" was not approved`
+    : `Your community "${communityName}" has been suspended`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>${isRejected ? 'Community Not Approved' : 'Community Suspended'}</h2>
+      <p>Hi ${firstname},</p>
+      <p>Your community <strong>${communityName}</strong> has been <strong>${status}</strong> by the hallos platform team.</p>
+      <p>If you believe this is an error, please contact our support team.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
+    to, subject, html
+  });
+};
+
+/**
+ * COMMUNITY JOIN CONFIRMATION EMAIL
+ */
+exports.sendCommunityJoinConfirmationEmail = async (to, firstname, communityName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Welcome to ${communityName}! 🎉</h2>
+      <p>Hi ${firstname},</p>
+      <p>Your request to join <strong>${communityName}</strong> has been approved. You now have full access to the community.</p>
+      <p>Visit <a href="https://www.hallos.net">hallos</a> to get started.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `You've been approved to join ${communityName}`,
+    html
+  });
+};
+
+/**
+ * COMMUNITY INVITE EMAIL (for non-registered users)
+ */
+exports.sendCommunityInviteEmail = async (to, communityName, inviteToken) => {
+  const inviteUrl = `${process.env.CLIENT_URL || 'https://www.hallos.net'}/communities/invite/${inviteToken}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>You've been invited to join ${communityName} on hallos!</h2>
+      <p>You've been invited to join the <strong>${communityName}</strong> community on hallos.</p>
+      <p>Click the link below to create your account and join:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${inviteUrl}" style="background-color: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+          Join ${communityName}
+        </a>
+      </div>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `You're invited to join ${communityName} on hallos`,
+    html
+  });
+};
+
+/**
+ * COMMUNITY ANNOUNCEMENT EMAIL
+ */
+exports.sendCommunityAnnouncementEmail = async (to, firstname, communityName, title, body) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>New Announcement in ${communityName}</h2>
+      <p>Hi ${firstname},</p>
+      <p><strong>${title}</strong></p>
+      <p>${body}</p>
+      <p>Visit <a href="https://www.hallos.net">hallos</a> to view the full announcement.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Communities" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `[${communityName}] ${title}`,
+    html
+  });
+};
+
+/**
+ * COMMUNITY OWNERSHIP TRANSFER EMAIL
+ */
+exports.sendCommunityOwnershipTransferEmail = async (to, firstname, communityName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>You are now the owner of ${communityName}</h2>
+      <p>Hi ${firstname},</p>
+      <p>You have been assigned as the new owner of <strong>${communityName}</strong> on hallos.</p>
+      <p>Visit <a href="https://www.hallos.net">hallos</a> to manage your community.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Team" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `You are now the owner of ${communityName}`,
+    html
+  });
+};
+
+/**
+ * COMMUNITY OWNERLESS NOTIFICATION (to platform admin)
+ */
+exports.sendCommunityOwnerlessEmail = async (to, adminName, communityName) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>Community Requires New Owner</h2>
+      <p>Hi ${adminName},</p>
+      <p>The community <strong>${communityName}</strong> no longer has an owner. The community status has been set to <strong>pending</strong>.</p>
+      <p>Please assign a new owner via the admin dashboard.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Admin" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Action Required: ${communityName} needs a new owner`,
+    html
+  });
+};
