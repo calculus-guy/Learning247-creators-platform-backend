@@ -1,4 +1,4 @@
-const sequelize = require('./config/db');
+const sequelize = require('../config/db');
 
 async function setupCommunity() {
   try {
