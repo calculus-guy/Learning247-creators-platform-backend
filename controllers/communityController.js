@@ -236,8 +236,14 @@ exports.updateCommunity = async (req, res) => {
           console.error('[Community] Failed to delete old poster from S3:', e.message)
         );
       }
-      const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
-      thumbnailUrl = result.url;
+      if (posterFile.location) {
+        // multer-s3: already uploaded, just use the URL
+        thumbnailUrl = posterFile.location;
+      } else if (posterFile.buffer) {
+        // memory storage: upload manually
+        const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
+        thumbnailUrl = result.url;
+      }
     }
 
     await community.update({ ...req.body, thumbnailUrl });

@@ -44,9 +44,15 @@ exports.createCommunity = async (userId, data, posterFile = null) => {
 
   let thumbnailUrl = null;
   if (posterFile) {
-    const { uploadFileToS3 } = require('../services/s3Service');
-    const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
-    thumbnailUrl = result.url;
+    if (posterFile.location) {
+      // multer-s3: already uploaded to S3, just use the URL
+      thumbnailUrl = posterFile.location;
+    } else if (posterFile.buffer) {
+      // memory storage: upload manually
+      const { uploadFileToS3 } = require('../services/s3Service');
+      const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
+      thumbnailUrl = result.url;
+    }
   }
 
   const t = await sequelize.transaction();
