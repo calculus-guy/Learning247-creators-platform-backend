@@ -22,8 +22,8 @@ exports.listCommunities = async (req, res) => {
 exports.getCommunity = async (req, res) => {
   try {
     const isAdmin = req.user && req.user.role === 'admin';
-    const result = await communityService.getCommunityProfile(req.params.id, req.user && req.user.id, isAdmin);
-    res.json({ success: true, data: result });
+    const { community, isMember, publicContent } = await communityService.getCommunityProfile(req.params.id, req.user && req.user.id, isAdmin);
+    res.json({ success: true, data: { ...community.toJSON(), isMember, publicContent } });
   } catch (err) { handleError(res, err); }
 };
 
