@@ -187,13 +187,13 @@ exports.getCommunityProfile = async (communityId, requestingUserId, isAdmin = fa
     throw makeError('Community not found.', 404);
   }
 
-  // Fetch public content for non-members
-  const publicContentWhere = { communityId, communityVisibility: 'public' };
+  // Fetch content — members see all, non-members see public only
+  const contentWhere = isMember ? { communityId } : { communityId, communityVisibility: 'public' };
   const [videos, liveClasses, liveSeries, freebies] = await Promise.all([
-    Video.findAll({ where: publicContentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
-    LiveClass.findAll({ where: publicContentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
-    LiveSeries.findAll({ where: publicContentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
-    Freebie.findAll({ where: publicContentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] })
+    Video.findAll({ where: contentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
+    LiveClass.findAll({ where: contentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
+    LiveSeries.findAll({ where: contentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] }),
+    Freebie.findAll({ where: contentWhere, attributes: ['id', 'title', 'thumbnailUrl', 'price', 'currency'] })
   ]);
 
   return {
@@ -440,11 +440,10 @@ exports.deleteAnnouncement = async (communityId, announcementId, actorId) => {
 // ---------------------------------------------------------------------------
 
 exports.submitContent = async (communityId, userId, data) => {
-  const { contentType, contentData, communityVisibility } = data;
+  const { contentType, contentData } = data;
   return CommunityContentSubmission.create({
     communityId, submittedBy: userId, contentType,
-    contentData, status: 'pending',
-    communityVisibility: communityVisibility || 'community_only'
+    contentData, status: 'pending'
   });
 };
 
@@ -462,8 +461,7 @@ exports.approveSubmission = async (submissionId, actorId) => {
   try {
     await Model.create({
       ...submission.contentData,
-      communityId: submission.communityId,
-      communityVisibility: submission.communityVisibility
+      communityId: submission.communityId
     }, { transaction: t });
 
     await submission.update({
@@ -513,11 +511,7 @@ exports.createContentDirect = async (communityId, actorId, contentType, data) =>
   const Model = CONTENT_MODEL_MAP[contentType];
   if (!Model) throw makeError('Unknown content type.', 400);
 
-  return Model.create({
-    ...data,
-    communityId,
-    communityVisibility: data.communityVisibility || 'community_only'
-  });
+  return Model.create({ ...data, communityId });
 };
 
 // ---------------------------------------------------------------------------
@@ -534,14 +528,9 @@ exports.listCommunityContent = async (communityId, requestingUserId, isAdmin = f
   }
 
   const where = { communityId };
-  const memberAttrs = null; // all attributes
-  const publicAttrs = ['id', 'title', 'thumbnailUrl', 'price', 'currency'];
+  if (!isMember) where.communityVisibility = 'public';
 
-  if (!isMember) {
-    where.communityVisibility = 'public';
-  }
-
-  const attrs = isMember ? memberAttrs : { include: publicAttrs };
+  const attrs = isMember ? null : ['id', 'title', 'thumbnailUrl', 'price', 'currency'];
   const opts = attrs ? { where, attributes: attrs } : { where };
 
   const [videos, liveClasses, liveSeries, freebies] = await Promise.all([

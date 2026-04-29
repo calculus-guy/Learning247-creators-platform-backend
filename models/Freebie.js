@@ -51,6 +51,16 @@ const Freebie = sequelize.define('Freebie', {
     type: DataTypes.ENUM('NGN', 'USD'),
     allowNull: false,
     defaultValue: 'NGN'
+  },
+  communityId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'community_id'
+  },
+  communityVisibility: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'community_visibility'
   }
 }, {
   tableName: 'freebies',

@@ -73,6 +73,16 @@ const LiveSeries = sequelize.define('LiveSeries', {
     allowNull: true,
     defaultValue: 200,
     field: 'max_participants'
+  },
+  communityId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'community_id'
+  },
+  communityVisibility: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'community_visibility'
   }
 }, {
   tableName: 'live_series',

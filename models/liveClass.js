@@ -54,6 +54,16 @@ const LiveClass = sequelize.define('LiveClass', {
       max: 1000
     }
   },
+  communityId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'community_id'
+  },
+  communityVisibility: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'community_visibility'
+  },
 
 }, {
   tableName: 'live_classes',

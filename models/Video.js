@@ -34,7 +34,17 @@ const Video = sequelize.define('Video', {
   status: { type: DataTypes.ENUM('uploading','processing','ready','failed'), defaultValue: 'uploading' },
   durationSeconds: { type: DataTypes.INTEGER, allowNull: true },
   sizeBytes: { type: DataTypes.BIGINT, allowNull: true },
-  viewsCount: { type: DataTypes.BIGINT, allowNull: false, defaultValue: 0 }
+  viewsCount: { type: DataTypes.BIGINT, allowNull: false, defaultValue: 0 },
+  communityId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    field: 'community_id'
+  },
+  communityVisibility: {
+    type: DataTypes.STRING(20),
+    allowNull: true,
+    field: 'community_visibility'
+  }
 }, {
   tableName: 'videos',
   timestamps: true,
