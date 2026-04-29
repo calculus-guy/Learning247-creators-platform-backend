@@ -5,13 +5,14 @@ const ctrl = require('../controllers/communityController');
 const authMiddleware = require('../middleware/authMiddleware');
 const communityMemberMiddleware = require('../middleware/communityMemberMiddleware');
 const communityModeratorMiddleware = require('../middleware/communityModeratorMiddleware');
+const { upload } = require('../utils/multerConfig');
 
 // ── Public (no auth required) ────────────────────────────────────────────────
 router.get('/', ctrl.listCommunities);
 router.get('/invite/:token', authMiddleware, ctrl.joinViaInvite);
 
 // ── Auth required (no membership check) ─────────────────────────────────────
-router.post('/', authMiddleware, ctrl.createCommunity);
+router.post('/', authMiddleware, upload.fields([{ name: 'poster', maxCount: 1 }]), ctrl.createCommunity);
 router.post('/:id/join', authMiddleware, ctrl.requestJoin);
 
 // ── Community profile (optional auth — handled inside service) ───────────────
@@ -42,7 +43,7 @@ router.post('/:id/join-requests/:uid/approve', authMiddleware, communityModerato
 router.post('/:id/join-requests/:uid/reject', authMiddleware, communityModeratorMiddleware, ctrl.rejectJoinRequest);
 
 // ── Owner routes (role enforced in service layer) ────────────────────────────
-router.patch('/:id', authMiddleware, communityMemberMiddleware, ctrl.updateCommunity);
+router.patch('/:id', authMiddleware, communityMemberMiddleware, upload.fields([{ name: 'poster', maxCount: 1 }]), ctrl.updateCommunity);
 router.patch('/:id/members/:uid/role', authMiddleware, communityMemberMiddleware, ctrl.updateMemberRole);
 router.delete('/:id', authMiddleware, communityMemberMiddleware, ctrl.deleteCommunity);
 router.post('/:id/transfer-ownership', authMiddleware, communityMemberMiddleware, ctrl.transferOwnership);

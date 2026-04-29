@@ -30,7 +30,8 @@ exports.getCommunity = async (req, res) => {
 // POST /api/communities
 exports.createCommunity = async (req, res) => {
   try {
-    const community = await communityService.createCommunity(req.user.id, req.body);
+    const posterFile = req.files?.poster?.[0] || null;
+    const community = await communityService.createCommunity(req.user.id, req.body, posterFile);
     res.status(201).json({ success: true, data: community });
   } catch (err) { handleError(res, err); }
 };
@@ -223,7 +224,23 @@ exports.updateCommunity = async (req, res) => {
   try {
     const community = await Community.findByPk(req.params.id);
     if (!community) return res.status(404).json({ success: false, message: 'Community not found.' });
-    await community.update(req.body);
+
+    const posterFile = req.files?.poster?.[0] || null;
+    let thumbnailUrl = community.thumbnailUrl;
+
+    if (posterFile) {
+      const { uploadFileToS3, deleteFileFromS3 } = require('../services/s3Service');
+      // Delete old poster from S3 if it exists
+      if (thumbnailUrl && thumbnailUrl.startsWith('https://')) {
+        deleteFileFromS3(thumbnailUrl).catch(e =>
+          console.error('[Community] Failed to delete old poster from S3:', e.message)
+        );
+      }
+      const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
+      thumbnailUrl = result.url;
+    }
+
+    await community.update({ ...req.body, thumbnailUrl });
     res.json({ success: true, data: community });
   } catch (err) { handleError(res, err); }
 };

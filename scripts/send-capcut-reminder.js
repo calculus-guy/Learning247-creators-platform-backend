@@ -1,8 +1,8 @@
 require('dotenv').config();
-const { LiveSession, LiveSeries } = require('./models/liveSeriesIndex');
-const Purchase = require('./models/Purchase');
-const User = require('./models/User');
-const { sendSessionReminderEmail } = require('./utils/email');
+const { LiveSession, LiveSeries } = require('../models/liveSeriesIndex');
+const Purchase = require('../models/Purchase');
+const User = require('../models/User');
+const { sendSessionReminderEmail } = require('../utils/email');
 const { Op } = require('sequelize');
 
 const SERIES_ID = 'f0e13348-6550-46df-88a0-66905d72a913';

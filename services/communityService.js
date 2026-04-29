@@ -38,9 +38,16 @@ const CONTENT_MODEL_MAP = {
 // 1. Community Creation
 // ---------------------------------------------------------------------------
 
-exports.createCommunity = async (userId, data) => {
+exports.createCommunity = async (userId, data, posterFile = null) => {
   const { name, description, type, visibility, joinPolicy } = data;
   const inviteToken = generateInviteToken();
+
+  let thumbnailUrl = null;
+  if (posterFile) {
+    const { uploadFileToS3 } = require('../services/s3Service');
+    const result = await uploadFileToS3(posterFile.buffer, posterFile.originalname, posterFile.mimetype, 'communities');
+    thumbnailUrl = result.url;
+  }
 
   const t = await sequelize.transaction();
   try {
@@ -53,7 +60,8 @@ exports.createCommunity = async (userId, data) => {
       status: 'pending',
       createdBy: userId,
       inviteToken,
-      memberCount: 1
+      memberCount: 1,
+      thumbnailUrl
     }, { transaction: t });
 
     await CommunityMember.create({
