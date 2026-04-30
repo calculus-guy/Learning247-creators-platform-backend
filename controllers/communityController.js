@@ -5,6 +5,13 @@ const User = require('../models/User');
 
 function handleError(res, err) {
   const status = err.statusCode || 500;
+  // Surface Sequelize validation errors clearly
+  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
+    return res.status(400).json({ success: false, message: err.errors.map(e => e.message).join(', ') });
+  }
+  if (err.name === 'SequelizeDatabaseError') {
+    return res.status(400).json({ success: false, message: err.message });
+  }
   return res.status(status).json({ success: false, message: err.message });
 }
 
@@ -94,7 +101,9 @@ exports.listAnnouncements = async (req, res) => {
 exports.listContent = async (req, res) => {
   try {
     const isAdmin = req.user && req.user.role === 'admin';
-    const content = await communityService.listCommunityContent(req.params.id, req.user && req.user.id, isAdmin);
+    // communityMemberMiddleware already confirmed membership — pass it directly
+    const isMember = isAdmin || !!req.communityMember;
+    const content = await communityService.listCommunityContent(req.params.id, req.user && req.user.id, isMember);
     res.json({ success: true, data: content });
   } catch (err) { handleError(res, err); }
 };

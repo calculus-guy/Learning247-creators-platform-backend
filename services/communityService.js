@@ -518,15 +518,7 @@ exports.createContentDirect = async (communityId, actorId, contentType, data) =>
 // 12. Community Content Listing
 // ---------------------------------------------------------------------------
 
-exports.listCommunityContent = async (communityId, requestingUserId, isAdmin = false) => {
-  let isMember = isAdmin;
-  if (!isMember && requestingUserId) {
-    const membership = await CommunityMember.findOne({
-      where: { communityId, userId: requestingUserId, status: 'active' }
-    });
-    isMember = !!membership;
-  }
-
+exports.listCommunityContent = async (communityId, requestingUserId, isMember = false) => {
   const where = { communityId };
   if (!isMember) where.communityVisibility = 'public';
 

@@ -544,7 +544,7 @@ class TransactionHistoryService {
    */
   async calculateSummary(filters, whereClause, replacements) {
     try {
-      const [summaryResult] = await sequelize.query(`
+      const summaryResult = await sequelize.query(`
         SELECT 
           ft.currency,
           ft.transaction_type as type,
