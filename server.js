@@ -239,7 +239,7 @@ function setupEmailScheduler() {
   console.log(`✅ Email scheduler started:`, status);
 }
 
-/**  
+/**   
  * Setup automated live class cleanup cron jobs
  */
 function setupLiveClassCleanup() {
