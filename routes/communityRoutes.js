@@ -13,6 +13,7 @@ router.get('/invite/:token', authMiddleware, ctrl.joinViaInvite);
 
 // ── Auth required (no membership check) ─────────────────────────────────────
 router.post('/', authMiddleware, upload.fields([{ name: 'poster', maxCount: 1 }]), ctrl.createCommunity);
+router.get('/my', authMiddleware, ctrl.getMyCommunities);
 router.post('/:id/join', authMiddleware, ctrl.requestJoin);
 
 // ── Community profile (optional auth — handled inside service) ───────────────

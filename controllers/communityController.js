@@ -25,6 +25,14 @@ exports.listCommunities = async (req, res) => {
   } catch (err) { handleError(res, err); }
 };
 
+// GET /api/communities/my
+exports.getMyCommunities = async (req, res) => {
+  try {
+    const communities = await communityService.getMyCommunities(req.user.id);
+    res.json({ success: true, data: communities });
+  } catch (err) { handleError(res, err); }
+};
+
 // GET /api/communities/:id
 exports.getCommunity = async (req, res) => {
   try {
