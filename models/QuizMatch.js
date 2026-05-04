@@ -46,7 +46,7 @@ const QuizMatch = sequelize.define('QuizMatch', {
     comment: 'Map of questionId to timestamp'
   },
   status: {
-    type: DataTypes.ENUM('pending', 'active', 'completed', 'cancelled'),
+    type: DataTypes.ENUM('pending', 'active', 'completed', 'cancelled', 'expired'),
     allowNull: false,
     defaultValue: 'pending'
   },
