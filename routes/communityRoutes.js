@@ -7,6 +7,19 @@ const communityMemberMiddleware = require('../middleware/communityMemberMiddlewa
 const communityModeratorMiddleware = require('../middleware/communityModeratorMiddleware');
 const { upload } = require('../utils/multerConfig');
 
+// Optional auth — sets req.user if token present, continues either way
+const optionalAuth = (req, res, next) => {
+  const jwt = require('jsonwebtoken');
+  let token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token && req.cookies && req.cookies.token) token = req.cookies.token;
+  if (token) {
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (_) { /* invalid token — treat as unauthenticated */ }
+  }
+  next();
+};
+
 // ── Public (no auth required) ────────────────────────────────────────────────
 router.get('/', ctrl.listCommunities);
 router.get('/invite/:token', authMiddleware, ctrl.joinViaInvite);
@@ -17,7 +30,7 @@ router.get('/my', authMiddleware, ctrl.getMyCommunities);
 router.post('/:id/join', authMiddleware, ctrl.requestJoin);
 
 // ── Community profile (optional auth — handled inside service) ───────────────
-router.get('/:id', ctrl.getCommunity);
+router.get('/:id', optionalAuth, ctrl.getCommunity);
 
 // ── Member routes ────────────────────────────────────────────────────────────
 router.delete('/:id/members/me', authMiddleware, communityMemberMiddleware, ctrl.leaveCommunity);
