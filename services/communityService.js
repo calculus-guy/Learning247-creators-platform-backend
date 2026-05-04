@@ -174,13 +174,20 @@ exports.getCommunityProfile = async (communityId, requestingUserId, isAdmin = fa
     throw makeError('This community is currently suspended.', 403);
   }
 
-  // Check membership for private communities
+  // Check membership status
   let isMember = isAdmin;
-  if (!isMember && requestingUserId) {
+  let membershipStatus = null; // null = not a member, 'pending', 'active', 'banned'
+
+  if (!isAdmin && requestingUserId) {
     const membership = await CommunityMember.findOne({
-      where: { communityId, userId: requestingUserId, status: 'active' }
+      where: { communityId, userId: requestingUserId }
     });
-    isMember = !!membership;
+    if (membership) {
+      membershipStatus = membership.status;
+      isMember = membership.status === 'active';
+    }
+  } else if (isAdmin) {
+    membershipStatus = 'active';
   }
 
   if (community.visibility === 'private' && !isMember) {
@@ -199,6 +206,7 @@ exports.getCommunityProfile = async (communityId, requestingUserId, isAdmin = fa
   return {
     community,
     isMember,
+    membershipStatus,
     publicContent: { videos, liveClasses, liveSeries, freebies }
   };
 };
