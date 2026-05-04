@@ -295,7 +295,7 @@ exports.transferOwnership = async (req, res) => {
 // POST /api/communities/:id/join-requests/:uid/approve
 exports.approveJoinRequest = async (req, res) => {
   try {
-    const member = await communityService.approveJoinRequest(req.params.id, parseInt(req.params.uid), req.user.id);
+    const member = await communityService.approveJoinRequest(req.params.id, req.params.uid, req.user.id);
     res.json({ success: true, data: member });
   } catch (err) { handleError(res, err); }
 };
@@ -303,7 +303,7 @@ exports.approveJoinRequest = async (req, res) => {
 // POST /api/communities/:id/join-requests/:uid/reject
 exports.rejectJoinRequest = async (req, res) => {
   try {
-    const member = await communityService.rejectJoinRequest(req.params.id, parseInt(req.params.uid), req.user.id);
+    const member = await communityService.rejectJoinRequest(req.params.id, req.params.uid, req.user.id);
     res.json({ success: true, data: member });
   } catch (err) { handleError(res, err); }
 };
