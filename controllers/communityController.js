@@ -28,8 +28,8 @@ exports.listCommunities = async (req, res) => {
 // GET /api/communities/my
 exports.getMyCommunities = async (req, res) => {
   try {
-    const communities = await communityService.getMyCommunities(req.user.id);
-    res.json({ success: true, data: communities });
+    const result = await communityService.getMyCommunities(req.user.id, req.query);
+    res.json({ success: true, data: result });
   } catch (err) { handleError(res, err); }
 };
 

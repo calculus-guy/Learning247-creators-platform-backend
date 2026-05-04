@@ -132,21 +132,34 @@ exports.suspendCommunity = async (communityId) => {
 // 3. Discovery
 // ---------------------------------------------------------------------------
 
-exports.getMyCommunities = async (userId) => {
-  const memberships = await CommunityMember.findAll({
+exports.getMyCommunities = async (userId, filters = {}) => {
+  const page = parseInt(filters.page) || 1;
+  const limit = parseInt(filters.limit) || 20;
+  const offset = (page - 1) * limit;
+
+  const { count, rows: memberships } = await CommunityMember.findAndCountAll({
     where: { userId },
     include: [{ model: Community, as: 'community' }],
-    order: [['joinedAt', 'DESC']]
+    order: [['joinedAt', 'DESC']],
+    limit,
+    offset
   });
 
-  return memberships
-    .filter(m => m.community) // guard against orphaned records
+  const communities = memberships
+    .filter(m => m.community)
     .map(m => ({
       ...m.community.toJSON(),
       membershipStatus: m.status,
       memberRole: m.role,
       joinedAt: m.joinedAt
     }));
+
+  return {
+    total: count,
+    page,
+    limit,
+    communities
+  };
 };
 
 exports.listPublicCommunities = async (filters = {}) => {
