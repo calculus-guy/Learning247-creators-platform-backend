@@ -220,7 +220,7 @@ exports.getCommunityProfile = async (communityId, requestingUserId, isAdmin = fa
     membershipStatus = 'active';
   }
 
-  if (community.visibility === 'private' && !isMember) {
+  if (community.visibility === 'private' && !isMember && membershipStatus !== 'pending') {
     throw makeError('Community not found.', 404);
   }
 
