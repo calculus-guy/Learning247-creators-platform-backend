@@ -347,12 +347,23 @@ exports.addMemberByEmail = async (communityId, email, actorId) => {
 };
 
 exports.removeMember = async (communityId, targetUserId, actorId) => {
-  const member = await CommunityMember.findOne({ where: { communityId, userId: targetUserId, status: 'active' } });
-  if (!member) throw makeError('Member not found.', 404);
+  const target = await CommunityMember.findOne({ where: { communityId, userId: targetUserId, status: 'active' } });
+  if (!target) throw makeError('Member not found.', 404);
+
+  // Owner cannot be removed — only via transferOwnership or ownerLeave
+  if (target.role === 'owner') throw makeError('The owner cannot be removed. Use transfer ownership instead.', 403);
+
+  // If actor is not removing themselves, check their rank
+  if (actorId !== targetUserId) {
+    const actor = await CommunityMember.findOne({ where: { communityId, userId: actorId, status: 'active' } });
+    if (actor && actor.role === 'moderator' && target.role === 'moderator') {
+      throw makeError('Moderators cannot remove other moderators.', 403);
+    }
+  }
 
   const t = await sequelize.transaction();
   try {
-    await member.destroy({ transaction: t });
+    await target.destroy({ transaction: t });
     await t.commit();
   } catch (err) {
     await t.rollback();
@@ -362,15 +373,29 @@ exports.removeMember = async (communityId, targetUserId, actorId) => {
 };
 
 exports.assignModerator = async (communityId, targetUserId, actorId) => {
+  // Only owner can assign moderators
+  const actor = await CommunityMember.findOne({ where: { communityId, userId: actorId, status: 'active' } });
+  if (!actor || actor.role !== 'owner') throw makeError('Only the owner can assign moderators.', 403);
+
   const member = await CommunityMember.findOne({ where: { communityId, userId: targetUserId, status: 'active' } });
   if (!member) throw makeError('Member not found.', 404);
+  if (member.role === 'owner') throw makeError('Cannot change the owner\'s role.', 403);
+  if (member.role === 'moderator') throw makeError('User is already a moderator.', 400);
+
   await member.update({ role: 'moderator' });
   return member;
 };
 
 exports.revokeModerator = async (communityId, targetUserId, actorId) => {
+  // Only owner can revoke moderators
+  const actor = await CommunityMember.findOne({ where: { communityId, userId: actorId, status: 'active' } });
+  if (!actor || actor.role !== 'owner') throw makeError('Only the owner can revoke moderators.', 403);
+
   const member = await CommunityMember.findOne({ where: { communityId, userId: targetUserId, status: 'active' } });
   if (!member) throw makeError('Member not found.', 404);
+  if (member.role === 'owner') throw makeError('Cannot change the owner\'s role.', 403);
+  if (member.role === 'member') throw makeError('User is already a regular member.', 400);
+
   await member.update({ role: 'member' });
   return member;
 };
