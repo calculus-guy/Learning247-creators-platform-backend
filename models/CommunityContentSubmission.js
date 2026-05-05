@@ -61,3 +61,10 @@ const CommunityContentSubmission = sequelize.define('CommunityContentSubmission'
 });
 
 module.exports = CommunityContentSubmission;
+
+CommunityContentSubmission.associate = (models) => {
+  CommunityContentSubmission.belongsTo(models.User, {
+    foreignKey: 'submittedBy',
+    as: 'submitter'
+  });
+};

@@ -38,6 +38,7 @@ router.patch('/:id/members/me/notifications', authMiddleware, communityMemberMid
 router.get('/:id/announcements', authMiddleware, communityMemberMiddleware, ctrl.listAnnouncements);
 router.get('/:id/content', authMiddleware, communityMemberMiddleware, ctrl.listContent);
 router.post('/:id/submissions', authMiddleware, communityMemberMiddleware, ctrl.submitContent);
+router.get('/:id/submissions/my', authMiddleware, communityMemberMiddleware, ctrl.listMySubmissions);
 router.patch('/:id/submissions/:sid/resubmit', authMiddleware, communityMemberMiddleware, ctrl.resubmitContent);
 
 // ── Moderator routes ─────────────────────────────────────────────────────────

@@ -159,15 +159,71 @@ exports.removeMember = async (req, res) => {
   } catch (err) { handleError(res, err); }
 };
 
-// GET /api/communities/:id/submissions
+// GET /api/communities/:id/submissions — moderator sees all pending/resubmitted (paginated)
 exports.listSubmissions = async (req, res) => {
   try {
     const CommunityContentSubmission = require('../models/CommunityContentSubmission');
-    const { Op } = require('sequelize');    const submissions = await CommunityContentSubmission.findAll({
-      where: { communityId: req.params.id, status: { [Op.in]: ['pending', 'resubmitted'] } },
-      order: [['createdAt', 'ASC']]
+    const { Op } = require('sequelize');
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const { count, rows } = await CommunityContentSubmission.findAndCountAll({
+      where: {
+        communityId: req.params.id,
+        status: { [Op.in]: ['pending', 'resubmitted'] }
+      },
+      include: [{
+        model: User,
+        as: 'submitter',
+        attributes: ['id', 'firstname', 'lastname', 'email']
+      }],
+      order: [['createdAt', 'ASC']],
+      limit,
+      offset
     });
-    res.json({ success: true, data: submissions });
+
+    res.json({
+      success: true,
+      data: {
+        total: count,
+        page,
+        limit,
+        submissions: rows
+      }
+    });
+  } catch (err) { handleError(res, err); }
+};
+
+// GET /api/communities/:id/submissions/my — member sees their own submissions
+exports.listMySubmissions = async (req, res) => {
+  try {
+    const CommunityContentSubmission = require('../models/CommunityContentSubmission');
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const { count, rows } = await CommunityContentSubmission.findAndCountAll({
+      where: {
+        communityId: req.params.id,
+        submittedBy: req.user.id
+      },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
+    });
+
+    res.json({
+      success: true,
+      data: {
+        total: count,
+        page,
+        limit,
+        submissions: rows
+      }
+    });
   } catch (err) { handleError(res, err); }
 };
 
