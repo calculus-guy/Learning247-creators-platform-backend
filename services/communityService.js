@@ -27,6 +27,10 @@ function generateInviteToken() {
   return crypto.randomBytes(32).toString('hex'); // 64-char hex
 }
 
+async function getLiveMemberCount(communityId) {
+  return CommunityMember.count({ where: { communityId, status: 'active' } });
+}
+
 const CONTENT_MODEL_MAP = {
   video: Video,
   live_class: LiveClass,
@@ -66,7 +70,6 @@ exports.createCommunity = async (userId, data, posterFile = null) => {
       status: 'pending',
       createdBy: userId,
       inviteToken,
-      memberCount: 1,
       thumbnailUrl
     }, { transaction: t });
 
@@ -145,14 +148,17 @@ exports.getMyCommunities = async (userId, filters = {}) => {
     offset
   });
 
-  const communities = memberships
-    .filter(m => m.community)
-    .map(m => ({
-      ...m.community.toJSON(),
-      membershipStatus: m.status,
-      memberRole: m.role,
-      joinedAt: m.joinedAt
-    }));
+  const communities = await Promise.all(
+    memberships
+      .filter(m => m.community)
+      .map(async (m) => ({
+        ...m.community.toJSON(),
+        memberCount: await getLiveMemberCount(m.community.id),
+        membershipStatus: m.status,
+        memberRole: m.role,
+        joinedAt: m.joinedAt
+      }))
+  );
 
   return {
     total: count,
@@ -172,7 +178,13 @@ exports.listPublicCommunities = async (filters = {}) => {
   const offset = (page - 1) * limit;
 
   const { count, rows } = await Community.findAndCountAll({ where, limit, offset, order: [['createdAt', 'DESC']] });
-  return { total: count, page, limit, communities: rows };
+
+  const communities = await Promise.all(rows.map(async (c) => ({
+    ...c.toJSON(),
+    memberCount: await getLiveMemberCount(c.id)
+  })));
+
+  return { total: count, page, limit, communities };
 };
 
 exports.listAllCommunities = async (filters = {}) => {
@@ -234,7 +246,10 @@ exports.getCommunityProfile = async (communityId, requestingUserId, isAdmin = fa
   ]);
 
   return {
-    community,
+    community: {
+      ...community.toJSON(),
+      memberCount: await getLiveMemberCount(communityId)
+    },
     isMember,
     membershipStatus,
     publicContent: { videos, liveClasses, liveSeries, freebies }
@@ -271,7 +286,6 @@ exports.approveJoinRequest = async (communityId, targetUserId, actorId) => {
   const t = await sequelize.transaction();
   try {
     await member.update({ status: 'active', joinedAt: new Date() }, { transaction: t });
-    await Community.increment('memberCount', { by: 1, where: { id: communityId }, transaction: t });
     await t.commit();
   } catch (err) {
     await t.rollback();
@@ -324,7 +338,6 @@ exports.addMemberByEmail = async (communityId, email, actorId) => {
       communityId, userId: user.id, role: 'member', status: 'active',
       joinedAt: new Date(), invitedBy: actorId
     }, { transaction: t });
-    await Community.increment('memberCount', { by: 1, where: { id: communityId }, transaction: t });
     await t.commit();
     return member;
   } catch (err) {
@@ -340,7 +353,6 @@ exports.removeMember = async (communityId, targetUserId, actorId) => {
   const t = await sequelize.transaction();
   try {
     await member.destroy({ transaction: t });
-    await Community.decrement('memberCount', { by: 1, where: { id: communityId }, transaction: t });
     await t.commit();
   } catch (err) {
     await t.rollback();
@@ -611,7 +623,6 @@ exports.ownerLeave = async (communityId, ownerId) => {
       if (earliestModerator) {
         await earliestModerator.update({ role: 'owner' }, { transaction: t });
         await ownerMember.destroy({ transaction: t });
-        await Community.decrement('memberCount', { by: 1, where: { id: communityId }, transaction: t });
 
         // Email new owner (fire-and-forget)
         const newOwnerUser = await User.findByPk(earliestModerator.userId);
@@ -624,7 +635,6 @@ exports.ownerLeave = async (communityId, ownerId) => {
         // No moderators — set pending, notify admin
         await Community.update({ status: 'pending' }, { where: { id: communityId }, transaction: t });
         await ownerMember.destroy({ transaction: t });
-        await Community.decrement('memberCount', { by: 1, where: { id: communityId }, transaction: t });
 
         // Email platform admin (fire-and-forget)
         const adminUsers = await User.findAll({ where: { role: 'admin' } });
