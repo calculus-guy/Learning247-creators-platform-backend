@@ -48,7 +48,13 @@ exports.createCommunity = async (req, res) => {
     const posterFile = req.files?.poster?.[0] || null;
     const community = await communityService.createCommunity(req.user.id, req.body, posterFile);
     res.status(201).json({ success: true, data: community });
-  } catch (err) { handleError(res, err); }
+  } catch (err) {
+    // Multer file type errors should be 400 not 500
+    if (err.message && err.message.includes('Invalid file type')) {
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    handleError(res, err);
+  }
 };
 
 // GET /api/communities/invite/:token
