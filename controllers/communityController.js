@@ -192,6 +192,9 @@ exports.getMemberProfile = async (req, res) => {
     return res.json({ success: true, data: profile });
   } catch (err) { handleError(res, err); }
 };
+
+// GET /api/communities/:id/members
+exports.listMembers = async (req, res) => {
   try {
     const members = await CommunityMember.findAll({
       where: { communityId: req.params.id },
