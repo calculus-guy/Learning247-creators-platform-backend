@@ -106,8 +106,54 @@ exports.toggleNotifications = async (req, res) => {
 // GET /api/communities/:id/announcements
 exports.listAnnouncements = async (req, res) => {
   try {
-    const announcements = await communityService.listAnnouncements(req.params.id);
+    const announcements = await communityService.listAnnouncements(req.params.id, req.user?.id);
     res.json({ success: true, data: announcements });
+  } catch (err) { handleError(res, err); }
+};
+
+// POST /api/communities/:id/announcements
+exports.createAnnouncement = async (req, res) => {
+  try {
+    const imageFile = req.files?.image?.[0] || null;
+    const announcement = await communityService.createAnnouncement(req.params.id, req.user.id, req.body, imageFile);
+    res.status(201).json({ success: true, data: announcement });
+  } catch (err) { handleError(res, err); }
+};
+
+// POST /api/communities/:id/announcements/:aid/like
+exports.toggleAnnouncementLike = async (req, res) => {
+  try {
+    const result = await communityService.toggleAnnouncementLike(req.params.aid, req.params.id, req.user.id);
+    res.json({ success: true, data: result });
+  } catch (err) { handleError(res, err); }
+};
+
+// POST /api/communities/:id/announcements/:aid/comments
+exports.addAnnouncementComment = async (req, res) => {
+  try {
+    const comment = await communityService.addAnnouncementComment(
+      req.params.aid, req.params.id, req.user.id, req.body.body
+    );
+    res.status(201).json({ success: true, data: comment });
+  } catch (err) { handleError(res, err); }
+};
+
+// GET /api/communities/:id/announcements/:aid/comments
+exports.listAnnouncementComments = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const result = await communityService.listAnnouncementComments(req.params.aid, req.params.id, page, limit);
+    res.json({ success: true, data: result });
+  } catch (err) { handleError(res, err); }
+};
+
+// DELETE /api/communities/:id/announcements/:aid/comments/:cid
+exports.deleteAnnouncementComment = async (req, res) => {
+  try {
+    const actorRole = req.communityMember?.role || 'member';
+    await communityService.deleteAnnouncementComment(req.params.cid, req.params.id, req.user.id, actorRole);
+    res.json({ success: true, message: 'Comment deleted.' });
   } catch (err) { handleError(res, err); }
 };
 
@@ -307,14 +353,6 @@ exports.rejectSubmission = async (req, res) => {
   try {
     const submission = await communityService.rejectSubmission(req.params.sid, req.user.id, req.body.rejectionReason);
     res.json({ success: true, data: submission });
-  } catch (err) { handleError(res, err); }
-};
-
-// POST /api/communities/:id/announcements
-exports.createAnnouncement = async (req, res) => {
-  try {
-    const announcement = await communityService.createAnnouncement(req.params.id, req.user.id, req.body);
-    res.status(201).json({ success: true, data: announcement });
   } catch (err) { handleError(res, err); }
 };
 

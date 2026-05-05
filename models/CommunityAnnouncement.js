@@ -36,6 +36,12 @@ const CommunityAnnouncement = sequelize.define('CommunityAnnouncement', {
     allowNull: false,
     defaultValue: false,
     field: 'is_pinned'
+  },
+  likedBy: {
+    type: DataTypes.JSONB,
+    allowNull: false,
+    defaultValue: [],
+    field: 'liked_by'
   }
 }, {
   tableName: 'community_announcements',

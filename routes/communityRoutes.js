@@ -42,6 +42,12 @@ router.get('/:id/submissions/my', authMiddleware, communityMemberMiddleware, ctr
 router.patch('/:id/submissions/:sid/resubmit', authMiddleware, communityMemberMiddleware, ctrl.resubmitContent);
 router.get('/:id/members/:uid', authMiddleware, communityMemberMiddleware, ctrl.getMemberProfile);
 
+// ── Announcement interactions (all members) ──────────────────────────────────
+router.post('/:id/announcements/:aid/like', authMiddleware, communityMemberMiddleware, ctrl.toggleAnnouncementLike);
+router.get('/:id/announcements/:aid/comments', authMiddleware, communityMemberMiddleware, ctrl.listAnnouncementComments);
+router.post('/:id/announcements/:aid/comments', authMiddleware, communityMemberMiddleware, ctrl.addAnnouncementComment);
+router.delete('/:id/announcements/:aid/comments/:cid', authMiddleware, communityMemberMiddleware, ctrl.deleteAnnouncementComment);
+
 // ── Moderator routes ─────────────────────────────────────────────────────────
 router.get('/:id/members', authMiddleware, communityModeratorMiddleware, ctrl.listMembers);
 router.post('/:id/members', authMiddleware, communityModeratorMiddleware, ctrl.addMember);
@@ -49,7 +55,7 @@ router.delete('/:id/members/:uid', authMiddleware, communityModeratorMiddleware,
 router.get('/:id/submissions', authMiddleware, communityModeratorMiddleware, ctrl.listSubmissions);
 router.post('/:id/submissions/:sid/approve', authMiddleware, communityModeratorMiddleware, ctrl.approveSubmission);
 router.post('/:id/submissions/:sid/reject', authMiddleware, communityModeratorMiddleware, ctrl.rejectSubmission);
-router.post('/:id/announcements', authMiddleware, communityModeratorMiddleware, ctrl.createAnnouncement);
+router.post('/:id/announcements', authMiddleware, communityModeratorMiddleware, upload.fields([{ name: 'image', maxCount: 1 }]), ctrl.createAnnouncement);
 router.patch('/:id/announcements/:aid', authMiddleware, communityModeratorMiddleware, ctrl.updateAnnouncement);
 router.delete('/:id/announcements/:aid', authMiddleware, communityModeratorMiddleware, ctrl.deleteAnnouncement);
 router.get('/:id/invite', authMiddleware, communityModeratorMiddleware, ctrl.getInviteLink);

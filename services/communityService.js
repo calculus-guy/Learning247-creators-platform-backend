@@ -5,6 +5,7 @@ const sequelize = require('../config/db');
 const Community = require('../models/Community');
 const CommunityMember = require('../models/CommunityMember');
 const CommunityAnnouncement = require('../models/CommunityAnnouncement');
+const CommunityAnnouncementComment = require('../models/CommunityAnnouncementComment');
 const CommunityContentSubmission = require('../models/CommunityContentSubmission');
 const User = require('../models/User');
 const LiveClass = require('../models/liveClass');
@@ -461,11 +462,19 @@ exports.transferOwnership = async (communityId, ownerId, newOwnerId) => {
 // 9. Announcements
 // ---------------------------------------------------------------------------
 
-exports.createAnnouncement = async (communityId, actorId, data) => {
-  const { title, body, imageUrl, isPinned } = data;
+exports.createAnnouncement = async (communityId, actorId, data, imageFile = null) => {
+  const { title, body, isPinned } = data;
+
+  let imageUrl = null;
+  if (imageFile) {
+    const { uploadFileToS3 } = require('./s3Service');
+    const result = await uploadFileToS3(imageFile.buffer, imageFile.originalname, imageFile.mimetype, 'communities');
+    imageUrl = result.url;
+  }
+
   const announcement = await CommunityAnnouncement.create({
     communityId, createdBy: actorId, title, body,
-    imageUrl: imageUrl || null,
+    imageUrl,
     isPinned: isPinned || false
   });
 
@@ -490,11 +499,118 @@ exports.createAnnouncement = async (communityId, actorId, data) => {
   return announcement;
 };
 
-exports.listAnnouncements = async (communityId) => {
-  return CommunityAnnouncement.findAll({
+exports.listAnnouncements = async (communityId, requestingUserId) => {
+  const announcements = await CommunityAnnouncement.findAll({
     where: { communityId },
+    include: [
+      { model: User, as: 'author', attributes: ['id', 'firstname', 'lastname', 'socialLinks'] }
+    ],
     order: [['isPinned', 'DESC'], ['createdAt', 'DESC']]
   });
+
+  return announcements.map(a => {
+    const json = a.toJSON();
+    return {
+      ...json,
+      author: {
+        id: json.author?.id,
+        firstname: json.author?.firstname,
+        lastname: json.author?.lastname,
+        profilePicture: json.author?.socialLinks?.profilePicture || null
+      },
+      likeCount: (json.likedBy || []).length,
+      likedByMe: requestingUserId ? (json.likedBy || []).includes(requestingUserId) : false
+    };
+  });
+};
+
+exports.toggleAnnouncementLike = async (announcementId, communityId, userId) => {
+  const announcement = await CommunityAnnouncement.findOne({ where: { id: announcementId, communityId } });
+  if (!announcement) throw makeError('Announcement not found.', 404);
+
+  const likedBy = announcement.likedBy || [];
+  const alreadyLiked = likedBy.includes(userId);
+
+  const updatedLikes = alreadyLiked
+    ? likedBy.filter(id => id !== userId)
+    : [...likedBy, userId];
+
+  await announcement.update({ likedBy: updatedLikes });
+
+  return {
+    liked: !alreadyLiked,
+    likeCount: updatedLikes.length
+  };
+};
+
+exports.addAnnouncementComment = async (announcementId, communityId, userId, body) => {
+  if (!body || !body.trim()) throw makeError('Comment body is required.', 400);
+
+  const announcement = await CommunityAnnouncement.findOne({ where: { id: announcementId, communityId } });
+  if (!announcement) throw makeError('Announcement not found.', 404);
+
+  const comment = await CommunityAnnouncementComment.create({
+    announcementId, communityId, userId, body: body.trim()
+  });
+
+  // Return with author info
+  const withAuthor = await CommunityAnnouncementComment.findByPk(comment.id, {
+    include: [{ model: User, as: 'author', attributes: ['id', 'firstname', 'lastname', 'socialLinks'] }]
+  });
+
+  const json = withAuthor.toJSON();
+  return {
+    ...json,
+    author: {
+      id: json.author?.id,
+      firstname: json.author?.firstname,
+      lastname: json.author?.lastname,
+      profilePicture: json.author?.socialLinks?.profilePicture || null
+    }
+  };
+};
+
+exports.listAnnouncementComments = async (announcementId, communityId, page = 1, limit = 20) => {
+  const announcement = await CommunityAnnouncement.findOne({ where: { id: announcementId, communityId } });
+  if (!announcement) throw makeError('Announcement not found.', 404);
+
+  const offset = (page - 1) * limit;
+  const { count, rows } = await CommunityAnnouncementComment.findAndCountAll({
+    where: { announcementId },
+    include: [{ model: User, as: 'author', attributes: ['id', 'firstname', 'lastname', 'socialLinks'] }],
+    order: [['createdAt', 'ASC']],
+    limit,
+    offset
+  });
+
+  return {
+    total: count,
+    page,
+    limit,
+    comments: rows.map(c => {
+      const json = c.toJSON();
+      return {
+        ...json,
+        author: {
+          id: json.author?.id,
+          firstname: json.author?.firstname,
+          lastname: json.author?.lastname,
+          profilePicture: json.author?.socialLinks?.profilePicture || null
+        }
+      };
+    })
+  };
+};
+
+exports.deleteAnnouncementComment = async (commentId, communityId, userId, actorRole) => {
+  const comment = await CommunityAnnouncementComment.findOne({ where: { id: commentId, communityId } });
+  if (!comment) throw makeError('Comment not found.', 404);
+
+  // Only the comment author or a moderator/owner can delete
+  const canDelete = comment.userId === userId || ['owner', 'moderator'].includes(actorRole);
+  if (!canDelete) throw makeError('You cannot delete this comment.', 403);
+
+  await comment.destroy();
 };
 
 exports.updateAnnouncement = async (communityId, announcementId, actorId, data) => {
