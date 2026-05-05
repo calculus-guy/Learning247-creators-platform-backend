@@ -132,8 +132,66 @@ exports.resubmitContent = async (req, res) => {
   } catch (err) { handleError(res, err); }
 };
 
-// GET /api/communities/:id/members
-exports.listMembers = async (req, res) => {
+// GET /api/communities/:id/members/:uid — view a member's profile
+exports.getMemberProfile = async (req, res) => {
+  try {
+    const { id: communityId, uid } = req.params;
+    const requesterId = req.user.id;
+
+    // Confirm target is an active member of this community
+    const targetMembership = await CommunityMember.findOne({
+      where: { communityId, userId: uid, status: 'active' }
+    });
+    if (!targetMembership) {
+      return res.status(404).json({ success: false, message: 'Member not found in this community.' });
+    }
+
+    // Determine requester's role
+    const requesterMembership = await CommunityMember.findOne({
+      where: { communityId, userId: requesterId, status: 'active' }
+    });
+    const isModOrOwner = req.user.role === 'admin' ||
+      (requesterMembership && ['owner', 'moderator'].includes(requesterMembership.role));
+
+    // Fields visible to all members
+    const memberFields = ['id', 'firstname', 'lastname', 'bio', 'country', 'socialLinks', 'createdAt'];
+    // Extra fields for moderators/owners
+    const modFields = [...memberFields, 'email', 'phoneNumber', 'role'];
+
+    const user = await User.findByPk(uid, {
+      attributes: isModOrOwner ? modFields : memberFields
+    });
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found.' });
+    }
+
+    // Count their submissions in this community
+    const CommunityContentSubmission = require('../models/CommunityContentSubmission');
+    const submissionCount = await CommunityContentSubmission.count({
+      where: { communityId, submittedBy: uid }
+    });
+
+    const profile = {
+      ...user.toJSON(),
+      // Extract profile picture from socialLinks
+      profilePicture: user.socialLinks?.profilePicture || null,
+      // Community-specific context
+      community: {
+        role: targetMembership.role,
+        joinedAt: targetMembership.joinedAt,
+        submissionCount
+      }
+    };
+
+    // Moderators/owners also see email notifications setting
+    if (isModOrOwner) {
+      profile.community.emailNotificationsEnabled = targetMembership.emailNotificationsEnabled;
+    }
+
+    return res.json({ success: true, data: profile });
+  } catch (err) { handleError(res, err); }
+};
   try {
     const members = await CommunityMember.findAll({
       where: { communityId: req.params.id },

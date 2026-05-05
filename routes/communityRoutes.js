@@ -40,6 +40,7 @@ router.get('/:id/content', authMiddleware, communityMemberMiddleware, ctrl.listC
 router.post('/:id/submissions', authMiddleware, communityMemberMiddleware, ctrl.submitContent);
 router.get('/:id/submissions/my', authMiddleware, communityMemberMiddleware, ctrl.listMySubmissions);
 router.patch('/:id/submissions/:sid/resubmit', authMiddleware, communityMemberMiddleware, ctrl.resubmitContent);
+router.get('/:id/members/:uid', authMiddleware, communityMemberMiddleware, ctrl.getMemberProfile);
 
 // ── Moderator routes ─────────────────────────────────────────────────────────
 router.get('/:id/members', authMiddleware, communityModeratorMiddleware, ctrl.listMembers);
