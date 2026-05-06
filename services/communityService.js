@@ -467,9 +467,15 @@ exports.createAnnouncement = async (communityId, actorId, data, imageFile = null
 
   let imageUrl = null;
   if (imageFile) {
-    const { uploadFileToS3 } = require('./s3Service');
-    const result = await uploadFileToS3(imageFile.buffer, imageFile.originalname, imageFile.mimetype, 'communities');
-    imageUrl = result.url;
+    if (imageFile.location) {
+      // multer-s3: already uploaded directly to S3
+      imageUrl = imageFile.location;
+    } else if (imageFile.buffer) {
+      // memory storage: upload manually
+      const { uploadFileToS3 } = require('./s3Service');
+      const result = await uploadFileToS3(imageFile.buffer, imageFile.originalname, imageFile.mimetype, 'communities');
+      imageUrl = result.url;
+    }
   }
 
   const announcement = await CommunityAnnouncement.create({
