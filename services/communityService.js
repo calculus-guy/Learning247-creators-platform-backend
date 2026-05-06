@@ -320,27 +320,35 @@ exports.addMemberByEmail = async (communityId, email, actorId) => {
   if (!community) throw makeError('Community not found.', 404);
 
   const user = await User.findOne({ where: { email } });
+
   if (!user) {
-    // Send invite email (fire-and-forget)
+    // Not on platform — send signup invite email (fire-and-forget)
     emailUtil.sendCommunityInviteEmail(email, community.name, community.inviteToken)
       .catch(err => console.error('[CommunityService] addMemberByEmail invite error:', err.message));
-    return { invited: true, email };
+    return { invited: true, registered: false, email };
   }
 
-  // Check for existing record
+  // Already on platform — check for existing membership
   const existing = await CommunityMember.findOne({
     where: { communityId, userId: user.id, status: { [Op.in]: ['active', 'pending'] } }
   });
   if (existing) throw makeError('User already has a pending or active membership.', 409);
 
+  // Add as pending — they must accept the invite
   const t = await sequelize.transaction();
   try {
     const member = await CommunityMember.create({
-      communityId, userId: user.id, role: 'member', status: 'active',
-      joinedAt: new Date(), invitedBy: actorId
+      communityId, userId: user.id, role: 'member', status: 'pending',
+      invitedBy: actorId
     }, { transaction: t });
     await t.commit();
-    return member;
+
+    // Send invite notification email (fire-and-forget)
+    emailUtil.sendCommunityMemberInviteEmail(
+      user.email, user.firstname, community.name, community.inviteToken
+    ).catch(err => console.error('[CommunityService] member invite email error:', err.message));
+
+    return { invited: true, registered: true, email, memberId: member.id };
   } catch (err) {
     await t.rollback();
     throw err;

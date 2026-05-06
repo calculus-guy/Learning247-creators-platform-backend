@@ -1102,18 +1102,50 @@ exports.sendCommunityJoinConfirmationEmail = async (to, firstname, communityName
 };
 
 /**
+ * COMMUNITY MEMBER INVITE EMAIL (for existing platform users)
+ */
+exports.sendCommunityMemberInviteEmail = async (to, firstname, communityName, inviteToken) => {
+  const acceptUrl = `${process.env.CLIENT_URL || 'https://www.hallos.net'}/communities/invite/${inviteToken}`;
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>You've been invited to join ${communityName}!</h2>
+      <p>Hi ${firstname},</p>
+      <p>You've been invited to join the <strong>${communityName}</strong> community on hallos.</p>
+      <p>Click the button below to accept the invitation:</p>
+      <div style="text-align: center; margin: 30px 0;">
+        <a href="${acceptUrl}" style="background-color: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+          Accept Invitation
+        </a>
+      </div>
+      <p>If you don't want to join, you can ignore this email.</p>
+      <p><strong>The hallos Team</strong></p>
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Communities" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `You've been invited to join ${communityName} on hallos`,
+    html
+  });
+};
+
+/**
  * COMMUNITY INVITE EMAIL (for non-registered users)
  */
 exports.sendCommunityInviteEmail = async (to, communityName, inviteToken) => {
-  const inviteUrl = `${process.env.CLIENT_URL || 'https://www.hallos.net'}/communities/invite/${inviteToken}`;
+  // Non-registered users go to signup page — after registration the frontend
+  // reads the invite param and calls GET /api/communities/invite/:token
+  const inviteUrl = `${process.env.CLIENT_URL || 'https://www.hallos.net'}/register?invite=${inviteToken}&community=${encodeURIComponent(communityName)}`;
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6;">
       <h2>You've been invited to join ${communityName} on hallos!</h2>
       <p>You've been invited to join the <strong>${communityName}</strong> community on hallos.</p>
-      <p>Click the link below to create your account and join:</p>
+      <p>Click the link below to create your free account and join:</p>
       <div style="text-align: center; margin: 30px 0;">
         <a href="${inviteUrl}" style="background-color: #667eea; color: white; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-          Join ${communityName}
+          Create Account & Join ${communityName}
         </a>
       </div>
       <p><strong>The hallos Team</strong></p>
