@@ -716,7 +716,13 @@ exports.createContentDirect = async (communityId, actorId, contentType, data) =>
   const Model = CONTENT_MODEL_MAP[contentType];
   if (!Model) throw makeError('Unknown content type.', 400);
 
-  return Model.create({ ...data, communityId });
+  // Always enforce communityId and default communityVisibility
+  return Model.create({
+    ...data,
+    userId: data.userId || actorId,
+    communityId,
+    communityVisibility: data.communityVisibility || 'community_only'
+  });
 };
 
 // ---------------------------------------------------------------------------
