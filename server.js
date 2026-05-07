@@ -65,6 +65,7 @@ app.set('trust proxy', 1);
 const allowedOrigins = [
   'https://www.aahbibi.com',
   'https://aahbibi.com',
+  'https://prod-api.aahbibi.com',
   'http://localhost:3000',
   'http://localhost:8080',
   'http://localhost:3001',
