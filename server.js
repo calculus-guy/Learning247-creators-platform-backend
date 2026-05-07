@@ -175,7 +175,7 @@ app.use('/api/communities', communityRoutes);
 app.use('/api/admin/communities', adminCommunityRoutes);
 app.use('/uploads', express.static('uploads'));
 
-app.use('/videos', videoRoutes); 
+app.use('/videos', videoRoutes);
 
 // Global error handler - catches any unhandled errors from routes/middleware
 // Must be defined after all routes
