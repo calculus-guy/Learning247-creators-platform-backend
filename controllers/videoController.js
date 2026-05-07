@@ -323,3 +323,42 @@ exports.deleteVideo = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to delete video' });
   }
 };
+
+// ============================
+//  LINK VIDEO TO COMMUNITY
+// ============================
+exports.linkVideoToCommunity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { communityId, communityVisibility = 'community_only' } = req.body;
+    const userId = req.user.id;
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'communityId is required' });
+    }
+
+    const video = await Video.findByPk(id);
+    if (!video) {
+      return res.status(404).json({ success: false, message: 'Video not found' });
+    }
+
+    // Only the owner or a platform admin can link
+    if (video.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    // Verify community exists and is active
+    const Community = require('../models/Community');
+    const community = await Community.findByPk(communityId);
+    if (!community) {
+      return res.status(404).json({ success: false, message: 'Community not found' });
+    }
+
+    await video.update({ communityId, communityVisibility });
+
+    return res.json({ success: true, data: video });
+  } catch (error) {
+    console.error('[Video Controller] Link to community error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to link video to community' });
+  }
+};

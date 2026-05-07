@@ -68,6 +68,7 @@ router.post('/:id/purchase', authMiddleware, idempotencyMiddleware({ required: t
 
 // ── Creator: update price ────────────────────────────────────────────────────
 router.patch('/:id/price', authMiddleware, freebieController.updateFreebiePrice);
+router.patch('/:id/community', authMiddleware, freebieController.linkFreebieToCommunity);
 
 // ── Admin: revoke access (manual refund) ─────────────────────────────────────
 router.delete('/access/revoke', authMiddleware, adminMiddleware, freebiePaymentController.revokeAccess);

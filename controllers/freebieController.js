@@ -644,3 +644,41 @@ async function notifyBuyersOfNewContent(freebieId, freebieTitle, newItemCount) {
 }
 
 exports.notifyBuyersOfNewContent = notifyBuyersOfNewContent;
+
+// ============================
+//  LINK FREEBIE TO COMMUNITY
+// ============================
+exports.linkFreebieToCommunity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { communityId, communityVisibility = 'community_only' } = req.body;
+    const userId = req.user.id;
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'communityId is required' });
+    }
+
+    const Freebie = require('../models/Freebie');
+    const freebie = await Freebie.findByPk(id);
+    if (!freebie) {
+      return res.status(404).json({ success: false, message: 'Freebie not found' });
+    }
+
+    if (freebie.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const Community = require('../models/Community');
+    const community = await Community.findByPk(communityId);
+    if (!community) {
+      return res.status(404).json({ success: false, message: 'Community not found' });
+    }
+
+    await freebie.update({ communityId, communityVisibility });
+
+    return res.json({ success: true, data: freebie });
+  } catch (error) {
+    console.error('[Freebie Controller] Link to community error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to link freebie to community' });
+  }
+};

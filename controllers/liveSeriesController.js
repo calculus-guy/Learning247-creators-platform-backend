@@ -543,3 +543,41 @@ exports.cancelSeries = async (req, res) => {
 };
 
 module.exports = exports;
+
+// ============================
+//  LINK LIVE SERIES TO COMMUNITY
+// ============================
+exports.linkLiveSeriesToCommunity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { communityId, communityVisibility = 'community_only' } = req.body;
+    const userId = req.user.id;
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'communityId is required' });
+    }
+
+    const LiveSeries = require('../models/LiveSeries');
+    const series = await LiveSeries.findByPk(id);
+    if (!series) {
+      return res.status(404).json({ success: false, message: 'Live series not found' });
+    }
+
+    if (series.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const Community = require('../models/Community');
+    const community = await Community.findByPk(communityId);
+    if (!community) {
+      return res.status(404).json({ success: false, message: 'Community not found' });
+    }
+
+    await series.update({ communityId, communityVisibility });
+
+    return res.json({ success: true, data: series });
+  } catch (error) {
+    console.error('[LiveSeries Controller] Link to community error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to link live series to community' });
+  }
+};

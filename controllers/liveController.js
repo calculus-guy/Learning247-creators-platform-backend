@@ -762,3 +762,41 @@ exports.deleteLiveClass = async (req, res) => {
     return handleError(res, error);
   }
 };
+
+// ============================
+//  LINK LIVE CLASS TO COMMUNITY
+// ============================
+exports.linkLiveClassToCommunity = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { communityId, communityVisibility = 'community_only' } = req.body;
+    const userId = req.user.id;
+
+    if (!communityId) {
+      return res.status(400).json({ success: false, message: 'communityId is required' });
+    }
+
+    const LiveClass = require('../models/liveClass');
+    const liveClass = await LiveClass.findByPk(id);
+    if (!liveClass) {
+      return res.status(404).json({ success: false, message: 'Live class not found' });
+    }
+
+    if (liveClass.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const Community = require('../models/Community');
+    const community = await Community.findByPk(communityId);
+    if (!community) {
+      return res.status(404).json({ success: false, message: 'Community not found' });
+    }
+
+    await liveClass.update({ communityId, communityVisibility });
+
+    return res.json({ success: true, data: liveClass });
+  } catch (error) {
+    console.error('[Live Controller] Link to community error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to link live class to community' });
+  }
+};

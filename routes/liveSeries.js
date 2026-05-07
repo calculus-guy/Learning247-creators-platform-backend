@@ -67,6 +67,7 @@ router.put('/:id', authMiddleware, upload.fields([
  * Auth: Required (Creator)
  */
 router.delete('/:id', authMiddleware, liveSeriesController.cancelSeries);
+router.patch('/:id/community', authMiddleware, liveSeriesController.linkLiveSeriesToCommunity);
 
 // ============================================
 // SESSION ROUTES
