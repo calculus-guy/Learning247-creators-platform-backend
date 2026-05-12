@@ -664,10 +664,22 @@ exports.approveSubmission = async (submissionId, actorId) => {
 
   const t = await sequelize.transaction();
   try {
-    await Model.create({
-      ...submission.contentData,
-      communityId: submission.communityId
-    }, { transaction: t });
+    if (submission.contentData.id) {
+      // Content already exists (submitted via link flow) — just update communityId
+      await Model.update(
+        {
+          communityId: submission.communityId,
+          communityVisibility: submission.contentData.communityVisibility || 'community_only'
+        },
+        { where: { id: submission.contentData.id }, transaction: t }
+      );
+    } else {
+      // Content doesn't exist yet — create it (original submission flow)
+      await Model.create({
+        ...submission.contentData,
+        communityId: submission.communityId
+      }, { transaction: t });
+    }
 
     await submission.update({
       status: 'approved',
