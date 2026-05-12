@@ -342,21 +342,51 @@ exports.linkVideoToCommunity = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Video not found' });
     }
 
-    // Only the owner or a platform admin can link
     if (video.userId !== userId && req.user.role !== 'admin') {
       return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    // Verify community exists and is active
     const Community = require('../models/Community');
+    const CommunityMember = require('../models/CommunityMember');
+    const CommunityContentSubmission = require('../models/CommunityContentSubmission');
+
     const community = await Community.findByPk(communityId);
     if (!community) {
       return res.status(404).json({ success: false, message: 'Community not found' });
     }
 
-    await video.update({ communityId, communityVisibility });
+    // Check caller's role in the community
+    const membership = req.user.role === 'admin' ? null : await CommunityMember.findOne({
+      where: { communityId, userId, status: 'active' }
+    });
 
-    return res.json({ success: true, data: video });
+    const canDirectLink = req.user.role === 'admin' ||
+      (membership && ['owner', 'moderator'].includes(membership.role));
+
+    if (canDirectLink) {
+      await video.update({ communityId, communityVisibility });
+      return res.json({ success: true, queued: false, data: video });
+    }
+
+    // Regular member — must go through submission queue
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'You must be an active member of this community.' });
+    }
+
+    const submission = await CommunityContentSubmission.create({
+      communityId,
+      submittedBy: userId,
+      contentType: 'video',
+      contentData: { ...video.toJSON(), communityVisibility },
+      status: 'pending'
+    });
+
+    return res.status(201).json({
+      success: true,
+      queued: true,
+      message: 'Your video has been submitted for moderator review.',
+      data: submission
+    });
   } catch (error) {
     console.error('[Video Controller] Link to community error:', error);
     return res.status(500).json({ success: false, message: 'Failed to link video to community' });

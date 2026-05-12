@@ -568,14 +568,44 @@ exports.linkLiveSeriesToCommunity = async (req, res) => {
     }
 
     const Community = require('../models/Community');
+    const CommunityMember = require('../models/CommunityMember');
+    const CommunityContentSubmission = require('../models/CommunityContentSubmission');
+
     const community = await Community.findByPk(communityId);
     if (!community) {
       return res.status(404).json({ success: false, message: 'Community not found' });
     }
 
-    await series.update({ communityId, communityVisibility });
+    const membership = req.user.role === 'admin' ? null : await CommunityMember.findOne({
+      where: { communityId, userId, status: 'active' }
+    });
 
-    return res.json({ success: true, data: series });
+    const canDirectLink = req.user.role === 'admin' ||
+      (membership && ['owner', 'moderator'].includes(membership.role));
+
+    if (canDirectLink) {
+      await series.update({ communityId, communityVisibility });
+      return res.json({ success: true, queued: false, data: series });
+    }
+
+    if (!membership) {
+      return res.status(403).json({ success: false, message: 'You must be an active member of this community.' });
+    }
+
+    const submission = await CommunityContentSubmission.create({
+      communityId,
+      submittedBy: userId,
+      contentType: 'live_series',
+      contentData: { ...series.toJSON(), communityVisibility },
+      status: 'pending'
+    });
+
+    return res.status(201).json({
+      success: true,
+      queued: true,
+      message: 'Your live series has been submitted for moderator review.',
+      data: submission
+    });
   } catch (error) {
     console.error('[LiveSeries Controller] Link to community error:', error);
     return res.status(500).json({ success: false, message: 'Failed to link live series to community' });
