@@ -108,7 +108,4 @@ Purchase.findByReference = function(paymentReference) {
   });
 };
 
-// Associations
-Purchase.belongsTo(require('./User'), { foreignKey: 'userId', as: 'user' });
-
 module.exports = Purchase;
