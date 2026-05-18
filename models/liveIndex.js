@@ -10,7 +10,7 @@ LiveHost.belongsTo(User, { foreignKey: 'userId' });
 
 LiveClass.hasMany(LiveAttendee, { foreignKey: 'liveClassId', as: 'attendees' });
 LiveAttendee.belongsTo(LiveClass, { foreignKey: 'liveClassId' });
-LiveAttendee.belongsTo(User, { foreignKey: 'userId' });
+LiveAttendee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
 // ✅ Add creator association
 LiveClass.belongsTo(User, { foreignKey: 'userId', as: 'creator' });

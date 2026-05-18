@@ -830,3 +830,159 @@ exports.linkLiveClassToCommunity = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to link live class to community' });
   }
 };
+
+// ============================
+//  SECURE A SPOT (free live classes only)
+// ============================
+exports.registerForLiveClass = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const liveClass = await LiveClass.findByPk(id);
+    if (!liveClass) {
+      return res.status(404).json({ success: false, message: 'Live class not found' });
+    }
+
+    if (liveClass.status !== 'scheduled') {
+      return res.status(400).json({ success: false, message: 'This live class is no longer accepting registrations' });
+    }
+
+    const price = parseFloat(liveClass.price);
+    if (price > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is a paid live class. Please complete payment to register.'
+      });
+    }
+
+    // Check if already registered
+    const existing = await LiveAttendee.findOne({ where: { liveClassId: id, userId } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'You have already secured a spot for this class.' });
+    }
+
+    // Check capacity
+    if (liveClass.max_participants) {
+      const count = await LiveAttendee.count({ where: { liveClassId: id } });
+      if (count >= liveClass.max_participants) {
+        return res.status(400).json({ success: false, message: 'Sorry, this class is full.' });
+      }
+    }
+
+    const registration = await LiveAttendee.create({ liveClassId: id, userId, statusPaid: false });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Spot secured! You will receive a reminder before the class starts.',
+      data: registration
+    });
+  } catch (error) {
+    console.error('[Live Controller] Register error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to secure spot' });
+  }
+};
+
+// ============================
+//  CANCEL SPOT (free live classes)
+// ============================
+exports.cancelLiveClassRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const registration = await LiveAttendee.findOne({ where: { liveClassId: id, userId } });
+    if (!registration) {
+      return res.status(404).json({ success: false, message: 'Registration not found' });
+    }
+
+    if (registration.statusPaid) {
+      return res.status(400).json({ success: false, message: 'Paid registrations cannot be cancelled here. Contact support.' });
+    }
+
+    await registration.destroy();
+    return res.json({ success: true, message: 'Registration cancelled.' });
+  } catch (error) {
+    console.error('[Live Controller] Cancel registration error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to cancel registration' });
+  }
+};
+
+// ============================
+//  GET REGISTRATIONS (creator/admin)
+// ============================
+exports.getLiveClassRegistrations = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const liveClass = await LiveClass.findByPk(id);
+    if (!liveClass) {
+      return res.status(404).json({ success: false, message: 'Live class not found' });
+    }
+
+    // Only creator or admin
+    if (liveClass.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const Purchase = require('../models/Purchase');
+
+    // Free registrations (LiveAttendee where statusPaid = false)
+    const [freeRegs, paidPurchases, totalFree, totalPaid] = await Promise.all([
+      LiveAttendee.findAll({
+        where: { liveClassId: id, statusPaid: false },
+        include: [{ model: User, as: 'user', attributes: ['id', 'firstname', 'lastname', 'email'] }],
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']]
+      }),
+      Purchase.findAll({
+        where: { contentType: 'live_class', contentId: id, paymentStatus: 'completed' },
+        include: [{ model: User, as: 'user', attributes: ['id', 'firstname', 'lastname', 'email'] }],
+        order: [['createdAt', 'DESC']]
+      }),
+      LiveAttendee.count({ where: { liveClassId: id, statusPaid: false } }),
+      Purchase.count({ where: { contentType: 'live_class', contentId: id, paymentStatus: 'completed' } })
+    ]);
+
+    const freeList = freeRegs.map(r => ({
+      userId: r.userId,
+      firstname: r.user?.firstname,
+      lastname: r.user?.lastname,
+      email: r.user?.email,
+      registrationType: 'free',
+      registeredAt: r.createdAt
+    }));
+
+    const paidList = paidPurchases.map(p => ({
+      userId: p.userId,
+      firstname: p.user?.firstname,
+      lastname: p.user?.lastname,
+      email: p.user?.email,
+      registrationType: 'paid',
+      amount: parseFloat(p.amount),
+      currency: p.currency,
+      registeredAt: p.createdAt
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        total: totalFree + totalPaid,
+        totalFree,
+        totalPaid,
+        page,
+        limit,
+        registrations: [...paidList, ...freeList]
+      }
+    });
+  } catch (error) {
+    console.error('[Live Controller] Get registrations error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch registrations' });
+  }
+};

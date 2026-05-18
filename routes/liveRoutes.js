@@ -19,6 +19,9 @@ router.post('/create', authMiddleware, upload.fields([
 ]), liveController.createLiveClass);
 router.post('/:id/add-host', authMiddleware, liveController.addHost);
 router.post('/:id/add-attendee', authMiddleware, liveController.addAttendee);
+router.post('/:id/register', authMiddleware, liveController.registerForLiveClass);
+router.delete('/:id/register', authMiddleware, liveController.cancelLiveClassRegistration);
+router.get('/:id/registrations', authMiddleware, liveController.getLiveClassRegistrations);
 router.get('/:id', liveController.getLiveClassById);  // ✅ Removed checkContentAccess - now handles access internally
 router.get('/:id/playback', checkContentAccess, liveController.getPlayback);
 router.get('/:id/hosts', authMiddleware, liveController.getHosts);

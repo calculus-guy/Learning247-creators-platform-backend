@@ -1,4 +1,5 @@
 const { LiveSession, LiveSeries } = require('../models/liveSeriesIndex');
+const { LiveClass, LiveAttendee } = require('../models/liveIndex');
 const Purchase = require('../models/Purchase');
 const User = require('../models/User');
 const { Op } = require('sequelize');
@@ -60,13 +61,13 @@ class NotificationService {
   }
 
   /**
-   * Get enrolled students for a series
+   * Get enrolled students for a series (paid + free registrations)
    * @param {string} seriesId - Series ID
    * @returns {Promise<Array>} Array of user objects
    */
   async getEnrolledStudents(seriesId) {
     try {
-      // Find all purchases for this series
+      // Paid students — from Purchase table
       const purchases = await Purchase.findAll({
         where: {
           contentType: 'live_series',
@@ -76,15 +77,28 @@ class NotificationService {
         attributes: ['userId']
       });
 
-      const userIds = [...new Set(purchases.map(p => p.userId))];
+      // Free registrants — from LiveSeriesRegistration table
+      let freeUserIds = [];
+      try {
+        const LiveSeriesRegistration = require('../models/LiveSeriesRegistration');
+        const freeRegs = await LiveSeriesRegistration.findAll({
+          where: { seriesId },
+          attributes: ['userId']
+        });
+        freeUserIds = freeRegs.map(r => r.userId);
+      } catch (e) {
+        // Table may not exist yet if migration hasn't run — non-fatal
+        console.warn('[Notification Service] LiveSeriesRegistration table not available:', e.message);
+      }
 
-      // Get user details
+      // Merge and deduplicate user IDs
+      const paidUserIds = purchases.map(p => p.userId);
+      const allUserIds = [...new Set([...paidUserIds, ...freeUserIds])];
+
+      if (allUserIds.length === 0) return [];
+
       const users = await User.findAll({
-        where: {
-          id: {
-            [Op.in]: userIds
-          }
-        },
+        where: { id: { [Op.in]: allUserIds } },
         attributes: ['id', 'email', 'firstname', 'lastname']
       });
 
@@ -130,6 +144,66 @@ class NotificationService {
   }
 
   /**
+   * Find live classes that need reminders (1 hour before start)
+   */
+  async findLiveClassesNeedingReminders() {
+    try {
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000);
+      const oneHourFifteenMinsFromNow = new Date(now.getTime() + 75 * 60 * 1000);
+
+      const classes = await LiveClass.findAll({
+        where: {
+          status: 'scheduled',
+          startTime: {
+            [Op.gte]: oneHourFromNow,
+            [Op.lte]: oneHourFifteenMinsFromNow
+          }
+        }
+      });
+
+      return classes;
+    } catch (error) {
+      console.error('[Notification Service] Find live classes error:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Get all registered students for a live class (free + paid)
+   */
+  async getLiveClassStudents(liveClassId) {
+    try {
+      // Free registrants
+      const freeAttendees = await LiveAttendee.findAll({
+        where: { liveClassId, statusPaid: false },
+        attributes: ['userId']
+      });
+
+      // Paid purchasers
+      const paidPurchases = await Purchase.findAll({
+        where: { contentType: 'live_class', contentId: liveClassId, paymentStatus: 'completed' },
+        attributes: ['userId']
+      });
+
+      const allUserIds = [...new Set([
+        ...freeAttendees.map(a => a.userId),
+        ...paidPurchases.map(p => p.userId)
+      ])];
+
+      if (allUserIds.length === 0) return [];
+
+      return User.findAll({
+        where: { id: { [Op.in]: allUserIds } },
+        attributes: ['id', 'email', 'firstname', 'lastname']
+      });
+    } catch (error) {
+      console.error('[Notification Service] Get live class students error:', error);
+      return [];
+    }
+  }
+
+  /**
    * Process session reminders (called by cron job)
    * @returns {Promise<Object>} Processing results
    */
@@ -143,17 +217,16 @@ class NotificationService {
       console.log('[Notification Service] Processing session reminders...');
 
       const sessions = await this.findSessionsNeedingReminders();
+      const liveClasses = await this.findLiveClassesNeedingReminders();
       let totalSent = 0;
       let totalFailed = 0;
 
+      // Process live series session reminders
       for (const session of sessions) {
         try {
-          // Get enrolled students
           const students = await this.getEnrolledStudents(session.seriesId);
-          
           console.log(`[Notification Service] Sending reminders for session ${session.id} to ${students.length} students`);
 
-          // Send reminders to all students
           const results = await Promise.allSettled(
             students.map(student => this.sendSessionReminder(student, session))
           );
@@ -164,9 +237,7 @@ class NotificationService {
           totalSent += sent;
           totalFailed += failed;
 
-          // Mark session as reminder sent
           await session.update({ reminderSent: true });
-
           console.log(`[Notification Service] Session ${session.id}: ${sent} sent, ${failed} failed`);
         } catch (error) {
           console.error(`[Notification Service] Error processing session ${session.id}:`, error);
@@ -174,8 +245,40 @@ class NotificationService {
         }
       }
 
+      // Process live class reminders
+      for (const liveClass of liveClasses) {
+        try {
+          const students = await this.getLiveClassStudents(liveClass.id);
+          console.log(`[Notification Service] Sending reminders for live class ${liveClass.id} to ${students.length} students`);
+
+          // Build a session-like object for the email template
+          const sessionLike = {
+            id: liveClass.id,
+            seriesId: null,
+            sessionNumber: 1,
+            series: { title: liveClass.title, thumbnailUrl: liveClass.thumbnailUrl },
+            scheduledStartTime: liveClass.startTime,
+            scheduledEndTime: liveClass.endTime
+          };
+
+          const results = await Promise.allSettled(
+            students.map(student => this.sendSessionReminder(student, sessionLike))
+          );
+
+          const sent = results.filter(r => r.status === 'fulfilled' && r.value === true).length;
+          const failed = results.filter(r => r.status === 'rejected' || r.value === false).length;
+
+          totalSent += sent;
+          totalFailed += failed;
+          console.log(`[Notification Service] Live class ${liveClass.id}: ${sent} sent, ${failed} failed`);
+        } catch (error) {
+          console.error(`[Notification Service] Error processing live class ${liveClass.id}:`, error);
+          totalFailed++;
+        }
+      }
+
       const result = {
-        processed: sessions.length,
+        processed: sessions.length + liveClasses.length,
         sent: totalSent,
         failed: totalFailed,
         timestamp: new Date()

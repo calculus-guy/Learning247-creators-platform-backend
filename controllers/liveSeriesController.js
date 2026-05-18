@@ -611,3 +611,162 @@ exports.linkLiveSeriesToCommunity = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Failed to link live series to community' });
   }
 };
+
+
+// ============================
+//  SECURE A SPOT (free live series only)
+// ============================
+exports.registerForSeries = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const { LiveSeries } = require('../models/liveSeriesIndex');
+    const LiveSeriesRegistration = require('../models/LiveSeriesRegistration');
+
+    const series = await LiveSeries.findByPk(id);
+    if (!series) {
+      return res.status(404).json({ success: false, message: 'Live series not found' });
+    }
+
+    if (!series.canEnroll()) {
+      return res.status(400).json({ success: false, message: 'This series is no longer accepting registrations' });
+    }
+
+    const price = parseFloat(series.price);
+    if (price > 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'This is a paid live series. Please complete payment to register.'
+      });
+    }
+
+    // Check if already registered
+    const existing = await LiveSeriesRegistration.findOne({ where: { seriesId: id, userId } });
+    if (existing) {
+      return res.status(409).json({ success: false, message: 'You have already secured a spot for this series.' });
+    }
+
+    // Check capacity
+    if (series.maxParticipants) {
+      const count = await LiveSeriesRegistration.count({ where: { seriesId: id } });
+      if (count >= series.maxParticipants) {
+        return res.status(400).json({ success: false, message: 'Sorry, this series is full.' });
+      }
+    }
+
+    const registration = await LiveSeriesRegistration.create({ seriesId: id, userId });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Spot secured! You will receive reminders before each session starts.',
+      data: registration
+    });
+  } catch (error) {
+    console.error('[LiveSeries Controller] Register error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to secure spot' });
+  }
+};
+
+// ============================
+//  CANCEL SPOT (free live series)
+// ============================
+exports.cancelSeriesRegistration = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const LiveSeriesRegistration = require('../models/LiveSeriesRegistration');
+    const registration = await LiveSeriesRegistration.findOne({ where: { seriesId: id, userId } });
+    if (!registration) {
+      return res.status(404).json({ success: false, message: 'Registration not found' });
+    }
+
+    await registration.destroy();
+    return res.json({ success: true, message: 'Registration cancelled.' });
+  } catch (error) {
+    console.error('[LiveSeries Controller] Cancel registration error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to cancel registration' });
+  }
+};
+
+// ============================
+//  GET REGISTRATIONS (creator/admin)
+// ============================
+exports.getSeriesRegistrations = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const { LiveSeries } = require('../models/liveSeriesIndex');
+    const LiveSeriesRegistration = require('../models/LiveSeriesRegistration');
+    const Purchase = require('../models/Purchase');
+    const User = require('../models/User');
+
+    const series = await LiveSeries.findByPk(id);
+    if (!series) {
+      return res.status(404).json({ success: false, message: 'Live series not found' });
+    }
+
+    // Only creator or admin
+    if (series.userId !== userId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const [freeRegs, paidPurchases, totalFree, totalPaid] = await Promise.all([
+      LiveSeriesRegistration.findAll({
+        where: { seriesId: id },
+        include: [{ model: User, as: 'user', attributes: ['id', 'firstname', 'lastname', 'email'] }],
+        limit,
+        offset,
+        order: [['createdAt', 'DESC']]
+      }),
+      Purchase.findAll({
+        where: { contentType: 'live_series', contentId: id, paymentStatus: 'completed' },
+        include: [{ model: User, as: 'user', attributes: ['id', 'firstname', 'lastname', 'email'] }],
+        order: [['createdAt', 'DESC']]
+      }),
+      LiveSeriesRegistration.count({ where: { seriesId: id } }),
+      Purchase.count({ where: { contentType: 'live_series', contentId: id, paymentStatus: 'completed' } })
+    ]);
+
+    const freeList = freeRegs.map(r => ({
+      userId: r.userId,
+      firstname: r.user?.firstname,
+      lastname: r.user?.lastname,
+      email: r.user?.email,
+      registrationType: 'free',
+      registeredAt: r.createdAt
+    }));
+
+    const paidList = paidPurchases.map(p => ({
+      userId: p.userId,
+      firstname: p.user?.firstname,
+      lastname: p.user?.lastname,
+      email: p.user?.email,
+      registrationType: 'paid',
+      amount: parseFloat(p.amount),
+      currency: p.currency,
+      registeredAt: p.createdAt
+    }));
+
+    return res.json({
+      success: true,
+      data: {
+        total: totalFree + totalPaid,
+        totalFree,
+        totalPaid,
+        page,
+        limit,
+        registrations: [...paidList, ...freeList]
+      }
+    });
+  } catch (error) {
+    console.error('[LiveSeries Controller] Get registrations error:', error);
+    return res.status(500).json({ success: false, message: 'Failed to fetch registrations' });
+  }
+};
