@@ -280,19 +280,19 @@ exports.getSeriesById = async (req, res) => {
     // Check if user has access (optional authentication)
     let hasAccess = false;
     let accessReason = null;
+    let isRegistered = false;
     const price = parseFloat(series.price);
-    
+
     // Check if free
     if (price === 0) {
       hasAccess = true;
       accessReason = 'free_content';
     }
-    
+
     // Check if user is authenticated and has access
     if (req.user && !hasAccess) {
       hasAccess = await liveSeriesService.checkSeriesAccess(req.user.id, series.id);
       if (hasAccess) {
-        // Determine access reason
         if (series.userId === req.user.id) {
           accessReason = 'creator';
         } else {
@@ -300,7 +300,19 @@ exports.getSeriesById = async (req, res) => {
         }
       }
     }
-    
+
+    // Check if user has secured a free spot
+    if (req.user && price === 0) {
+      const LiveSeriesRegistration = require('../models/LiveSeriesRegistration');
+      const reg = await LiveSeriesRegistration.findOne({
+        where: { seriesId: id, userId: req.user.id }
+      });
+      isRegistered = !!reg;
+    } else if (req.user && hasAccess && accessReason === 'purchased') {
+      // Paid users are registered by virtue of their purchase
+      isRegistered = true;
+    }
+
     return res.json({
       success: true,
       series: {
@@ -308,6 +320,7 @@ exports.getSeriesById = async (req, res) => {
         stats,
         hasAccess,
         accessReason,
+        isRegistered,
         requiresPayment: !hasAccess && price > 0,
         pricing: series.getDualPricing()
       }

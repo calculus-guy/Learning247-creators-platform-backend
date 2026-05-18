@@ -267,6 +267,19 @@ exports.getLiveClassById = async (req, res) => {
       }
     }
 
+    // Check if user has secured a free spot or paid
+    let isRegistered = false;
+    if (userId) {
+      const price = parseFloat(live.price);
+      if (price === 0) {
+        const reg = await LiveAttendee.findOne({ where: { liveClassId: id, userId } });
+        isRegistered = !!reg;
+      } else {
+        // Paid — registered if they have a completed purchase
+        isRegistered = hasAccess && accessReason === 'purchased';
+      }
+    }
+
     // Build public response (always returned)
     const publicInfo = {
       id: live.id,
@@ -294,7 +307,8 @@ exports.getLiveClassById = async (req, res) => {
       // Access flags
       hasAccess,
       requiresPayment: !hasAccess && price > 0,
-      accessReason
+      accessReason,
+      isRegistered
     };
 
     // If user has access, add private streaming info
