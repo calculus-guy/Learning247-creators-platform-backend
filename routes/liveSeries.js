@@ -5,6 +5,19 @@ const liveSessionController = require('../controllers/liveSessionController');
 const authMiddleware = require('../middleware/authMiddleware');
 const { upload } = require('../utils/multerConfig');
 
+// Optional auth — sets req.user if token present, continues either way
+const optionalAuth = (req, res, next) => {
+  const jwt = require('jsonwebtoken');
+  let token = req.header('Authorization')?.replace('Bearer ', '');
+  if (!token && req.cookies && req.cookies.token) token = req.cookies.token;
+  if (token) {
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET_KEY);
+    } catch (_) { /* invalid token — treat as unauthenticated */ }
+  }
+  next();
+};
+
 // ============================================
 // SERIES ROUTES
 // ============================================
@@ -40,7 +53,7 @@ router.get('/my-series', authMiddleware, liveSeriesController.getMySeries);
  * GET /api/live/series/:id
  * Auth: Optional
  */
-router.get('/:id', liveSeriesController.getSeriesById);
+router.get('/:id', optionalAuth, liveSeriesController.getSeriesById);
 
 /**
  * Get all sessions for a series
