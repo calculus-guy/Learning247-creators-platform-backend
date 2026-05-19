@@ -65,11 +65,14 @@ exports.createSeries = async (req, res) => {
         message: 'End date must be after start date'
       });
     }
-    
-    if (start < new Date()) {
+
+    // Allow scheduling up to 24 hours in the past to account for timezone differences
+    // between the user's local time and the server's UTC time
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    if (start < twentyFourHoursAgo) {
       return res.status(400).json({
         success: false,
-        message: 'Start date cannot be in the past'
+        message: 'Start date cannot be more than 24 hours in the past'
       });
     }
     
