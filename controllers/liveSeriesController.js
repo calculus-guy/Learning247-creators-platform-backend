@@ -119,7 +119,17 @@ exports.createSeries = async (req, res) => {
         pricing: series.getDualPricing()
       }
     });
-    
+
+    // Queue digest notifications in background (fire-and-forget)
+    setImmediate(async () => {
+      try {
+        const audienceService = require('../services/audienceService');
+        await audienceService.queueDigestItems(series, 'live_series');
+      } catch (e) {
+        console.error('[LiveSeries Controller] Failed to queue digest items:', e.message);
+      }
+    });
+
   } catch (error) {
     console.error('[Live Series Controller] Create series error:', error);
     return res.status(500).json({

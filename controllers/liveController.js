@@ -131,6 +131,16 @@ exports.createLiveClass = async (req, res) => {
         pricing: liveClass.getDualPricing()
       }
     });
+
+    // Queue digest notifications in background (fire-and-forget)
+    setImmediate(async () => {
+      try {
+        const audienceService = require('../services/audienceService');
+        await audienceService.queueDigestItems(liveClass, 'live_class');
+      } catch (e) {
+        console.error('[Live Controller] Failed to queue digest items:', e.message);
+      }
+    });
   } catch (error) {
     return handleError(res, error);
   }

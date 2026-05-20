@@ -1230,3 +1230,97 @@ exports.sendCommunityOwnerlessEmail = async (to, adminName, communityName) => {
     html
   });
 };
+
+/**
+ * DIGEST EMAIL (daily or weekly)
+ * Sends a single email with multiple upcoming live classes/series
+ * @param {string} to - Recipient email
+ * @param {string} firstname - Recipient first name
+ * @param {Array} items - Array of content items { title, creatorName, startTime, category, thumbnailUrl, price, currency, contentType, joinLink }
+ * @param {string} digestType - 'daily' | 'weekly'
+ */
+exports.sendDigestEmail = async (to, firstname, items, digestType) => {
+  const isWeekly = digestType === 'weekly';
+  const subject = isWeekly
+    ? `Your weekly live class roundup on hallos`
+    : `Upcoming live classes for you on hallos`;
+
+  const formatDate = (date) => {
+    if (!date) return 'TBD';
+    return new Date(date).toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC'
+    }) + ' UTC';
+  };
+
+  const itemsHtml = items.map(item => `
+    <div style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; background: #ffffff;">
+      ${item.thumbnailUrl ? `
+        <div style="text-align: center; margin-bottom: 12px;">
+          <img src="${item.thumbnailUrl}" alt="${item.title}" style="width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px;" />
+        </div>
+      ` : ''}
+      <h3 style="margin: 0 0 6px; font-size: 16px; color: #1a202c;">${item.title}</h3>
+      <p style="margin: 0 0 4px; color: #718096; font-size: 13px;">By <strong>${item.creatorName}</strong></p>
+      ${item.category ? `<p style="margin: 0 0 4px; color: #718096; font-size: 13px;">📂 ${item.category}</p>` : ''}
+      <p style="margin: 0 0 8px; color: #718096; font-size: 13px;">🗓 ${formatDate(item.startTime)}</p>
+      <p style="margin: 0 0 14px; font-size: 13px; color: #2d3748;">
+        ${item.price === 0
+          ? '<span style="color: #38a169; font-weight: bold;">Free</span>'
+          : `<span style="font-weight: bold;">${item.currency === 'USD' ? '$' : '₦'}${parseFloat(item.price).toLocaleString()}</span>`
+        }
+      </p>
+      <div style="text-align: center;">
+        <a href="${item.joinLink}" style="display: inline-block; background-color: #667eea; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: bold;">
+          ${item.contentType === 'live_series' ? 'View Series →' : 'View Class →'}
+        </a>
+      </div>
+    </div>
+  `).join('');
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>${isWeekly ? '📅 Your Weekly Live Class Roundup' : '🎯 Upcoming Live Classes For You'}</h2>
+
+      <p>Hi ${firstname},</p>
+
+      <p>
+        ${isWeekly
+          ? "Here's your weekly roundup of upcoming live classes on hallos that you might enjoy:"
+          : "Here are some upcoming live classes on hallos picked for you:"}
+      </p>
+
+      ${itemsHtml}
+
+      <div style="background-color: #f0f7ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
+        <p style="margin: 0; font-size: 13px; color: #4a5568;">
+          💡 <strong>Tip:</strong> Log in to your dashboard at 
+          <a href="${process.env.CLIENT_URL || 'https://www.hallos.net'}/dashboard" style="color: #667eea;">hallos.net/dashboard</a> 
+          to see all upcoming classes and manage your registrations.
+        </p>
+      </div>
+
+      <hr style="margin: 25px 0; border: none; border-top: 1px solid #ddd;" />
+
+      <p style="font-size: 12px; color: #666; text-align: center;">
+        You're receiving this because you subscribed to hallos notifications.<br/>
+        <a href="${process.env.CLIENT_URL || 'https://www.hallos.net'}/settings/notifications" style="color: #667eea;">Manage your notification preferences</a>
+      </p>
+
+      <p><strong>The hallos Team</strong></p>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos" <${process.env.EMAIL_USER}>`,
+    to,
+    subject,
+    html
+  });
+};

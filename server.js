@@ -173,6 +173,7 @@ app.use('/api/coupons', couponRoutes);
 app.use('/api/admin/coupons', adminCouponRoutes);
 app.use('/api/communities', communityRoutes);
 app.use('/api/admin/communities', adminCommunityRoutes);
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/uploads', express.static('uploads'));
 
 app.use('/videos', videoRoutes);
