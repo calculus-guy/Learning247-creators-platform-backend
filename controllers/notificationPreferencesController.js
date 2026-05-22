@@ -126,9 +126,20 @@ exports.getNotificationLogs = async (req, res) => {
     const limit = parseInt(req.query.limit) || 50;
     const offset = (page - 1) * limit;
 
+    const VALID_NOTIFICATION_TYPES = ['instant', 'daily_digest', 'weekly_digest', 'reminder'];
+
     const where = {};
     if (req.query.userId) where.userId = parseInt(req.query.userId);
-    if (req.query.notificationType) where.notificationType = req.query.notificationType;
+    if (req.query.notificationType) {
+      if (!VALID_NOTIFICATION_TYPES.includes(req.query.notificationType)) {
+        return res.status(400).json({
+          success: false,
+          message: `Invalid notificationType. Must be one of: ${VALID_NOTIFICATION_TYPES.join(', ')}`
+        });
+      }
+      where.notificationType = req.query.notificationType;
+    }
+    if (req.query.contentType) where.contentType = req.query.contentType;
 
     const { count, rows } = await NotificationLog.findAndCountAll({
       where,
