@@ -88,6 +88,51 @@ exports.handlePaystackWebhook = async (req, res) => {
         return res.status(200).send('Webhook processed');
       }
 
+      // ── CAMPAIGN REGISTRATION: handle separately ──
+      if (metadata.type === 'campaign_registration') {
+        console.log('[Paystack Webhook] Processing campaign registration payment:', reference);
+
+        const CampaignRegistration = require('../models/CampaignRegistration');
+        const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
+
+        const registration = await CampaignRegistration.findOne({
+          where: { paymentReference: reference }
+        });
+
+        if (!registration) {
+          console.error('[Paystack Webhook] Campaign registration not found for reference:', reference);
+          return res.status(200).send('Webhook processed');
+        }
+
+        if (registration.paymentStatus === 'completed') {
+          console.log('[Paystack Webhook] Campaign registration already confirmed:', reference);
+          return res.status(200).send('Already processed');
+        }
+
+        await registration.update({ paymentStatus: 'completed' });
+
+        if (!registration.emailSent) {
+          try {
+            await sendCampaignRegistrationConfirmationEmail(
+              registration.email,
+              registration.firstName,
+              {
+                lastName: registration.lastName,
+                talent: registration.talent,
+                location: registration.location
+              }
+            );
+            await registration.update({ emailSent: true });
+            console.log('[Paystack Webhook] Campaign confirmation email sent to:', registration.email);
+          } catch (emailErr) {
+            console.error('[Paystack Webhook] Campaign email failed:', emailErr.message);
+          }
+        }
+
+        console.log('[Paystack Webhook] Campaign registration confirmed:', reference);
+        return res.status(200).send('Webhook processed');
+      }
+
       // Check if already processed
       const existingPurchase = await Purchase.findOne({
         where: { paymentReference: reference }
