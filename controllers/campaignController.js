@@ -1,6 +1,5 @@
 const { paystackClient } = require('../config/paystack');
 const CampaignRegistration = require('../models/CampaignRegistration');
-const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
 
 const CAMPAIGN_AMOUNT_NGN = 3000;        // ₦3,000
 const CAMPAIGN_AMOUNT_KOBO = 300000;     // in kobo
@@ -112,95 +111,6 @@ exports.registerForCampaign = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Failed to initiate campaign registration. Please try again.'
-    });
-  }
-};
-
-/**
- * Verify campaign payment after Paystack redirect
- * POST /api/campaigns/verify/:reference
- *
- * Call this from the frontend after Paystack redirects back.
- * Idempotent — safe to call multiple times.
- */
-exports.verifyCampaignPayment = async (req, res) => {
-  try {
-    const { reference } = req.params;
-
-    if (!reference) {
-      return res.status(400).json({ success: false, message: 'Payment reference is required' });
-    }
-
-    // Find the registration
-    const registration = await CampaignRegistration.findOne({ where: { paymentReference: reference } });
-
-    if (!registration) {
-      return res.status(404).json({ success: false, message: 'Registration not found for this reference' });
-    }
-
-    // Already confirmed — return cached result
-    if (registration.paymentStatus === 'completed') {
-      return res.status(200).json({
-        success: true,
-        message: 'Payment already confirmed. Welcome to the retreat!',
-        alreadyProcessed: true,
-        registration: {
-          id: registration.id,
-          firstName: registration.firstName,
-          lastName: registration.lastName,
-          email: registration.email,
-          paymentStatus: registration.paymentStatus
-        }
-      });
-    }
-
-    // Verify with Paystack
-    const paystackResponse = await paystackClient.get(`/transaction/verify/${reference}`);
-    const txData = paystackResponse.data.data;
-
-    if (!paystackResponse.data.status || txData.status !== 'success') {
-      // Mark as failed
-      await registration.update({ paymentStatus: 'failed' });
-      return res.status(400).json({
-        success: false,
-        message: `Payment not successful. Paystack status: ${txData.status}`
-      });
-    }
-
-    // Confirm registration
-    await registration.update({ paymentStatus: 'completed' });
-
-    // Send confirmation email (fire-and-forget, non-blocking)
-    if (!registration.emailSent) {
-      sendCampaignRegistrationConfirmationEmail(
-        registration.email,
-        registration.firstName,
-        {
-          lastName: registration.lastName,
-          talent: registration.talent,
-          location: registration.location
-        }
-      )
-        .then(() => registration.update({ emailSent: true }))
-        .catch(err => console.error('[Campaign] Confirmation email failed:', err.message));
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: 'Payment confirmed! Check your email for retreat details.',
-      registration: {
-        id: registration.id,
-        firstName: registration.firstName,
-        lastName: registration.lastName,
-        email: registration.email,
-        paymentStatus: 'completed'
-      }
-    });
-  } catch (error) {
-    console.error('[Campaign] Verify payment error:', error.response?.data || error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Failed to verify payment. Please contact support.'
     });
   }
 };

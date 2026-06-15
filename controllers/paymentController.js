@@ -129,7 +129,74 @@ exports.verifyPayment = async (req, res) => {
       });
     }
 
-     // ── WALLET TOP-UP: reference starts with 'topup_' ──
+    // ── CAMPAIGN REGISTRATION: reference starts with 'camp_' ──
+    if (reference && reference.startsWith('camp_')) {
+      console.log(`[Payment Verification] Detected campaign registration reference: ${reference}`);
+
+      const CampaignRegistration = require('../models/CampaignRegistration');
+      const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
+      const { paystackClient } = require('../config/paystack');
+
+      const registration = await CampaignRegistration.findOne({ where: { paymentReference: reference } });
+
+      if (!registration) {
+        return res.status(404).json({ success: false, message: 'Campaign registration not found for this reference' });
+      }
+
+      if (registration.paymentStatus === 'completed') {
+        return res.status(200).json({
+          success: true,
+          message: 'Payment already confirmed. Welcome to the retreat!',
+          alreadyProcessed: true,
+          registration: {
+            id: registration.id,
+            firstName: registration.firstName,
+            lastName: registration.lastName,
+            email: registration.email,
+            paymentStatus: registration.paymentStatus
+          }
+        });
+      }
+
+      const paystackResponse = await paystackClient.get(`/transaction/verify/${reference}`);
+      const txData = paystackResponse.data.data;
+
+      if (!paystackResponse.data.status || txData.status !== 'success') {
+        await registration.update({ paymentStatus: 'failed' });
+        return res.status(400).json({
+          success: false,
+          message: `Payment not successful. Paystack status: ${txData.status}`
+        });
+      }
+
+      await registration.update({ paymentStatus: 'completed' });
+
+      if (!registration.emailSent) {
+        sendCampaignRegistrationConfirmationEmail(
+          registration.email,
+          registration.firstName,
+          { lastName: registration.lastName, talent: registration.talent, location: registration.location }
+        )
+          .then(() => registration.update({ emailSent: true }))
+          .catch(err => console.error('[Campaign] Confirmation email failed:', err.message));
+      }
+
+      console.log(`[Payment Verification] Campaign registration confirmed: ${reference}`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Payment confirmed! Check your email for retreat details.',
+        registration: {
+          id: registration.id,
+          firstName: registration.firstName,
+          lastName: registration.lastName,
+          email: registration.email,
+          paymentStatus: 'completed'
+        }
+      });
+    }
+
+    // ── WALLET TOP-UP: reference starts with 'topup_' ──
     if (reference && reference.startsWith('topup_')) {
       console.log(`[Payment Verification] Detected wallet top-up reference: ${reference}`);
 
