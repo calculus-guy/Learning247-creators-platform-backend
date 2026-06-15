@@ -62,7 +62,7 @@ const CampaignRegistration = sequelize.define('CampaignRegistration', {
   },
   amount: {
     type: DataTypes.DECIMAL(10, 2),
-    defaultValue: 2000.00
+    defaultValue: 3000.00
   },
   currency: {
     type: DataTypes.STRING(3),

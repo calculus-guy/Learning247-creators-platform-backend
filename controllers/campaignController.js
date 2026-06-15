@@ -2,8 +2,8 @@ const { paystackClient } = require('../config/paystack');
 const CampaignRegistration = require('../models/CampaignRegistration');
 const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
 
-const CAMPAIGN_AMOUNT_NGN = 2000;        // ₦2,000
-const CAMPAIGN_AMOUNT_KOBO = 200000;     // in kobo
+const CAMPAIGN_AMOUNT_NGN = 3000;        // ₦3,000
+const CAMPAIGN_AMOUNT_KOBO = 300000;     // in kobo
 
 /**
  * Register for the Hallos Fastrack Retreat campaign
