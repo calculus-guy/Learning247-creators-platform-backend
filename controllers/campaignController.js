@@ -85,6 +85,7 @@ exports.registerForCampaign = async (req, res) => {
       amount: CAMPAIGN_AMOUNT_KOBO,
       currency: 'NGN',
       reference,
+      callback_url: `${process.env.CLIENT_URL}/payments/verify`,
       metadata: {
         type: 'campaign_registration',
         registrationId: registration.id,
