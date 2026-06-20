@@ -1060,7 +1060,8 @@ exports.sendFreebieNewContentEmail = async (to, buyerFirstname, freebieTitle, ne
  */
 exports.sendCampaignQuizAccessEmail = async (to, firstName, registrationData) => {
   const { lastName, talent, location, token } = registrationData;
-  const quizUrl = `${process.env.CLIENT_URL}/campaign/quiz?token=${token}`;
+  const quizBaseUrl = process.env.QUIZ_CLIENT_URL || process.env.CLIENT_URL;
+  const quizUrl = `${quizBaseUrl}/campaign/quiz?token=${token}`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 640px; margin: 0 auto;">
