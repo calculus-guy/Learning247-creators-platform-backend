@@ -38,7 +38,7 @@ const QuizQuestion = sequelize.define('QuizQuestion', {
     allowNull: false,
     field: 'correct_answer',
     validate: {
-      isIn: [['a', 'b', 'c', 'd']]
+      isIn: [['a', 'b', 'c', 'd', 'e']]
     }
   },
   difficulty: {

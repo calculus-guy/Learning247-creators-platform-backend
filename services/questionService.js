@@ -156,6 +156,7 @@ class QuestionService {
     const optionB = getField(row, 'Option B', 'OptionB');
     const optionC = getField(row, 'Option C', 'OptionC');
     const optionD = getField(row, 'Option D', 'OptionD');
+    const optionE = getField(row, 'Option E', 'OptionE'); // optional — 5-option questions
     const rawAnswer = getField(row, 'Correct Answer', 'CorrectAnswer');
     const rawDifficulty = getField(row, 'Difficulty');
 
@@ -177,16 +178,22 @@ class QuestionService {
     }
 
     const options = { a: optionA, b: optionB, c: optionC, d: optionD };
+    if (optionE) options.e = optionE;
 
-    // Validate correct answer — accept a/b/c/d or OptionA/OptionB/OptionC/OptionD
+    // Validate correct answer — accept a/b/c/d/e or OptionA-E variants
     const answerMap = {
-      'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd',
-      'optiona': 'a', 'optionb': 'b', 'optionc': 'c', 'optiond': 'd',
-      'option a': 'a', 'option b': 'b', 'option c': 'c', 'option d': 'd'
+      'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e',
+      'optiona': 'a', 'optionb': 'b', 'optionc': 'c', 'optiond': 'd', 'optione': 'e',
+      'option a': 'a', 'option b': 'b', 'option c': 'c', 'option d': 'd', 'option e': 'e'
     };
     const correctAnswer = answerMap[rawAnswer.toLowerCase()];
     if (!correctAnswer) {
-      return { valid: false, error: `Correct Answer must be a/b/c/d or OptionA/OptionB/OptionC/OptionD. Got: "${rawAnswer}"` };
+      return { valid: false, error: `Correct Answer must be a/b/c/d/e or OptionA-E. Got: "${rawAnswer}"` };
+    }
+
+    // If correct answer is 'e', Option E must exist
+    if (correctAnswer === 'e' && !optionE) {
+      return { valid: false, error: 'Correct Answer is "e" but Option E is missing' };
     }
 
     const difficulty = rawDifficulty.toLowerCase();
@@ -358,8 +365,8 @@ class QuestionService {
     }
 
     // Validate updates if they include certain fields
-    if (updates.correctAnswer && !['a', 'b', 'c', 'd'].includes(updates.correctAnswer)) {
-      throw new Error('Correct answer must be a, b, c, or d');
+    if (updates.correctAnswer && !['a', 'b', 'c', 'd', 'e'].includes(updates.correctAnswer)) {
+      throw new Error('Correct answer must be a, b, c, d, or e');
     }
 
     if (updates.difficulty && !['easy', 'medium', 'hard'].includes(updates.difficulty)) {

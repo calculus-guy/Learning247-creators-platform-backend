@@ -1053,17 +1053,21 @@ exports.sendFreebieNewContentEmail = async (to, buyerFirstname, freebieTitle, ne
 
 
 /**
- * HALLOS FASTRACK RETREAT — CAMPAIGN REGISTRATION CONFIRMATION EMAIL
+ * HALLOS FASTRACK RETREAT — QUIZ ACCESS EMAIL
+ * Sent immediately after payment is confirmed.
+ * Combines payment confirmation + quiz link in one email.
+ * registrationData: { lastName, talent, location, token }
  */
-exports.sendCampaignRegistrationConfirmationEmail = async (to, firstName, registrationData) => {
-  const { lastName, talent, location } = registrationData;
+exports.sendCampaignQuizAccessEmail = async (to, firstName, registrationData) => {
+  const { lastName, talent, location, token } = registrationData;
+  const quizUrl = `${process.env.CLIENT_URL}/campaign/quiz?token=${token}`;
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 640px; margin: 0 auto;">
 
       <!-- Header banner -->
       <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
-        <h1 style="color: #f0c040; margin: 0 0 8px; font-size: 26px; letter-spacing: 1px;">🏆 You're IN!</h1>
+        <h1 style="color: #f0c040; margin: 0 0 8px; font-size: 26px; letter-spacing: 1px;">🎯 Registration Confirmed!</h1>
         <p style="color: #ffffff; margin: 0; font-size: 16px; opacity: 0.9;">Hallos Fastrack Your Growth to Success Retreat</p>
       </div>
 
@@ -1073,65 +1077,59 @@ exports.sendCampaignRegistrationConfirmationEmail = async (to, firstName, regist
         <p style="font-size: 17px; color: #222;">Hi <strong>${firstName} ${lastName}</strong>,</p>
 
         <p style="font-size: 15px; color: #444; line-height: 1.8;">
-          🎉 <strong>Your registration is confirmed!</strong> Your payment of <strong>₦2,000</strong> has been received
-          and your spot at the <strong>Hallos Fastrack Your Growth to Success Retreat</strong> is secured.
+          Your <strong>₦3,000 registration fee</strong> has been confirmed. You are now officially in the selection pool
+          for the <strong>Hallos Fastrack Your Growth to Success Retreat</strong>.
         </p>
 
         <p style="font-size: 15px; color: #444; line-height: 1.8;">
-          Welcome to something extraordinary. You are now part of a curated group of talented, passionate,
-          and driven individuals who are serious about compressing years of learning into just <strong>two days</strong>.
+          But this is just the beginning — a spot at the retreat is <strong>earned, not bought</strong>.
+          To qualify, you must complete your Round 1 qualifying quiz. Your personal quiz link is below.
         </p>
 
-        <!-- Campaign promo block -->
-        <div style="background: linear-gradient(135deg, #f0c040 0%, #f5a623 100%); padding: 25px; border-radius: 10px; margin: 25px 0; text-align: center;">
-          <h2 style="margin: 0 0 10px; color: #1a1a2e; font-size: 20px;">Two Days. Zero Excuses. All Expenses Covered.</h2>
-          <p style="margin: 0; color: #1a1a2e; font-size: 14px; font-weight: bold;">Your launchpad awaits.</p>
-        </div>
-
-        <!-- What to expect -->
-        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #0f3460;">
-          <h3 style="color: #1a1a2e; margin-top: 0;">🎯 What the Retreat Covers</h3>
-          <p style="color: #555; margin: 0 0 12px;">Two days of intensive, practical sessions designed to reshape how you think, communicate, and grow:</p>
-          <div style="display: grid; column-gap: 10px;">
-            <ul style="color: #444; line-height: 2.2; margin: 0; padding-left: 20px;">
-              <li>🧠 Critical Thinking</li>
-              <li>📣 Marketing &amp; Brand Strategy</li>
-              <li>🦁 Leadership &amp; Communication</li>
-              <li>🎤 Public Speaking</li>
-              <li>🤝 Negotiation</li>
-              <li>💰 Financial Literacy</li>
-              <li>🤖 AI Prompting</li>
-              <li>⚙️ Habit Stacking &amp; more</li>
-            </ul>
-          </div>
-          <p style="color: #444; margin: 12px 0 0; font-style: italic;">
-            Plus games, exciting quizzes, and a <strong>₦1,000,000 cash prize</strong> up for grabs!
+        <!-- Quiz link CTA -->
+        <div style="background: linear-gradient(135deg, #f0c040 0%, #f5a623 100%); padding: 30px; border-radius: 10px; margin: 30px 0; text-align: center;">
+          <h2 style="margin: 0 0 8px; color: #1a1a2e; font-size: 20px;">Your Qualifying Quiz is Ready</h2>
+          <p style="margin: 0 0 20px; color: #1a1a2e; font-size: 14px;">⏳ This link expires in <strong>72 hours</strong> — don't wait!</p>
+          <a href="${quizUrl}" style="background-color: #1a1a2e; color: #f0c040; padding: 15px 35px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 16px; display: inline-block; letter-spacing: 0.5px;">
+            Take My Qualifying Quiz →
+          </a>
+          <p style="margin: 15px 0 0; color: #1a1a2e; font-size: 12px; word-break: break-all;">
+            Or copy this link: ${quizUrl}
           </p>
         </div>
 
-        <!-- Quiz competition -->
+        <!-- Quiz rules -->
+        <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #ffc107;">
+          <h3 style="color: #1a1a2e; margin-top: 0;">📋 Quiz Rules — Read Before You Start</h3>
+          <ul style="color: #444; line-height: 2.2; margin: 0; padding-left: 20px;">
+            <li><strong>20 questions</strong>, each with 5 options (A–E)</li>
+            <li><strong>15 seconds per question</strong> — no pausing, no going back</li>
+            <li>Questions are <strong>randomised</strong> — every participant gets a different set</li>
+            <li>You must be <strong>logged into your hallos account</strong> to take the quiz</li>
+            <li><strong>One attempt only</strong> — once you start, you cannot retake it</li>
+            <li>This link is <strong>personal to you</strong> — do not share it</li>
+            <li>Link expires <strong>72 hours</strong> after this email was sent</li>
+          </ul>
+        </div>
+
+        <!-- Competition structure -->
         <div style="background-color: #fff8e1; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f0c040;">
-          <h3 style="color: #1a1a2e; margin-top: 0;">🏅 How the Quiz Competition Works</h3>
-          <p style="color: #555; margin: 0 0 15px;">
-            Your journey to the retreat — and the chance to win <strong>₦1 million</strong> — goes through two exciting quiz rounds:
-          </p>
+          <h3 style="color: #1a1a2e; margin-top: 0;">🏅 How You Qualify for the Retreat</h3>
 
           <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #f0c040;">
-            <h4 style="color: #0f3460; margin: 0 0 6px;">Round 1 — The Open Challenge</h4>
+            <h4 style="color: #0f3460; margin: 0 0 6px;">Round 1 — The Qualifying Quiz (You are here)</h4>
             <p style="color: #555; margin: 0; font-size: 14px;">
-              All registered participants compete in a general knowledge quiz. The quiz will be taken online —
-              you will receive full details (link, date &amp; time) via email before it begins.
-              Top performers advance to Round 2.
+              All registered participants take this solo quiz. Top performers — ranked by score, then by speed —
+              advance to Round 2. Your results will be emailed to you immediately after you submit.
             </p>
           </div>
 
           <div style="background-color: #ffffff; padding: 15px; border-radius: 6px; border: 1px solid #f0c040;">
             <h4 style="color: #0f3460; margin: 0 0 6px;">Round 2 — The 1v1 Showdown</h4>
             <p style="color: #555; margin: 0; font-size: 14px;">
-              Top scorers from Round 1 are placed into a randomised 1v1 matchmaking bracket.
-              You play head-to-head — winner advances, loser exits.
-              The <strong>top 20 finalists</strong> earn their place at the all-expense-paid retreat
-              and compete for the <strong>₦1,000,000 cash prize</strong>.
+              Top scorers from Round 1 enter a live 1v1 bracket. You compete head-to-head until
+              <strong>20 finalists</strong> remain. Those 20 earn a fully-covered place at the retreat
+              and a shot at the <strong>₦1,000,000 cash prize</strong>.
             </p>
           </div>
         </div>
@@ -1142,29 +1140,31 @@ exports.sendCampaignRegistrationConfirmationEmail = async (to, firstName, regist
           <p style="margin: 5px 0; color: #444;"><strong>Name:</strong> ${firstName} ${lastName}</p>
           <p style="margin: 5px 0; color: #444;"><strong>Talent/Skill:</strong> ${talent}</p>
           <p style="margin: 5px 0; color: #444;"><strong>Location:</strong> ${location}</p>
-          <p style="margin: 5px 0; color: #444;"><strong>Registration Fee:</strong> ₦2,000 ✅ Paid</p>
+          <p style="margin: 5px 0; color: #444;"><strong>Registration Fee:</strong> ₦3,000 ✅ Paid</p>
         </div>
 
-        <!-- Next steps -->
-        <div style="background-color: #f0f4ff; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #667eea;">
-          <h3 style="color: #333; margin-top: 0;">📋 What Happens Next</h3>
-          <ol style="color: #444; line-height: 2.2; margin: 0; padding-left: 20px;">
-            <li>Watch your inbox — we'll send you the <strong>quiz date, time, and access link</strong> before Round 1 begins.</li>
-            <li>Prepare yourself! Brush up on general knowledge, critical thinking, and current affairs.</li>
-            <li>Ace Round 1 to advance to the 1v1 bracket in Round 2.</li>
-            <li>Top 20 finalists will be contacted directly with retreat logistics.</li>
-          </ol>
+        <!-- What the retreat covers -->
+        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #0f3460;">
+          <h3 style="color: #1a1a2e; margin-top: 0;">🚀 What the Retreat Covers</h3>
+          <ul style="color: #444; line-height: 2.2; margin: 0; padding-left: 20px;">
+            <li>🧠 Critical Thinking</li>
+            <li>📣 Marketing &amp; Brand Strategy</li>
+            <li>🦁 Leadership &amp; Communication</li>
+            <li>🎤 Public Speaking</li>
+            <li>🤝 Negotiation</li>
+            <li>💰 Financial Literacy</li>
+            <li>🤖 AI Prompting</li>
+            <li>⚙️ Habit Stacking &amp; more</li>
+          </ul>
         </div>
 
         <!-- Share CTA -->
         <div style="background-color: #1a1a2e; padding: 20px; border-radius: 8px; margin: 25px 0; text-align: center;">
-          <p style="color: #f0c040; font-size: 15px; margin: 0 0 12px; font-weight: bold;">
-            Know someone who deserves this?
-          </p>
+          <p style="color: #f0c040; font-size: 15px; margin: 0 0 12px; font-weight: bold;">Know someone who should compete?</p>
           <p style="color: #ccc; font-size: 14px; margin: 0 0 16px; line-height: 1.7;">
-            "Just registered for the Hallos Fastrack Your Growth to Success Retreat! 🚀<br/>
-            Two days, zero excuses, all expenses covered — plus a chance to win ₦1 million!<br/>
-            Register now at www.hallos.net before spots run out! #HallosRetreat #FastrackGrowth"
+            "Just registered for the Hallos Fastrack Retreat! 🚀<br/>
+            Take the qualifying quiz, beat the competition, win ₦1 million!<br/>
+            Register at www.hallos.net #HallosRetreat #FastrackGrowth"
           </p>
           <a href="https://www.hallos.net" style="background-color: #f0c040; color: #1a1a2e; padding: 12px 28px; text-decoration: none; border-radius: 25px; font-weight: bold; font-size: 14px; display: inline-block;">
             Share hallos.net
@@ -1172,7 +1172,7 @@ exports.sendCampaignRegistrationConfirmationEmail = async (to, firstName, regist
         </div>
 
         <p style="font-size: 15px; color: #444; line-height: 1.8; margin-top: 30px;">
-          We are rooting for you, ${firstName}. Give it your best and let's see you in the top 20! 🔥
+          You registered — now go <em>earn</em> it. Give the quiz everything you have and let's see you in the top 20. 🔥
         </p>
 
         <p style="font-size: 15px; margin-top: 30px;">
@@ -1189,7 +1189,96 @@ exports.sendCampaignRegistrationConfirmationEmail = async (to, firstName, regist
   await transporter.sendMail({
     from: `"hallos Retreat" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "🏆 You're In! Hallos Fastrack Your Growth to Success Retreat — Registration Confirmed",
+    subject: 'Registration Confirmed — Your Hallos Qualifying Quiz is Ready (72 Hours)',
+    html
+  });
+};
+
+/**
+ * HALLOS FASTRACK RETREAT — QUIZ RESULTS EMAIL
+ * Sent immediately after a participant submits their qualifying quiz.
+ * resultData: { lastName, score, totalQuestions, totalCorrect, totalTimeMs }
+ */
+exports.sendCampaignQuizResultsEmail = async (to, firstName, resultData) => {
+  const { lastName, score, totalQuestions, totalCorrect, totalTimeMs } = resultData;
+
+  const totalSeconds = Math.floor(totalTimeMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+  const percentage = Math.round((totalCorrect / totalQuestions) * 100);
+
+  const scoreColor = percentage >= 70 ? '#28a745' : percentage >= 50 ? '#f0c040' : '#dc3545';
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.6; max-width: 640px; margin: 0 auto;">
+
+      <!-- Header -->
+      <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%); padding: 40px 30px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="color: #f0c040; margin: 0 0 8px; font-size: 26px; letter-spacing: 1px;">✅ Quiz Submitted!</h1>
+        <p style="color: #ffffff; margin: 0; font-size: 16px; opacity: 0.9;">Hallos Fastrack Retreat — Round 1 Results</p>
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 35px 30px; background-color: #ffffff;">
+
+        <p style="font-size: 17px; color: #222;">Hi <strong>${firstName} ${lastName}</strong>,</p>
+
+        <p style="font-size: 15px; color: #444; line-height: 1.8;">
+          You've completed your Round 1 qualifying quiz. Here's how you did:
+        </p>
+
+        <!-- Score card -->
+        <div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; margin: 25px 0; text-align: center; border: 2px solid ${scoreColor};">
+          <p style="font-size: 14px; color: #666; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 1px;">Your Score</p>
+          <p style="font-size: 56px; font-weight: bold; color: ${scoreColor}; margin: 0 0 4px; line-height: 1;">${score}<span style="font-size: 24px; color: #999;">/${totalQuestions}</span></p>
+          <p style="font-size: 18px; color: #555; margin: 0 0 16px;">${percentage}% correct</p>
+          <div style="display: inline-block; background-color: #1a1a2e; color: #f0c040; padding: 8px 20px; border-radius: 20px; font-size: 14px; font-weight: bold;">
+            ⏱ Total Time: ${timeDisplay}
+          </div>
+        </div>
+
+        <!-- Stats breakdown -->
+        <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #28a745;">
+          <h3 style="color: #333; margin-top: 0;">📊 Your Breakdown</h3>
+          <p style="margin: 5px 0; color: #444;"><strong>Correct answers:</strong> ${totalCorrect} out of ${totalQuestions}</p>
+          <p style="margin: 5px 0; color: #444;"><strong>Wrong / Timed out:</strong> ${totalQuestions - totalCorrect}</p>
+          <p style="margin: 5px 0; color: #444;"><strong>Total time taken:</strong> ${timeDisplay}</p>
+          <p style="margin: 5px 0; color: #444;"><strong>Accuracy:</strong> ${percentage}%</p>
+        </div>
+
+        <!-- What happens next -->
+        <div style="background-color: #fff8e1; padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #f0c040;">
+          <h3 style="color: #1a1a2e; margin-top: 0;">⏳ What Happens Next</h3>
+          <p style="color: #555; margin: 0 0 12px;">
+            The campaign quiz is still open. Other participants are taking their qualifying quiz.
+            Once the Round 1 window closes, the top scorers (ranked by score, then by speed) will be selected
+            for Round 2.
+          </p>
+          <p style="color: #555; margin: 0;">
+            If you advance to <strong>Round 2</strong>, you will receive a separate email with details for
+            the live 1v1 bracket. The <strong>top 20 finalists</strong> earn a place at the retreat and
+            compete for the <strong>₦1,000,000 prize</strong>.
+          </p>
+        </div>
+
+        <p style="font-size: 15px; color: #444; line-height: 1.8; margin-top: 30px;">
+          You showed up. That already puts you ahead. Now we wait — stay sharp. 🔥
+        </p>
+
+        <p style="font-size: 15px; margin-top: 30px;">
+          <strong>The hallos Team</strong>
+        </p>
+      </div>
+
+      ${getSocialFooter()}
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"hallos Retreat" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: `Your Round 1 Results: ${score}/${totalQuestions} — Hallos Fastrack Retreat`,
     html
   });
 };

@@ -93,7 +93,8 @@ exports.handlePaystackWebhook = async (req, res) => {
         console.log('[Paystack Webhook] Processing campaign registration payment:', reference);
 
         const CampaignRegistration = require('../models/CampaignRegistration');
-        const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
+        const { createQuizSession } = require('../services/campaignQuizService');
+        const { sendCampaignQuizAccessEmail } = require('../utils/email');
 
         const registration = await CampaignRegistration.findOne({
           where: { paymentReference: reference }
@@ -113,19 +114,21 @@ exports.handlePaystackWebhook = async (req, res) => {
 
         if (!registration.emailSent) {
           try {
-            await sendCampaignRegistrationConfirmationEmail(
+            const { token } = await createQuizSession(registration.id, registration.email);
+            await sendCampaignQuizAccessEmail(
               registration.email,
               registration.firstName,
               {
                 lastName: registration.lastName,
                 talent: registration.talent,
-                location: registration.location
+                location: registration.location,
+                token
               }
             );
             await registration.update({ emailSent: true });
-            console.log('[Paystack Webhook] Campaign confirmation email sent to:', registration.email);
+            console.log('[Paystack Webhook] Campaign quiz access email sent to:', registration.email);
           } catch (emailErr) {
-            console.error('[Paystack Webhook] Campaign email failed:', emailErr.message);
+            console.error('[Paystack Webhook] Campaign quiz email failed:', emailErr.message);
           }
         }
 

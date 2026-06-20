@@ -134,7 +134,8 @@ exports.verifyPayment = async (req, res) => {
       console.log(`[Payment Verification] Detected campaign registration reference: ${reference}`);
 
       const CampaignRegistration = require('../models/CampaignRegistration');
-      const { sendCampaignRegistrationConfirmationEmail } = require('../utils/email');
+      const { createQuizSession } = require('../services/campaignQuizService');
+      const { sendCampaignQuizAccessEmail } = require('../utils/email');
       const { paystackClient } = require('../config/paystack');
 
       const registration = await CampaignRegistration.findOne({ where: { paymentReference: reference } });
@@ -172,13 +173,14 @@ exports.verifyPayment = async (req, res) => {
       await registration.update({ paymentStatus: 'completed' });
 
       if (!registration.emailSent) {
-        sendCampaignRegistrationConfirmationEmail(
-          registration.email,
-          registration.firstName,
-          { lastName: registration.lastName, talent: registration.talent, location: registration.location }
-        )
+        createQuizSession(registration.id, registration.email)
+          .then(({ token }) => sendCampaignQuizAccessEmail(
+            registration.email,
+            registration.firstName,
+            { lastName: registration.lastName, talent: registration.talent, location: registration.location, token }
+          ))
           .then(() => registration.update({ emailSent: true }))
-          .catch(err => console.error('[Campaign] Confirmation email failed:', err.message));
+          .catch(err => console.error('[Campaign] Quiz access email failed:', err.message));
       }
 
       console.log(`[Payment Verification] Campaign registration confirmed: ${reference}`);
