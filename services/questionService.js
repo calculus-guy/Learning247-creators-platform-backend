@@ -151,23 +151,24 @@ class QuestionService {
       return null;
     };
 
+    // Accept both "Option A" / "OptionA" and bare letter "A" column headers
     const questionText = getField(row, 'Question');
-    const optionA = getField(row, 'Option A', 'OptionA');
-    const optionB = getField(row, 'Option B', 'OptionB');
-    const optionC = getField(row, 'Option C', 'OptionC');
-    const optionD = getField(row, 'Option D', 'OptionD');
-    const optionE = getField(row, 'Option E', 'OptionE'); // optional — 5-option questions
+    const optionA = getField(row, 'Option A', 'OptionA', 'A');
+    const optionB = getField(row, 'Option B', 'OptionB', 'B');
+    const optionC = getField(row, 'Option C', 'OptionC', 'C');
+    const optionD = getField(row, 'Option D', 'OptionD', 'D');
+    const optionE = getField(row, 'Option E', 'OptionE', 'E'); // optional — 5-option questions
     const rawAnswer = getField(row, 'Correct Answer', 'CorrectAnswer');
-    const rawDifficulty = getField(row, 'Difficulty');
+    // Difficulty is optional — defaults to 'medium' if column is absent
+    const rawDifficulty = getField(row, 'Difficulty') || 'medium';
 
     const missing = [];
     if (!questionText) missing.push('Question');
-    if (!optionA) missing.push('Option A');
-    if (!optionB) missing.push('Option B');
-    if (!optionC) missing.push('Option C');
-    if (!optionD) missing.push('Option D');
+    if (!optionA) missing.push('Option A / A');
+    if (!optionB) missing.push('Option B / B');
+    if (!optionC) missing.push('Option C / C');
+    if (!optionD) missing.push('Option D / D');
     if (!rawAnswer) missing.push('Correct Answer');
-    if (!rawDifficulty) missing.push('Difficulty');
 
     if (missing.length > 0) {
       return { valid: false, error: `Missing required fields: ${missing.join(', ')}` };
@@ -180,7 +181,7 @@ class QuestionService {
     const options = { a: optionA, b: optionB, c: optionC, d: optionD };
     if (optionE) options.e = optionE;
 
-    // Validate correct answer — accept a/b/c/d/e or OptionA-E variants
+    // Accept a/b/c/d/e, A/B/C/D/E, OptionA-E, "Option A"-"Option E"
     const answerMap = {
       'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', 'e': 'e',
       'optiona': 'a', 'optionb': 'b', 'optionc': 'c', 'optiond': 'd', 'optione': 'e',
@@ -188,12 +189,12 @@ class QuestionService {
     };
     const correctAnswer = answerMap[rawAnswer.toLowerCase()];
     if (!correctAnswer) {
-      return { valid: false, error: `Correct Answer must be a/b/c/d/e or OptionA-E. Got: "${rawAnswer}"` };
+      return { valid: false, error: `Correct Answer must be A/B/C/D/E or OptionA-E. Got: "${rawAnswer}"` };
     }
 
     // If correct answer is 'e', Option E must exist
     if (correctAnswer === 'e' && !optionE) {
-      return { valid: false, error: 'Correct Answer is "e" but Option E is missing' };
+      return { valid: false, error: 'Correct Answer is "E" but Option E / E column is missing or empty' };
     }
 
     const difficulty = rawDifficulty.toLowerCase();
