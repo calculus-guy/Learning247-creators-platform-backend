@@ -158,7 +158,7 @@ async function getValidSession(token) {
 
 /**
  * Start a session — associate userId, mark active, record startedAt.
- * Returns the 20 questions with shuffled options (NO correct answers).
+ * Returns the 20 questions with shuffled options and question text (NO correct answers).
  */
 async function startSession(token, userId) {
   const session = await getValidSession(token);
@@ -172,7 +172,7 @@ async function startSession(token, userId) {
 
   // Already active for this same user — return current state (browser refresh)
   if (session.status === 'active' && session.userId === userId) {
-    return buildSessionResponse(session);
+    return await buildSessionResponse(session);
   }
 
   await session.update({
@@ -181,18 +181,29 @@ async function startSession(token, userId) {
     startedAt: new Date()
   });
 
-  return buildSessionResponse(session);
+  return await buildSessionResponse(session);
 }
 
 /**
- * Build the response payload for start/status — strips correct answers
+ * Build the response payload for start — fetches question text, strips correct answers.
+ * Question text is fetched fresh from DB each time (not stored in session).
  */
-function buildSessionResponse(session) {
+async function buildSessionResponse(session) {
+  // Fetch question texts in one query, maintaining order from session.questions
+  const questionRows = await QuizQuestion.findAll({
+    where: { id: session.questions },
+    attributes: ['id', 'questionText']
+  });
+
+  const textMap = {};
+  for (const q of questionRows) textMap[q.id] = q.questionText;
+
   const questionList = session.questions.map((questionId, index) => {
     const data = session.sessionData[questionId];
     return {
       questionIndex: index,
       questionId,
+      questionText: textMap[questionId] || '',
       shuffledOptions: data.shuffledOptions
       // correctAnswer intentionally omitted
     };
