@@ -22,7 +22,7 @@ async function run() {
 
   const info = await transporter.sendMail({
     from: `"hallos Team" <${process.env.EMAIL_USER}>`,
-    to: 'sakariyauabdullateef993@gmail.com',
+    to: 'osejialexander77@gmail.com',
     subject: 'hallos Email Test — support@hallos.net',
     html: `
       <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:24px">
